@@ -1,0 +1,22 @@
+# Build output
+/bin/
+*.exe
+*.test
+
+# Test coverage
+*.out
+coverage.html
+
+# Local environment (secrets). Commit .env.example instead.
+.env
+.env.*
+!.env.example
+
+# Local file storage (uploaded PDFs, images)
+/storage/
+
+# Editors and OS
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
