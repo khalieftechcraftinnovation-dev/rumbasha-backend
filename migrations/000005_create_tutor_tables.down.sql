@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS tutor_students;
-DROP TABLE IF EXISTS tutors;

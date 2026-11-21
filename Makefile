@@ -1,4 +1,4 @@
-.PHONY: run build test vet fmt tidy check migrate-up migrate-down migrate-version
+.PHONY: run build test vet fmt tidy check migrate-up migrate-down migrate-version seed
 
 # Menjalankan API (membaca file .env kalau ada)
 run:
@@ -39,3 +39,7 @@ migrate-down:
 # Melihat versi migration saat ini
 migrate-version:
 	go run ./cmd/migrate version
+
+# Mengisi data dummy (akun tiap role, paket, coin). Tidak bisa dijalankan di production.
+seed:
+	go run ./cmd/seed

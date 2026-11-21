@@ -9,17 +9,21 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
 )
 
 // Handlers berisi semua handler aplikasi.
 // Setiap ada domain baru, tambahkan field-nya di sini.
 type Handlers struct {
+	Auth    *handler.AuthHandler
 	Subject *handler.SubjectHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
-func New(h Handlers) *gin.Engine {
+// jwtSecret dipakai middleware untuk memeriksa access token.
+func New(h Handlers, jwtSecret string) *gin.Engine {
 	// Supaya pesan error validasi memakai nama field JSON ("per_page"),
 	// bukan nama field struct Go ("PerPage").
 	response.UseJSONFieldNames()
@@ -37,14 +41,29 @@ func New(h Handlers) *gin.Engine {
 		response.Success(c, http.StatusOK, "OK", nil)
 	})
 
+	// Middleware yang sering dipakai, disiapkan sekali di sini.
+	requireAuth := middleware.RequireAuth(jwtSecret)
+	adminOnly := middleware.RequireRole(model.RoleSuperAdmin, model.RoleAdmin)
+
 	api := r.Group("/api/v1")
 
-	// Subject (mata pelajaran)
-	api.GET("/subjects", h.Subject.List)
-	api.POST("/subjects", h.Subject.Create)
-	api.GET("/subjects/:id", h.Subject.GetByID)
-	api.PUT("/subjects/:id", h.Subject.Update)
-	api.DELETE("/subjects/:id", h.Subject.Delete)
+	// ----- Publik (tanpa login) -----
+	api.POST("/auth/login", h.Auth.Login)
+	api.POST("/auth/refresh", h.Auth.Refresh)
+	api.POST("/auth/logout", h.Auth.Logout)
+
+	// ----- Wajib login -----
+	// Semua route di dalam grup ini melewati requireAuth lebih dulu.
+	private := api.Group("", requireAuth)
+
+	private.GET("/auth/me", h.Auth.Me)
+
+	// Subject (mata pelajaran): semua user boleh melihat, hanya admin yang boleh mengubah.
+	private.GET("/subjects", h.Subject.List)
+	private.GET("/subjects/:id", h.Subject.GetByID)
+	private.POST("/subjects", adminOnly, h.Subject.Create)
+	private.PUT("/subjects/:id", adminOnly, h.Subject.Update)
+	private.DELETE("/subjects/:id", adminOnly, h.Subject.Delete)
 
 	return r
 }

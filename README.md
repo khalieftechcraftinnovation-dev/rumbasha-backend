@@ -5,7 +5,7 @@ Backend API Rumbasha E-Learning dengan Go, framework [Gin](https://gin-gonic.com
 ## Persiapan (sekali saja)
 
 1. **Go 1.27.** Kalau `go version` masih versi lama, jalankan: `go env -w GOTOOLCHAIN=go1.27.4`
-2. **File `.env`.** Salin dari contoh, lalu isi `DB_PASSWORD`:
+2. **File `.env`.** Salin dari contoh, lalu isi `DB_PASSWORD` dan `JWT_SECRET` (buat dengan `openssl rand -hex 32`):
 
    ```bash
    cp .env.example .env
@@ -17,6 +17,12 @@ Backend API Rumbasha E-Learning dengan Go, framework [Gin](https://gin-gonic.com
 
    ```bash
    make migrate-up
+   ```
+
+5. **Isi data dummy** (akun tiap role, paket, coin). Hanya untuk development, ditolak kalau `APP_ENV=production`:
+
+   ```bash
+   make seed
    ```
 
 ## Menjalankan
@@ -37,6 +43,21 @@ curl http://localhost:8080/health
 | `make migrate-up`      | Menjalankan migration yang belum               |
 | `make migrate-down`    | Membatalkan 1 migration terakhir               |
 | `make migrate-version` | Melihat versi migration saat ini               |
+| `make seed`            | Mengisi data dummy (sekali, aman diulang)      |
+
+## Akun dummy
+
+Setelah `make seed`, semua akun memakai password **`password123`**. Isinya ada di [cmd/seed/dummy_data.sql](cmd/seed/dummy_data.sql).
+
+| Username         | Role        | Keterangan                                                              |
+|------------------|-------------|-------------------------------------------------------------------------|
+| `superadmin`     | super_admin | Semua cabang                                                            |
+| `admin.sbytimur` | admin       | Cabang Surabaya Timur                                                   |
+| `tutor.rina`     | tutor       | Cabang Surabaya Timur                                                   |
+| `siswa.budi`     | student     | SMP Kelas 7, paket **offline** Reguler SMP bulan ini, 100 coin          |
+| `siswa.citra`    | student     | SD Kelas 5, paket **online** Reguler SD aktif + akses khusus RUMATH     |
+| `siswa.dimas`    | student     | SMA Kelas 10, paket online **sudah expired** kemarin                    |
+| `siswa.eka`      | student     | PraSD Nol Besar, akun **nonaktif** (login ditolak)                      |
 
 ## Struktur folder
 
@@ -44,19 +65,47 @@ curl http://localhost:8080/health
 cmd/
   api/main.go             Titik awal aplikasi: konek DB, susun layer, jalankan server.
   migrate/main.go         Program untuk menjalankan migration.
+  seed/                   Program + file SQL data dummy.
 migrations/               File SQL pembuat tabel (*.up.sql & *.down.sql).
 internal/
   router/router.go        ROUTE       Semua URL → handler ada di satu file ini.
+  middleware/             Cek login (RequireAuth) dan role (RequireRole) sebelum handler.
   handler/                HANDLER     Baca request, panggil service, kirim response.
   service/                SERVICE     Aturan bisnis.
   repository/             REPOSITORY  Query database (GORM atau native SQL).
   model/                  Struct yang mewakili tabel + daftar error.
   dto/                    Bentuk request & response JSON.
+  token/                  Membuat & membaca access token (JWT) dan refresh token.
   response/               Helper format JSON (sukses, error, validasi).
   database/               Koneksi PostgreSQL + runner migration.
   config/                 Membaca konfigurasi dari .env.
   testutil/               Helper untuk test (database test).
 ```
+
+## Login & sesi
+
+```text
+POST /auth/login   {username, password}
+  ← access_token  (JWT, 15 menit)          → kirim di header: Authorization: Bearer <access_token>
+  ← refresh_token (sampai tgl 1 bulan depan, 00:00 WIB)
+
+access_token habis? → POST /auth/refresh {refresh_token} → dapat pasangan token baru
+keluar             → POST /auth/logout  {refresh_token}
+```
+
+- **Semua user wajib login ulang setiap tanggal 1, jam 00:00 WIB.** Refresh tidak bisa memperpanjang sesi melewati batas itu. Ini berkaitan dengan paket offline yang dibayar manual setiap bulan di bimbel.
+- **Paket dicek setiap hari** di `student_subscriptions` memakai tanggal hari ini (WIB), untuk paket offline maupun online. Paket yang habis tanggal 15 otomatis tidak berlaku mulai tanggal 16, tanpa perlu login ulang. Lihat `GET /auth/me`.
+- **Refresh token sekali pakai.** Setiap refresh menukar token lama dengan yang baru; token lama langsung tidak berlaku.
+- Di database hanya disimpan **hash** refresh token dan **hash bcrypt** password.
+
+Melindungi endpoint di [router.go](internal/router/router.go):
+
+```go
+private := api.Group("", requireAuth)                    // wajib login
+private.POST("/subjects", adminOnly, h.Subject.Create)   // wajib login + role admin/super_admin
+```
+
+Di handler, ID dan role user yang login dibaca dengan `middleware.GetUserID(c)` dan `middleware.GetRole(c)`.
 
 ## Alur request
 
@@ -94,17 +143,17 @@ db.Raw(`SELECT * FROM subjects WHERE code = '` + code + `'`) // ❌ SQL injectio
 
 Semua tabel ada di satu schema (`public`), jadi cukup ditulis `SELECT ... FROM users` tanpa awalan schema.
 
-| Domain     | Tabel                                                                                          |
-|------------|------------------------------------------------------------------------------------------------|
-| Master     | `branches` (cabang), `master_data_items` (data acuan generik: jenjang, kelas)                  |
-| Auth/akun  | `users`, `roles`, `permissions`, `role_permissions`, `refresh_tokens`, `password_reset_tokens` |
-| Siswa      | `students` (data tambahan siswa: kode siswa, tanggal lahir, target sekolah)                    |
-| Tutor      | `tutors` (profil tutor), `tutor_students` (siswa bimbingan)                                    |
-| Paket      | `features`, `subscription_plans`, `subscription_plan_prices`, `subscription_plan_features`,    |
-|            | `student_subscriptions`, `subscription_histories`, `student_feature_overrides`                 |
-| Coin       | `coin_packages`, `student_coin_balances`, `coin_transactions`, `coin_purchases`,               |
-|            | `daily_quota_usages`                                                                           |
-| Lain-lain  | `subjects` (contoh awal), `schema_migrations` (catatan versi migration, jangan diubah manual)  |
+| Domain    | Tabel                                                                                               |
+|-----------|-----------------------------------------------------------------------------------------------------|
+| Master    | `branches` (cabang), `master_data_items` (data acuan generik: jenjang & kelas)                      |
+| Akun      | `users` (semua akun + role), `refresh_tokens` (sesi login)                                          |
+| Siswa     | `students` (kode siswa, tanggal lahir, target sekolah, saldo coin)                                  |
+| Paket     | `subscription_plans` (paket + harga + akses fitur), `student_subscriptions` (paket dibeli/riwayat), |
+|           | `student_feature_overrides` (akses khusus per siswa)                                                |
+| Coin      | `coin_packages` (paket isi coin), `coin_transactions` (riwayat coin, termasuk pembelian)            |
+| Lain-lain | `subjects` (contoh awal), `schema_migrations` (catatan versi migration, jangan diubah manual)       |
+
+Tutor adalah user dengan `role = 'tutor'` dan boleh mengajar siswa mana pun. Jatah gratis Daily Quiz berlaku global untuk semua siswa dan diatur di `.env` (`DAILY_QUIZ_FREE_QUOTA`, `DAILY_QUIZ_COIN_COST`).
 
 Supaya tetap mudah dipecah jadi microservice nanti: data milik satu domain hanya ditulis oleh repository domain itu sendiri.
 
@@ -142,14 +191,20 @@ Kalau migration gagal di tengah jalan (status `dirty`), perbaiki tabelnya, lalu 
 
 ## Endpoint
 
-| Method | URL                      | Fungsi              |
-|--------|--------------------------|---------------------|
-| GET    | `/health`                | Cek server hidup    |
-| GET    | `/api/v1/subjects`       | Daftar (pagination) |
-| POST   | `/api/v1/subjects`       | Tambah              |
-| GET    | `/api/v1/subjects/:id`   | Detail              |
-| PUT    | `/api/v1/subjects/:id`   | Ubah                |
-| DELETE | `/api/v1/subjects/:id`   | Hapus               |
+| Method | URL                    | Akses        | Fungsi                                          |
+|--------|------------------------|--------------|-------------------------------------------------|
+| GET    | `/health`              | Publik       | Cek server hidup                                |
+| POST   | `/api/v1/auth/login`   | Publik       | Login dengan username + password                |
+| POST   | `/api/v1/auth/refresh` | Publik       | Tukar refresh token dengan token baru           |
+| POST   | `/api/v1/auth/logout`  | Publik       | Tutup sesi                                      |
+| GET    | `/api/v1/auth/me`      | Login        | Data user; untuk siswa + paket & fitur hari ini |
+| GET    | `/api/v1/subjects`     | Login        | Daftar subject (pagination)                     |
+| GET    | `/api/v1/subjects/:id` | Login        | Detail subject                                  |
+| POST   | `/api/v1/subjects`     | Admin        | Tambah subject                                  |
+| PUT    | `/api/v1/subjects/:id` | Admin        | Ubah subject                                    |
+| DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
+
+"Admin" = role `admin` atau `super_admin`.
 
 ## Format response
 
@@ -158,4 +213,4 @@ Kalau migration gagal di tengah jalan (status `dirty`), perbaiki tabelnya, lalu 
 { "success": false, "message": "Validasi gagal", "errors": [{ "field": "code", "message": "wajib diisi" }] }
 ```
 
-Status: 422 validasi gagal, 400 JSON rusak, 404 data tidak ada, 409 data kembar, 500 error server (detail hanya di log).
+Status: 401 belum login / sesi habis, 403 tidak punya akses / akun nonaktif, 422 validasi gagal, 400 JSON rusak, 404 data tidak ada, 409 data kembar, 500 error server (detail hanya di log).

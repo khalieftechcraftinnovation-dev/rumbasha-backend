@@ -2,9 +2,12 @@
 package config
 
 import (
+	"log"
 	"net"
 	"net/url"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -12,7 +15,8 @@ import (
 // Config berisi semua pengaturan aplikasi.
 // Tambahkan field di sini saat butuh pengaturan baru.
 type Config struct {
-	Port string
+	AppEnv string // development, staging, atau production
+	Port   string
 
 	DBHost     string
 	DBPort     string
@@ -21,6 +25,18 @@ type Config struct {
 	DBName     string
 	DBSSLMode  string
 	DBDebug    bool // true = semua query SQL dicetak di terminal
+
+	JWTSecret    string        // kunci rahasia untuk menandatangani access token
+	JWTAccessTTL time.Duration // masa berlaku access token, contoh 15m
+
+	// Aturan Daily Quiz, berlaku sama untuk semua siswa (BR-019).
+	DailyQuizFreeQuota int // jatah gratis per hari
+	DailyQuizCoinCost  int // biaya coin per quiz setelah jatah gratis habis
+}
+
+// IsProduction bernilai true kalau aplikasi berjalan di production.
+func (c Config) IsProduction() bool {
+	return c.AppEnv == "production"
 }
 
 // Load membaca file .env (kalau ada), lalu mengisi Config dari environment variable.
@@ -30,7 +46,8 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port: getEnv("APP_PORT", "8080"),
+		AppEnv: getEnv("APP_ENV", "development"),
+		Port:   getEnv("APP_PORT", "8080"),
 
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),
@@ -39,6 +56,12 @@ func Load() Config {
 		DBName:     getEnv("DB_NAME", "rumbasha"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 		DBDebug:    getEnv("DB_DEBUG", "false") == "true",
+
+		JWTSecret:    getEnv("JWT_SECRET", ""),
+		JWTAccessTTL: getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
+
+		DailyQuizFreeQuota: getEnvInt("DAILY_QUIZ_FREE_QUOTA", 2),
+		DailyQuizCoinCost:  getEnvInt("DAILY_QUIZ_COIN_COST", 10),
 	}
 }
 
@@ -65,4 +88,32 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvInt sama seperti getEnv, tapi untuk angka.
+// Aplikasi langsung berhenti kalau nilainya bukan angka, supaya salah
+// konfigurasi ketahuan saat start, bukan diam-diam memakai nilai default.
+func getEnvInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	number, err := strconv.Atoi(value)
+	if err != nil {
+		log.Fatalf("konfigurasi %s harus berupa angka, tapi isinya %q", key, value)
+	}
+	return number
+}
+
+// getEnvDuration sama seperti getEnv, tapi untuk durasi, contoh "15m", "1h".
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		log.Fatalf("konfigurasi %s harus berupa durasi (contoh 15m), tapi isinya %q", key, value)
+	}
+	return duration
 }

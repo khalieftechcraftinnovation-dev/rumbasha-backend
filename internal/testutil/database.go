@@ -44,29 +44,20 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 
 	// Kosongkan semua tabel supaya setiap test mulai dari data kosong.
 	// Tambahkan tabel baru di sini setiap ada migration baru.
-	// JANGAN masukkan tabel berisi data awal dari migration (roles, permissions,
-	// role_permissions, master_data_items, features), karena isinya tidak dibuat ulang.
+	// JANGAN masukkan master_data_items: isinya data awal dari migration
+	// (jenjang & kelas) yang tidak dibuat ulang.
 	err = db.Exec(`
 		TRUNCATE
 			subjects,
 			branches,
 			users,
 			refresh_tokens,
-			password_reset_tokens,
 			students,
-			tutors,
-			tutor_students,
 			subscription_plans,
-			subscription_plan_prices,
-			subscription_plan_features,
 			student_subscriptions,
-			subscription_histories,
 			student_feature_overrides,
 			coin_packages,
-			student_coin_balances,
-			coin_transactions,
-			coin_purchases,
-			daily_quota_usages
+			coin_transactions
 		RESTART IDENTITY`).Error
 	if err != nil {
 		t.Fatalf("gagal mengosongkan tabel: %v", err)

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Data tambahan khusus siswa. (BRD 3.2, 3.14, 8.2)
+-- Data tambahan khusus siswa. (BRD 3.2, 3.9, 3.14, 8.2)
 -- Username, nama, HP orang tua, asal sekolah, jenjang, kelas, cabang, dan status
 -- siswa ada di tabel users.
 -- ============================================================================
@@ -14,6 +14,11 @@ CREATE TABLE students (
                   DEFAULT ('STU' || LPAD(nextval('student_code_seq')::TEXT, 6, '0')),
     date_of_birth DATE,
     target_school VARCHAR(150),  -- contoh: "SMAN 5 Surabaya" (FR-STU-011)
+
+    -- Saldo coin saat ini. Tidak boleh negatif (BR-010).
+    -- Setiap perubahan saldo WAJIB dicatat juga di coin_transactions (BR-012).
+    coin_balance  INT          NOT NULL DEFAULT 0 CHECK (coin_balance >= 0),
+
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -24,3 +29,4 @@ ALTER SEQUENCE student_code_seq OWNED BY students.student_code;
 COMMENT ON TABLE  students               IS 'Data tambahan siswa (1 baris per user ber-role student)';
 COMMENT ON COLUMN students.student_code  IS 'Kode siswa otomatis (STU000001). Saat insert, jangan diisi';
 COMMENT ON COLUMN students.target_school IS 'Target sekolah tujuan, contoh SMAN 5 Surabaya';
+COMMENT ON COLUMN students.coin_balance  IS 'Saldo coin saat ini (tidak boleh negatif). Riwayatnya di coin_transactions';
