@@ -1,4 +1,10 @@
-package model
+// Package login (model) berisi struct data untuk fitur login: user dan sesi login.
+// Satu struct model mewakili satu tabel di database.
+//
+// Di package lain, import dengan alias loginmodel:
+//
+//	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+package login
 
 import (
 	"errors"

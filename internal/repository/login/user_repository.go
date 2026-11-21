@@ -1,4 +1,9 @@
-package repository
+// Package login (repository) mengakses tabel untuk fitur login: users dan refresh_tokens.
+//
+// Di package lain, import dengan alias loginrepo:
+//
+//	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
+package login
 
 import (
 	"context"
@@ -7,7 +12,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
 )
 
 // UserRepository mengakses tabel users.
@@ -23,27 +28,27 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 // FindByUsername mencari user (yang belum dihapus) berdasarkan username. [GORM]
 //
 //	SELECT * FROM users WHERE username = ? AND deleted_at IS NULL LIMIT 1
-func (r *UserRepository) FindByUsername(ctx context.Context, username string) (model.User, error) {
-	var user model.User
+func (r *UserRepository) FindByUsername(ctx context.Context, username string) (loginmodel.User, error) {
+	var user loginmodel.User
 	err := r.db.WithContext(ctx).
 		Where("username = ? AND deleted_at IS NULL", username).
 		Take(&user).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return model.User{}, model.ErrUserNotFound
+		return loginmodel.User{}, loginmodel.ErrUserNotFound
 	}
 	return user, err
 }
 
 // FindByID mencari user (yang belum dihapus) berdasarkan ID. [GORM]
-func (r *UserRepository) FindByID(ctx context.Context, id string) (model.User, error) {
-	var user model.User
+func (r *UserRepository) FindByID(ctx context.Context, id string) (loginmodel.User, error) {
+	var user loginmodel.User
 	err := r.db.WithContext(ctx).
 		Where("id = ? AND deleted_at IS NULL", id).
 		Take(&user).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return model.User{}, model.ErrUserNotFound
+		return loginmodel.User{}, loginmodel.ErrUserNotFound
 	}
 	return user, err
 }
@@ -53,7 +58,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (model.User, e
 //	UPDATE users SET last_login_at = ? WHERE id = ?
 func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string, at time.Time) error {
 	return r.db.WithContext(ctx).
-		Model(&model.User{}).
+		Model(&loginmodel.User{}).
 		Where("id = ?", userID).
 		UpdateColumn("last_login_at", at).Error
 }

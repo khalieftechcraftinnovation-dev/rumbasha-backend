@@ -1,6 +1,10 @@
-// Package router adalah layer ROUTE: daftar semua URL dan handler-nya.
-// Semua route ada di file ini (seperti routes/api.php di Laravel), jadi
-// kalau mau tahu sebuah URL ditangani oleh fungsi apa, cukup cari di sini.
+// Package router adalah layer ROUTE.
+//
+// File ini adalah pintu utamanya: membuat Gin, memasang middleware global,
+// lalu memanggil route setiap fitur. Daftar URL per fitur ada di subfolder:
+//
+//	router/login/login_routes.go      → /auth/...
+//	router/subject/subject_routes.go  → /subjects/...
 package router
 
 import (
@@ -8,17 +12,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler"
+	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
+	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
+	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
+	subjectrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subject"
 )
 
 // Handlers berisi semua handler aplikasi.
-// Setiap ada domain baru, tambahkan field-nya di sini.
+// Setiap ada fitur baru, tambahkan field-nya di sini.
 type Handlers struct {
-	Auth    *handler.AuthHandler
-	Subject *handler.SubjectHandler
+	Login   *loginhandler.LoginHandler
+	Subject *subjecthandler.SubjectHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
@@ -41,29 +47,14 @@ func New(h Handlers, jwtSecret string) *gin.Engine {
 		response.Success(c, http.StatusOK, "OK", nil)
 	})
 
-	// Middleware yang sering dipakai, disiapkan sekali di sini.
-	requireAuth := middleware.RequireAuth(jwtSecret)
-	adminOnly := middleware.RequireRole(model.RoleSuperAdmin, model.RoleAdmin)
+	// public  = boleh diakses tanpa login
+	// private = wajib login (semua route di dalamnya melewati RequireAuth lebih dulu)
+	public := r.Group("/api/v1")
+	private := r.Group("/api/v1", middleware.RequireAuth(jwtSecret))
 
-	api := r.Group("/api/v1")
-
-	// ----- Publik (tanpa login) -----
-	api.POST("/auth/login", h.Auth.Login)
-	api.POST("/auth/refresh", h.Auth.Refresh)
-	api.POST("/auth/logout", h.Auth.Logout)
-
-	// ----- Wajib login -----
-	// Semua route di dalam grup ini melewati requireAuth lebih dulu.
-	private := api.Group("", requireAuth)
-
-	private.GET("/auth/me", h.Auth.Me)
-
-	// Subject (mata pelajaran): semua user boleh melihat, hanya admin yang boleh mengubah.
-	private.GET("/subjects", h.Subject.List)
-	private.GET("/subjects/:id", h.Subject.GetByID)
-	private.POST("/subjects", adminOnly, h.Subject.Create)
-	private.PUT("/subjects/:id", adminOnly, h.Subject.Update)
-	private.DELETE("/subjects/:id", adminOnly, h.Subject.Delete)
+	// Daftarkan route setiap fitur. Tambahkan baris baru setiap ada fitur baru.
+	loginrouter.Register(public, private, h.Login)
+	subjectrouter.Register(private, h.Subject)
 
 	return r
 }

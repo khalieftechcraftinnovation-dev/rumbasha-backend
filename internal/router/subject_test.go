@@ -8,14 +8,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
 )
 
 // createSubject membuat subject lewat API (sebagai admin) dan mengembalikan ID-nya.
 func createSubject(t *testing.T, r *gin.Engine, code, name string) string {
 	t.Helper()
 	res := sendRequest(r, http.MethodPost, "/api/v1/subjects",
-		`{"code":"`+code+`","name":"`+name+`"}`, tokenFor(t, model.RoleAdmin))
+		`{"code":"`+code+`","name":"`+name+`"}`, tokenFor(t, loginmodel.RoleAdmin))
 	if res.Code != http.StatusCreated {
 		t.Fatalf("gagal membuat subject: status %d, body: %s", res.Code, res.Body)
 	}
@@ -47,7 +47,7 @@ func TestSubject_TanpaLoginDitolak(t *testing.T) {
 
 func TestSubject_SiswaBolehMelihatTapiTidakBolehMengubah(t *testing.T) {
 	r, _ := setupRouter(t)
-	studentToken := tokenFor(t, model.RoleStudent)
+	studentToken := tokenFor(t, loginmodel.RoleStudent)
 
 	res := sendRequest(r, http.MethodGet, "/api/v1/subjects", "", studentToken)
 	if res.Code != http.StatusOK {
@@ -62,7 +62,7 @@ func TestSubject_SiswaBolehMelihatTapiTidakBolehMengubah(t *testing.T) {
 
 func TestCreateSubject_KodeDijadikanHurufBesar(t *testing.T) {
 	r, _ := setupRouter(t)
-	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"code":" mtk ","name":"Matematika"}`, tokenFor(t, model.RoleAdmin))
+	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"code":" mtk ","name":"Matematika"}`, tokenFor(t, loginmodel.RoleAdmin))
 
 	if res.Code != http.StatusCreated {
 		t.Fatalf("status = %d, seharusnya 201. body: %s", res.Code, res.Body)
@@ -74,7 +74,7 @@ func TestCreateSubject_KodeDijadikanHurufBesar(t *testing.T) {
 
 func TestCreateSubject_ValidasiGagal(t *testing.T) {
 	r, _ := setupRouter(t)
-	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"name":"Matematika"}`, tokenFor(t, model.RoleAdmin))
+	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"name":"Matematika"}`, tokenFor(t, loginmodel.RoleAdmin))
 
 	if res.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, seharusnya 422. body: %s", res.Code, res.Body)
@@ -86,7 +86,7 @@ func TestCreateSubject_ValidasiGagal(t *testing.T) {
 
 func TestCreateSubject_JSONRusak(t *testing.T) {
 	r, _ := setupRouter(t)
-	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"code":`, tokenFor(t, model.RoleAdmin))
+	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"code":`, tokenFor(t, loginmodel.RoleAdmin))
 
 	if res.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, seharusnya 400. body: %s", res.Code, res.Body)
@@ -97,7 +97,7 @@ func TestCreateSubject_KodeKembar(t *testing.T) {
 	r, _ := setupRouter(t)
 	createSubject(t, r, "MTK", "Matematika")
 
-	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"code":"mtk","name":"Lagi"}`, tokenFor(t, model.RoleAdmin))
+	res := sendRequest(r, http.MethodPost, "/api/v1/subjects", `{"code":"mtk","name":"Lagi"}`, tokenFor(t, loginmodel.RoleAdmin))
 
 	if res.Code != http.StatusConflict {
 		t.Errorf("status = %d, seharusnya 409. body: %s", res.Code, res.Body)
@@ -108,7 +108,7 @@ func TestGetSubject_Berhasil(t *testing.T) {
 	r, _ := setupRouter(t)
 	id := createSubject(t, r, "MTK", "Matematika")
 
-	res := sendRequest(r, http.MethodGet, "/api/v1/subjects/"+id, "", tokenFor(t, model.RoleStudent))
+	res := sendRequest(r, http.MethodGet, "/api/v1/subjects/"+id, "", tokenFor(t, loginmodel.RoleStudent))
 
 	if res.Code != http.StatusOK {
 		t.Errorf("status = %d, seharusnya 200. body: %s", res.Code, res.Body)
@@ -117,7 +117,7 @@ func TestGetSubject_Berhasil(t *testing.T) {
 
 func TestGetSubject_TidakDitemukan(t *testing.T) {
 	r, _ := setupRouter(t)
-	studentToken := tokenFor(t, model.RoleStudent)
+	studentToken := tokenFor(t, loginmodel.RoleStudent)
 
 	// ID berformat UUID yang valid, tapi tidak ada di database.
 	res := sendRequest(r, http.MethodGet, "/api/v1/subjects/00000000-0000-0000-0000-000000000000", "", studentToken)
@@ -138,7 +138,7 @@ func TestListSubject_Pagination(t *testing.T) {
 	createSubject(t, r, "B", "Mapel B")
 	createSubject(t, r, "C", "Mapel C")
 
-	res := sendRequest(r, http.MethodGet, "/api/v1/subjects?page=1&per_page=2", "", tokenFor(t, model.RoleStudent))
+	res := sendRequest(r, http.MethodGet, "/api/v1/subjects?page=1&per_page=2", "", tokenFor(t, loginmodel.RoleStudent))
 
 	if res.Code != http.StatusOK {
 		t.Fatalf("status = %d, seharusnya 200. body: %s", res.Code, res.Body)
@@ -155,7 +155,7 @@ func TestListSubject_Pagination(t *testing.T) {
 
 func TestListSubject_PerPageTerlaluBesar(t *testing.T) {
 	r, _ := setupRouter(t)
-	res := sendRequest(r, http.MethodGet, "/api/v1/subjects?per_page=500", "", tokenFor(t, model.RoleStudent))
+	res := sendRequest(r, http.MethodGet, "/api/v1/subjects?per_page=500", "", tokenFor(t, loginmodel.RoleStudent))
 
 	if res.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, seharusnya 422. body: %s", res.Code, res.Body)
@@ -169,7 +169,7 @@ func TestUpdateSubject_Berhasil(t *testing.T) {
 	r, _ := setupRouter(t)
 	id := createSubject(t, r, "MTK", "Matematika")
 
-	res := sendRequest(r, http.MethodPut, "/api/v1/subjects/"+id, `{"code":"mtk-1","name":"Matematika Dasar"}`, tokenFor(t, model.RoleAdmin))
+	res := sendRequest(r, http.MethodPut, "/api/v1/subjects/"+id, `{"code":"mtk-1","name":"Matematika Dasar"}`, tokenFor(t, loginmodel.RoleAdmin))
 
 	if res.Code != http.StatusOK {
 		t.Fatalf("status = %d, seharusnya 200. body: %s", res.Code, res.Body)
@@ -184,7 +184,7 @@ func TestUpdateSubject_KodeDipakaiSubjectLain(t *testing.T) {
 	createSubject(t, r, "MTK", "Matematika")
 	idIPA := createSubject(t, r, "IPA", "Ilmu Pengetahuan Alam")
 
-	res := sendRequest(r, http.MethodPut, "/api/v1/subjects/"+idIPA, `{"code":"MTK","name":"IPA"}`, tokenFor(t, model.RoleAdmin))
+	res := sendRequest(r, http.MethodPut, "/api/v1/subjects/"+idIPA, `{"code":"MTK","name":"IPA"}`, tokenFor(t, loginmodel.RoleAdmin))
 
 	if res.Code != http.StatusConflict {
 		t.Errorf("status = %d, seharusnya 409. body: %s", res.Code, res.Body)
@@ -194,7 +194,7 @@ func TestUpdateSubject_KodeDipakaiSubjectLain(t *testing.T) {
 func TestDeleteSubject(t *testing.T) {
 	r, _ := setupRouter(t)
 	id := createSubject(t, r, "MTK", "Matematika")
-	adminToken := tokenFor(t, model.RoleSuperAdmin)
+	adminToken := tokenFor(t, loginmodel.RoleSuperAdmin)
 
 	res := sendRequest(r, http.MethodDelete, "/api/v1/subjects/"+id, "", adminToken)
 	if res.Code != http.StatusOK {

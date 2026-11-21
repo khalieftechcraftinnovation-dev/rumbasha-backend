@@ -1,7 +1,9 @@
-// Package model berisi struct data utama (entity) aplikasi.
-// Satu struct model mewakili satu tabel di database.
-// Untuk bentuk JSON yang dikirim ke client, lihat package dto.
-package model
+// Package subject (model) berisi struct data untuk fitur subject (mata pelajaran).
+//
+// Di package lain, import dengan alias subjectmodel:
+//
+//	subjectmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subject"
+package subject
 
 import (
 	"errors"

@@ -1,4 +1,9 @@
-package model
+// Package subscription (model) berisi struct data untuk fitur paket akses siswa.
+//
+// Di package lain, import dengan alias subscriptionmodel:
+//
+//	subscriptionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subscription"
+package subscription
 
 import "time"
 

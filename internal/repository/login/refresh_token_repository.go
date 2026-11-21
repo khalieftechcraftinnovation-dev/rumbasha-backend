@@ -1,4 +1,4 @@
-package repository
+package login
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
 )
 
 // RefreshTokenRepository mengakses tabel refresh_tokens (sesi login).
@@ -20,14 +20,14 @@ func NewRefreshTokenRepository(db *gorm.DB) *RefreshTokenRepository {
 }
 
 // Create menyimpan sesi login baru. [GORM]
-func (r *RefreshTokenRepository) Create(ctx context.Context, refreshToken model.RefreshToken) error {
+func (r *RefreshTokenRepository) Create(ctx context.Context, refreshToken loginmodel.RefreshToken) error {
 	return r.db.WithContext(ctx).Create(&refreshToken).Error
 }
 
 // FindValidByHash mencari sesi yang masih berlaku: belum di-logout/ditukar dan
 // belum lewat expires_at. [Native SQL]
-func (r *RefreshTokenRepository) FindValidByHash(ctx context.Context, tokenHash string, now time.Time) (model.RefreshToken, error) {
-	var refreshToken model.RefreshToken
+func (r *RefreshTokenRepository) FindValidByHash(ctx context.Context, tokenHash string, now time.Time) (loginmodel.RefreshToken, error) {
+	var refreshToken loginmodel.RefreshToken
 	err := r.db.WithContext(ctx).
 		Raw(`
 			SELECT id, user_id, token_hash, user_agent, expires_at, revoked_at, created_at
@@ -37,12 +37,12 @@ func (r *RefreshTokenRepository) FindValidByHash(ctx context.Context, tokenHash 
 			  AND expires_at > ?`, tokenHash, now).
 		Scan(&refreshToken).Error
 	if err != nil {
-		return model.RefreshToken{}, err
+		return loginmodel.RefreshToken{}, err
 	}
 
 	// Scan tidak mengembalikan error kalau datanya tidak ada, jadi cek ID-nya.
 	if refreshToken.ID == "" {
-		return model.RefreshToken{}, model.ErrSessionExpired
+		return loginmodel.RefreshToken{}, loginmodel.ErrSessionExpired
 	}
 	return refreshToken, nil
 }
@@ -50,7 +50,7 @@ func (r *RefreshTokenRepository) FindValidByHash(ctx context.Context, tokenHash 
 // Rotate menukar sesi lama dengan sesi baru (dipakai saat refresh).
 // Dua langkah ini dijalankan dalam satu database transaction:
 // kalau salah satu gagal, keduanya dibatalkan.
-func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID string, newToken model.RefreshToken, now time.Time) error {
+func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID string, newToken loginmodel.RefreshToken, now time.Time) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// "AND revoked_at IS NULL" mencegah 2 request refresh bersamaan dengan
 		// token yang sama sama-sama berhasil: hanya yang pertama mengubah 1 baris.
@@ -62,7 +62,7 @@ func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID string, newTo
 			return result.Error
 		}
 		if result.RowsAffected == 0 {
-			return model.ErrSessionExpired
+			return loginmodel.ErrSessionExpired
 		}
 
 		return tx.Create(&newToken).Error

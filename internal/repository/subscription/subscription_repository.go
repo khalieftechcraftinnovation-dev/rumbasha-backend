@@ -1,15 +1,20 @@
-package repository
+// Package subscription (repository) mengakses tabel paket akses siswa
+// (student_subscriptions, subscription_plans, student_feature_overrides).
+//
+// Di package lain, import dengan alias subscriptionrepo:
+//
+//	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
+package subscription
 
 import (
 	"context"
 
 	"gorm.io/gorm"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	subscriptionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subscription"
 )
 
-// SubscriptionRepository mengakses tabel paket akses siswa
-// (student_subscriptions, subscription_plans, student_feature_overrides).
+// SubscriptionRepository mengakses tabel paket akses siswa.
 type SubscriptionRepository struct {
 	db *gorm.DB
 }
@@ -23,8 +28,8 @@ func NewSubscriptionRepository(db *gorm.DB) *SubscriptionRepository {
 // dan akses fitur paketnya. Mengembalikan nil kalau tidak ada paket aktif. [Native SQL]
 //
 // date berformat "2026-11-22" (tanggal Asia/Jakarta).
-func (r *SubscriptionRepository) FindActive(ctx context.Context, studentID, date string) (*model.ActiveSubscription, error) {
-	var subscription model.ActiveSubscription
+func (r *SubscriptionRepository) FindActive(ctx context.Context, studentID, date string) (*subscriptionmodel.ActiveSubscription, error) {
+	var subscription subscriptionmodel.ActiveSubscription
 	err := r.db.WithContext(ctx).
 		Raw(`
 			SELECT ss.id   AS subscription_id,
@@ -58,8 +63,8 @@ func (r *SubscriptionRepository) FindActive(ctx context.Context, studentID, date
 // FindOverrides mengambil akses khusus per siswa yang diatur admin. [GORM]
 //
 //	SELECT * FROM student_feature_overrides WHERE student_id = ?
-func (r *SubscriptionRepository) FindOverrides(ctx context.Context, studentID string) ([]model.FeatureOverride, error) {
-	overrides := []model.FeatureOverride{}
+func (r *SubscriptionRepository) FindOverrides(ctx context.Context, studentID string) ([]subscriptionmodel.FeatureOverride, error) {
+	overrides := []subscriptionmodel.FeatureOverride{}
 	err := r.db.WithContext(ctx).
 		Where("student_id = ?", studentID).
 		Find(&overrides).Error

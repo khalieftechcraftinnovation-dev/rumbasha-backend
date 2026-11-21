@@ -68,19 +68,56 @@ cmd/
   seed/                   Program + file SQL data dummy.
 migrations/               File SQL pembuat tabel (*.up.sql & *.down.sql).
 internal/
-  router/router.go        ROUTE       Semua URL → handler ada di satu file ini.
-  middleware/             Cek login (RequireAuth) dan role (RequireRole) sebelum handler.
+  router/                 ROUTE       Daftar URL → handler.
+    router.go               Pintu utama: Gin, middleware global, /health, memanggil route tiap fitur.
+    login/                  login_routes.go
+    subject/                subject_routes.go
+    *_test.go               Test endpoint dari ujung ke ujung (semua fitur).
   handler/                HANDLER     Baca request, panggil service, kirim response.
+    login/  subject/
   service/                SERVICE     Aturan bisnis.
+    login/  subject/  subscription/
   repository/             REPOSITORY  Query database (GORM atau native SQL).
+    login/  subject/  subscription/
   model/                  Struct yang mewakili tabel + daftar error.
+    login/  subject/  subscription/
   dto/                    Bentuk request & response JSON.
+    pagination.go           Dipakai bersama semua fitur.
+    login/  subject/
+
+  middleware/             Cek login (RequireAuth) dan role (RequireRole) sebelum handler.
+  clock/                  Aturan waktu WIB (awal bulan, tanggal hari ini).
   token/                  Membuat & membaca access token (JWT) dan refresh token.
   response/               Helper format JSON (sukses, error, validasi).
   database/               Koneksi PostgreSQL + runner migration.
   config/                 Membaca konfigurasi dari .env.
   testutil/               Helper untuk test (database test).
 ```
+
+Setiap layer dikelompokkan per fitur: `<layer>/<fitur>/<fitur>_<layer>.go`, misalnya `service/login/login_service.go`.
+File di root folder layer (misalnya `dto/pagination.go`) dipakai bersama oleh semua fitur.
+
+Fitur saat ini: **login** (`/auth/...`), **subject** (`/subjects/...`), dan **subscription** (paket akses siswa; belum punya endpoint sendiri, dipakai oleh `/auth/me`). Fitur yang tidak punya endpoint sendiri tidak perlu folder di `handler/` dan `router/`.
+
+### Import dengan alias
+
+Di Go, nama package = nama folder terakhir. Karena `service/login`, `model/login`, `dto/login`, dan seterusnya semuanya bernama `login`, setiap import diberi alias `<fitur><layer>` supaya tidak bentrok dan langsung jelas asalnya:
+
+```go
+import (
+    loginmodel   ".../internal/model/login"
+    logindto     ".../internal/dto/login"
+    loginrepo    ".../internal/repository/login"
+    loginservice ".../internal/service/login"
+    loginhandler ".../internal/handler/login"
+    loginrouter  ".../internal/router/login"
+)
+
+loginService := loginservice.NewLoginService(...)   // jelas: service milik fitur login
+if errors.Is(err, loginmodel.ErrUserInactive) {}    // jelas: error milik model fitur login
+```
+
+Alias yang dipakai: `<fitur>model`, `<fitur>dto`, `<fitur>repo`, `<fitur>service`, `<fitur>handler`, `<fitur>router`. Komentar di baris pertama setiap package juga menuliskan alias-nya.
 
 ## Login & sesi
 
@@ -98,11 +135,11 @@ keluar             → POST /auth/logout  {refresh_token}
 - **Refresh token sekali pakai.** Setiap refresh menukar token lama dengan yang baru; token lama langsung tidak berlaku.
 - Di database hanya disimpan **hash** refresh token dan **hash bcrypt** password.
 
-Melindungi endpoint di [router.go](internal/router/router.go):
+Grup `public` (tanpa login) dan `private` (wajib login) dibuat di [router.go](internal/router/router.go), lalu diteruskan ke route tiap fitur. Contoh di [subject_routes.go](internal/router/subject/subject_routes.go):
 
 ```go
-private := api.Group("", requireAuth)                    // wajib login
-private.POST("/subjects", adminOnly, h.Subject.Create)   // wajib login + role admin/super_admin
+private.GET("/subjects", h.List)                 // wajib login
+private.POST("/subjects", adminOnly, h.Create)   // wajib login + role admin/super_admin
 ```
 
 Di handler, ID dan role user yang login dibaca dengan `middleware.GetUserID(c)` dan `middleware.GetRole(c)`.
@@ -111,10 +148,10 @@ Di handler, ID dan role user yang login dibaca dengan `middleware.GetUserID(c)` 
 
 ```text
 GET /api/v1/subjects
-  → router      (router.go)              mencari handler untuk URL ini
-  → handler     (subject_handler.go)     SubjectHandler.List
-  → service     (subject_service.go)     SubjectService.List
-  → repository  (subject_repository.go)  SubjectRepository.FindAll → PostgreSQL
+  → router      router/subject/subject_routes.go          mencari handler untuk URL ini
+  → handler     handler/subject/subject_handler.go        SubjectHandler.List
+  → service     service/subject/subject_service.go        SubjectService.List
+  → repository  repository/subject/subject_repository.go  SubjectRepository.FindAll → PostgreSQL
 ```
 
 Saat debug, ikuti alur di atas: Ctrl+klik nama fungsinya di VS Code untuk langsung melompat ke layer berikutnya.
@@ -124,7 +161,7 @@ Dengan `DB_DEBUG=true` di `.env`, setiap query SQL ikut tercetak di terminal.
 
 ### Kapan pakai GORM, kapan native SQL
 
-Contoh keduanya ada di [subject_repository.go](internal/repository/subject_repository.go).
+Contoh keduanya ada di [subject_repository.go](internal/repository/subject/subject_repository.go).
 
 | Kebutuhan                            | Pakai                                        |
 |--------------------------------------|----------------------------------------------|
@@ -175,19 +212,22 @@ Kalau migration gagal di tengah jalan (status `dirty`), perbaiki tabelnya, lalu 
 1. **Arah panggilan hanya ke bawah:** handler → service → repository. Handler tidak boleh memanggil repository langsung.
 2. **Aturan bisnis hanya di service.** Handler cukup baca request dan kirim response.
 3. **Semua layer disusun di `main.go`.** Setiap layer menerima layer di bawahnya lewat parameter `New...()`.
-4. **Satu domain = satu file per layer**, misalnya `subject_handler.go`, `subject_service.go`, `subject_repository.go`.
-5. **Service domain A tidak boleh memakai repository domain B.** Kalau butuh data domain lain, panggil service-nya. Ini yang membuat project mudah dipecah jadi microservice nanti.
+4. **Satu fitur = satu subfolder per layer**, misalnya `handler/subject/`, `service/subject/`, `repository/subject/`.
+5. **Service fitur A tidak boleh memakai repository fitur B.** Kalau butuh data fitur lain, panggil service-nya (contoh: `LoginHandler` memakai `SubscriptionService` untuk `/auth/me`). Ini yang membuat project mudah dipecah jadi microservice nanti.
 
-## Menambah domain baru (contoh: `material`)
+## Menambah fitur baru (contoh: `material`)
 
 1. `migrations/00000N_create_materials_table.up.sql` + `.down.sql`, lalu `make migrate-up`.
-2. `internal/model/material.go`: struct `Material` + `TableName()` + error-nya.
-3. `internal/dto/material.go`: struct request & response.
-4. `internal/repository/material_repository.go`: query database.
-5. `internal/service/material_service.go`: logika bisnis.
-6. `internal/handler/material_handler.go`: handler + `handleError`.
-7. `internal/router/router.go`: tambah field di `Handlers` dan daftarkan route-nya.
-8. `cmd/api/main.go`: susun repository → service → handler.
+2. `internal/model/material/material_model.go`: struct `Material` + `TableName()` + error-nya.
+3. `internal/dto/material/material_dto.go`: struct request & response.
+4. `internal/repository/material/material_repository.go`: query database.
+5. `internal/service/material/material_service.go`: logika bisnis.
+6. `internal/handler/material/material_handler.go`: handler + `handleError`.
+7. `internal/router/material/material_routes.go`: fungsi `Register(...)` berisi route-nya.
+8. `internal/router/router.go`: tambah field di `Handlers` dan panggil `materialrouter.Register(...)`.
+9. `cmd/api/main.go`: susun repository → service → handler.
+
+Setiap file baru diawali `package material`, dan diimport dengan alias (`materialmodel`, `materialservice`, ...).
 
 ## Endpoint
 

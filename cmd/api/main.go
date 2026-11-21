@@ -7,10 +7,18 @@ import (
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/config"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/database"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service"
+
+	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
+	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
+	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
+
+	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
+	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
+	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
+
+	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
+	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
 )
 
 func main() {
@@ -31,24 +39,28 @@ func main() {
 	// Setiap layer menerima layer di bawahnya lewat parameter (dependency injection),
 	// jadi tidak ada layer yang membuat dependency-nya sendiri.
 
-	// Repositories
-	userRepository := repository.NewUserRepository(db)
-	refreshTokenRepository := repository.NewRefreshTokenRepository(db)
-	subscriptionRepository := repository.NewSubscriptionRepository(db)
-	subjectRepository := repository.NewSubjectRepository(db)
+	// Fitur: subscription (paket akses siswa; dipakai oleh fitur login di /auth/me)
+	subscriptionService := subscriptionservice.NewSubscriptionService(
+		subscriptionrepo.NewSubscriptionRepository(db),
+	)
 
-	// Services
-	authService := service.NewAuthService(userRepository, refreshTokenRepository, cfg.JWTSecret, cfg.JWTAccessTTL)
-	subscriptionService := service.NewSubscriptionService(subscriptionRepository)
-	subjectService := service.NewSubjectService(subjectRepository)
+	// Fitur: login
+	loginService := loginservice.NewLoginService(
+		loginrepo.NewUserRepository(db),
+		loginrepo.NewRefreshTokenRepository(db),
+		cfg.JWTSecret,
+		cfg.JWTAccessTTL,
+	)
+	loginHandler := loginhandler.NewLoginHandler(loginService, subscriptionService)
 
-	// Handlers
-	handlers := router.Handlers{
-		Auth:    handler.NewAuthHandler(authService, subscriptionService),
-		Subject: handler.NewSubjectHandler(subjectService),
-	}
+	// Fitur: subject
+	subjectService := subjectservice.NewSubjectService(subjectrepo.NewSubjectRepository(db))
+	subjectHandler := subjecthandler.NewSubjectHandler(subjectService)
 
-	r := router.New(handlers, cfg.JWTSecret)
+	r := router.New(router.Handlers{
+		Login:   loginHandler,
+		Subject: subjectHandler,
+	}, cfg.JWTSecret)
 
 	log.Printf("server berjalan di http://localhost:%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

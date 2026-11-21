@@ -1,9 +1,15 @@
-package dto
+// Package login (dto) berisi bentuk request dan response JSON untuk fitur login.
+//
+// Di package lain, import dengan alias logindto:
+//
+//	logindto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/login"
+package login
 
 import (
 	"time"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	subscriptionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subscription"
 )
 
 // LoginRequest adalah body JSON untuk POST /api/v1/auth/login.
@@ -64,7 +70,7 @@ type SubscriptionResponse struct {
 }
 
 // ToSessionResponse mengubah hasil login/refresh menjadi SessionResponse.
-func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time, user model.User) SessionResponse {
+func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time, user loginmodel.User) SessionResponse {
 	return SessionResponse{
 		AccessToken:           accessToken,
 		AccessTokenExpiresAt:  accessExpiresAt,
@@ -74,8 +80,8 @@ func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshTok
 	}
 }
 
-// ToUserResponse mengubah model.User menjadi UserResponse.
-func ToUserResponse(user model.User) UserResponse {
+// ToUserResponse mengubah loginmodel.User menjadi UserResponse.
+func ToUserResponse(user loginmodel.User) UserResponse {
 	return UserResponse{
 		ID:               user.ID,
 		Role:             user.Role,
@@ -93,7 +99,7 @@ func ToUserResponse(user model.User) UserResponse {
 }
 
 // ToSubscriptionResponse mengubah paket aktif menjadi SubscriptionResponse (nil tetap nil).
-func ToSubscriptionResponse(subscription *model.ActiveSubscription) *SubscriptionResponse {
+func ToSubscriptionResponse(subscription *subscriptionmodel.ActiveSubscription) *SubscriptionResponse {
 	if subscription == nil {
 		return nil
 	}

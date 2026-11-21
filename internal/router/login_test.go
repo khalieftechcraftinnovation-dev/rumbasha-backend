@@ -1,4 +1,4 @@
-// Test endpoint /auth: login, refresh, logout, dan me (termasuk cek paket harian).
+// Test endpoint /auth (fitur login): login, refresh, logout, dan me (termasuk cek paket harian).
 package router
 
 import (
@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
 )
 
 // sessionData adalah isi "data" dari response login/refresh.
@@ -75,14 +75,14 @@ func createPlanAndSubscription(t *testing.T, db *gorm.DB, studentID, channel str
 
 func TestLogin_Berhasil(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 
 	session := login(t, r, "admin.test", testPassword)
 
 	if session.AccessToken == "" || session.RefreshToken == "" {
 		t.Fatal("access_token dan refresh_token seharusnya terisi")
 	}
-	if session.User.Role != model.RoleAdmin {
+	if session.User.Role != loginmodel.RoleAdmin {
 		t.Errorf("role = %q, seharusnya admin", session.User.Role)
 	}
 
@@ -101,7 +101,7 @@ func TestLogin_Berhasil(t *testing.T) {
 
 func TestLogin_UsernameTidakPekaHurufBesarDanSpasi(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleTutor, "tutor.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleTutor, "tutor.test", loginmodel.UserStatusActive)
 
 	session := login(t, r, " Tutor.Test ", testPassword)
 
@@ -112,7 +112,7 @@ func TestLogin_UsernameTidakPekaHurufBesarDanSpasi(t *testing.T) {
 
 func TestLogin_PasswordSalahDanUsernameTidakAdaPesannyaSama(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 
 	wrongPassword := sendRequest(r, http.MethodPost, "/api/v1/auth/login", `{"username":"admin.test","password":"salah"}`, "")
 	unknownUser := sendRequest(r, http.MethodPost, "/api/v1/auth/login", `{"username":"tidak.ada","password":"salah"}`, "")
@@ -128,7 +128,7 @@ func TestLogin_PasswordSalahDanUsernameTidakAdaPesannyaSama(t *testing.T) {
 
 func TestLogin_AkunNonaktifDitolak(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleStudent, "siswa.nonaktif", model.UserStatusInactive)
+	createUser(t, db, loginmodel.RoleStudent, "siswa.nonaktif", loginmodel.UserStatusInactive)
 
 	res := sendRequest(r, http.MethodPost, "/api/v1/auth/login", `{"username":"siswa.nonaktif","password":"`+testPassword+`"}`, "")
 
@@ -151,7 +151,7 @@ func TestLogin_ValidasiGagal(t *testing.T) {
 
 func TestRefresh_TokenLamaTidakBisaDipakaiLagi(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 	first := login(t, r, "admin.test", testPassword)
 
 	res := sendRequest(r, http.MethodPost, "/api/v1/auth/refresh", `{"refresh_token":"`+first.RefreshToken+`"}`, "")
@@ -178,7 +178,7 @@ func TestRefresh_TokenLamaTidakBisaDipakaiLagi(t *testing.T) {
 
 func TestRefresh_AkunDinonaktifkanSetelahLogin(t *testing.T) {
 	r, db := setupRouter(t)
-	userID := createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	userID := createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 	session := login(t, r, "admin.test", testPassword)
 
 	db.Exec(`UPDATE users SET status = 'inactive' WHERE id = ?`, userID)
@@ -191,7 +191,7 @@ func TestRefresh_AkunDinonaktifkanSetelahLogin(t *testing.T) {
 
 func TestRefresh_SesiSudahLewatAwalBulan(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 	session := login(t, r, "admin.test", testPassword)
 
 	// Simulasikan awal bulan sudah lewat: akhir sesi dimundurkan ke masa lalu.
@@ -205,7 +205,7 @@ func TestRefresh_SesiSudahLewatAwalBulan(t *testing.T) {
 
 func TestLogout_RefreshTokenTidakBisaDipakaiLagi(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 	session := login(t, r, "admin.test", testPassword)
 	body := `{"refresh_token":"` + session.RefreshToken + `"}`
 
@@ -242,7 +242,7 @@ func TestMe_TanpaTokenAtauTokenPalsuDitolak(t *testing.T) {
 
 func TestMe_AdminTidakPunyaDataAkses(t *testing.T) {
 	r, db := setupRouter(t)
-	createUser(t, db, model.RoleAdmin, "admin.test", model.UserStatusActive)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
 	session := login(t, r, "admin.test", testPassword)
 
 	res := sendRequest(r, http.MethodGet, "/api/v1/auth/me", "", session.AccessToken)
@@ -261,7 +261,7 @@ func TestMe_AdminTidakPunyaDataAkses(t *testing.T) {
 
 func TestMe_SiswaPaketOnlineAktifDenganAksesKhusus(t *testing.T) {
 	r, db := setupRouter(t)
-	studentID := createUser(t, db, model.RoleStudent, "siswa.test", model.UserStatusActive)
+	studentID := createUser(t, db, loginmodel.RoleStudent, "siswa.test", loginmodel.UserStatusActive)
 	createPlanAndSubscription(t, db, studentID, "online", -10, 20) // aktif hari ini
 	db.Exec(`INSERT INTO student_feature_overrides (student_id, feature, is_enabled) VALUES (?, 'rumath', TRUE)`, studentID)
 
@@ -291,7 +291,7 @@ func TestMe_SiswaPaketOnlineAktifDenganAksesKhusus(t *testing.T) {
 
 func TestMe_SiswaPaketExpiredKemarin(t *testing.T) {
 	r, db := setupRouter(t)
-	studentID := createUser(t, db, model.RoleStudent, "siswa.test", model.UserStatusActive)
+	studentID := createUser(t, db, loginmodel.RoleStudent, "siswa.test", loginmodel.UserStatusActive)
 	createPlanAndSubscription(t, db, studentID, "online", -31, -1) // berakhir kemarin
 
 	session := login(t, r, "siswa.test", testPassword)

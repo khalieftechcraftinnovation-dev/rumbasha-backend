@@ -1,11 +1,15 @@
-// Package dto (Data Transfer Object) berisi bentuk request dan response JSON.
+// Package subject (dto) berisi bentuk request dan response JSON untuk fitur subject.
 // Dipisah dari model supaya format API bisa berubah tanpa mengubah struktur tabel.
-package dto
+//
+// Di package lain, import dengan alias subjectdto:
+//
+//	subjectdto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/subject"
+package subject
 
 import (
 	"time"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
+	subjectmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subject"
 )
 
 // CreateSubjectRequest adalah body JSON untuk POST /api/v1/subjects.
@@ -35,8 +39,8 @@ type SubjectResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ToSubjectResponse mengubah model.Subject menjadi SubjectResponse.
-func ToSubjectResponse(subject model.Subject) SubjectResponse {
+// ToSubjectResponse mengubah subjectmodel.Subject menjadi SubjectResponse.
+func ToSubjectResponse(subject subjectmodel.Subject) SubjectResponse {
 	return SubjectResponse{
 		ID:        subject.ID,
 		Code:      subject.Code,
@@ -46,29 +50,12 @@ func ToSubjectResponse(subject model.Subject) SubjectResponse {
 	}
 }
 
-// ToSubjectResponses mengubah daftar model.Subject menjadi daftar SubjectResponse.
-func ToSubjectResponses(subjects []model.Subject) []SubjectResponse {
+// ToSubjectResponses mengubah daftar subject menjadi daftar SubjectResponse.
+func ToSubjectResponses(subjects []subjectmodel.Subject) []SubjectResponse {
 	// make(..., 0, n) membuat slice kosong (bukan nil), supaya JSON-nya [] bukan null.
 	result := make([]SubjectResponse, 0, len(subjects))
 	for _, subject := range subjects {
 		result = append(result, ToSubjectResponse(subject))
 	}
 	return result
-}
-
-// PaginationQuery adalah query string ?page=1&per_page=20 untuk endpoint list.
-// Tag form:"..." dipakai untuk query string (bukan body JSON).
-type PaginationQuery struct {
-	Page    int `form:"page" binding:"omitempty,min=1"`
-	PerPage int `form:"per_page" binding:"omitempty,min=1,max=100"`
-}
-
-// SetDefaults mengisi nilai default kalau client tidak mengirim page/per_page.
-func (q *PaginationQuery) SetDefaults() {
-	if q.Page == 0 {
-		q.Page = 1
-	}
-	if q.PerPage == 0 {
-		q.PerPage = 20
-	}
 }

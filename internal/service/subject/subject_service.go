@@ -1,7 +1,10 @@
-// Package service adalah layer SERVICE: tempat semua aturan bisnis.
-// Service tidak tahu soal HTTP (Gin) maupun SQL. Data dibaca/ditulis
-// lewat repository.
-package service
+// Package subject (service) berisi aturan bisnis untuk mata pelajaran.
+// Service tidak tahu soal HTTP (Gin) maupun SQL. Data dibaca/ditulis lewat repository.
+//
+// Di package lain, import dengan alias subjectservice:
+//
+//	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
+package subject
 
 import (
 	"context"
@@ -10,18 +13,18 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository"
+	subjectdto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/subject"
+	subjectmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subject"
+	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
 )
 
 // SubjectService berisi logika bisnis untuk mata pelajaran.
 type SubjectService struct {
-	repo *repository.SubjectRepository
+	repo *subjectrepo.SubjectRepository
 }
 
 // NewSubjectService membuat SubjectService. Dipanggil sekali di main.go.
-func NewSubjectService(repo *repository.SubjectRepository) *SubjectService {
+func NewSubjectService(repo *subjectrepo.SubjectRepository) *SubjectService {
 	return &SubjectService{repo: repo}
 }
 
@@ -29,10 +32,10 @@ func NewSubjectService(repo *repository.SubjectRepository) *SubjectService {
 //
 // Catatan Go: fungsi bisa mengembalikan lebih dari satu nilai. Polanya selalu
 // (hasil, error): kalau error tidak nil, hasilnya diabaikan.
-func (s *SubjectService) Create(ctx context.Context, req dto.CreateSubjectRequest) (model.Subject, error) {
+func (s *SubjectService) Create(ctx context.Context, req subjectdto.CreateSubjectRequest) (subjectmodel.Subject, error) {
 	now := time.Now().UTC()
 
-	subject := model.Subject{
+	subject := subjectmodel.Subject{
 		ID:        uuid.NewString(),
 		Code:      normalizeCode(req.Code),
 		Name:      strings.TrimSpace(req.Name),
@@ -41,39 +44,39 @@ func (s *SubjectService) Create(ctx context.Context, req dto.CreateSubjectReques
 	}
 
 	if err := s.repo.Create(ctx, subject); err != nil {
-		return model.Subject{}, err
+		return subjectmodel.Subject{}, err
 	}
 	return subject, nil
 }
 
 // GetByID mengambil satu mata pelajaran berdasarkan ID.
-func (s *SubjectService) GetByID(ctx context.Context, id string) (model.Subject, error) {
+func (s *SubjectService) GetByID(ctx context.Context, id string) (subjectmodel.Subject, error) {
 	if !isValidID(id) {
-		return model.Subject{}, model.ErrSubjectNotFound
+		return subjectmodel.Subject{}, subjectmodel.ErrSubjectNotFound
 	}
 	return s.repo.FindByID(ctx, id)
 }
 
 // List mengambil daftar mata pelajaran per halaman, beserta total datanya.
-func (s *SubjectService) List(ctx context.Context, page, perPage int) ([]model.Subject, int, error) {
+func (s *SubjectService) List(ctx context.Context, page, perPage int) ([]subjectmodel.Subject, int, error) {
 	offset := (page - 1) * perPage
 	return s.repo.FindAll(ctx, offset, perPage)
 }
 
 // Update mengubah data mata pelajaran, lalu mengembalikan data terbarunya.
-func (s *SubjectService) Update(ctx context.Context, id string, req dto.UpdateSubjectRequest) (model.Subject, error) {
+func (s *SubjectService) Update(ctx context.Context, id string, req subjectdto.UpdateSubjectRequest) (subjectmodel.Subject, error) {
 	if !isValidID(id) {
-		return model.Subject{}, model.ErrSubjectNotFound
+		return subjectmodel.Subject{}, subjectmodel.ErrSubjectNotFound
 	}
 
-	subject := model.Subject{
+	subject := subjectmodel.Subject{
 		ID:        id,
 		Code:      normalizeCode(req.Code),
 		Name:      strings.TrimSpace(req.Name),
 		UpdatedAt: time.Now().UTC(),
 	}
 	if err := s.repo.Update(ctx, subject); err != nil {
-		return model.Subject{}, err
+		return subjectmodel.Subject{}, err
 	}
 
 	// Ambil ulang dari database supaya created_at ikut terisi di response.
@@ -83,7 +86,7 @@ func (s *SubjectService) Update(ctx context.Context, id string, req dto.UpdateSu
 // Delete menghapus mata pelajaran.
 func (s *SubjectService) Delete(ctx context.Context, id string) error {
 	if !isValidID(id) {
-		return model.ErrSubjectNotFound
+		return subjectmodel.ErrSubjectNotFound
 	}
 	return s.repo.Delete(ctx, id)
 }

@@ -20,9 +20,14 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository"
-	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service"
+	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
+	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
+	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
+	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
+	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
+	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
+	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
+	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/testutil"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/token"
 )
@@ -34,7 +39,7 @@ const (
 
 // testPasswordHash dihitung sekali saja, karena bcrypt sengaja dibuat lambat.
 var testPasswordHash = sync.OnceValue(func() string {
-	hash, err := service.HashPassword(testPassword)
+	hash, err := loginservice.HashPassword(testPassword)
 	if err != nil {
 		panic(err)
 	}
@@ -48,18 +53,18 @@ func setupRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	gin.SetMode(gin.TestMode)
 	db := testutil.SetupTestDB(t)
 
-	authService := service.NewAuthService(
-		repository.NewUserRepository(db),
-		repository.NewRefreshTokenRepository(db),
+	loginService := loginservice.NewLoginService(
+		loginrepo.NewUserRepository(db),
+		loginrepo.NewRefreshTokenRepository(db),
 		testJWTSecret,
 		15*time.Minute,
 	)
-	subscriptionService := service.NewSubscriptionService(repository.NewSubscriptionRepository(db))
-	subjectService := service.NewSubjectService(repository.NewSubjectRepository(db))
+	subscriptionService := subscriptionservice.NewSubscriptionService(subscriptionrepo.NewSubscriptionRepository(db))
+	subjectService := subjectservice.NewSubjectService(subjectrepo.NewSubjectRepository(db))
 
 	r := New(Handlers{
-		Auth:    handler.NewAuthHandler(authService, subscriptionService),
-		Subject: handler.NewSubjectHandler(subjectService),
+		Login:   loginhandler.NewLoginHandler(loginService, subscriptionService),
+		Subject: subjecthandler.NewSubjectHandler(subjectService),
 	}, testJWTSecret)
 
 	return r, db
