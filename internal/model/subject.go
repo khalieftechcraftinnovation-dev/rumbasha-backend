@@ -1,6 +1,6 @@
 // Package model berisi struct data utama (entity) aplikasi.
-// Model dipakai oleh service dan repository. Untuk bentuk JSON yang dikirim
-// ke client, lihat package dto.
+// Satu struct model mewakili satu tabel di database.
+// Untuk bentuk JSON yang dikirim ke client, lihat package dto.
 package model
 
 import (
@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-// Subject adalah data mata pelajaran, misalnya "Matematika".
+// Subject mewakili satu baris di tabel "subjects" (mata pelajaran).
+//
+// GORM otomatis mencocokkan nama field ke nama kolom:
+// ID → id, Code → code, CreatedAt → created_at, dan seterusnya.
 //
 // Catatan Go: nama yang diawali huruf BESAR (Subject, Code) bersifat public
 // dan bisa dipakai package lain. Huruf kecil berarti private.
@@ -18,6 +21,11 @@ type Subject struct {
 	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// TableName memberi tahu GORM nama tabel untuk model ini.
+func (Subject) TableName() string {
+	return "subjects"
 }
 
 // Daftar error untuk Subject. Repository/service mengembalikan error ini,

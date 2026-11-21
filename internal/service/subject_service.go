@@ -17,13 +17,11 @@ import (
 
 // SubjectService berisi logika bisnis untuk mata pelajaran.
 type SubjectService struct {
-	// repo bertipe interface, bukan struct tertentu. Jadi service tidak peduli
-	// data disimpan di memori atau PostgreSQL.
-	repo repository.SubjectRepository
+	repo *repository.SubjectRepository
 }
 
 // NewSubjectService membuat SubjectService. Dipanggil sekali di main.go.
-func NewSubjectService(repo repository.SubjectRepository) *SubjectService {
+func NewSubjectService(repo *repository.SubjectRepository) *SubjectService {
 	return &SubjectService{repo: repo}
 }
 
@@ -36,7 +34,7 @@ func (s *SubjectService) Create(ctx context.Context, req dto.CreateSubjectReques
 
 	subject := model.Subject{
 		ID:        uuid.NewString(),
-		Code:      strings.ToUpper(strings.TrimSpace(req.Code)), // aturan bisnis: kode selalu huruf besar
+		Code:      normalizeCode(req.Code),
 		Name:      strings.TrimSpace(req.Name),
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -50,6 +48,9 @@ func (s *SubjectService) Create(ctx context.Context, req dto.CreateSubjectReques
 
 // GetByID mengambil satu mata pelajaran berdasarkan ID.
 func (s *SubjectService) GetByID(ctx context.Context, id string) (model.Subject, error) {
+	if !isValidID(id) {
+		return model.Subject{}, model.ErrSubjectNotFound
+	}
 	return s.repo.FindByID(ctx, id)
 }
 
@@ -57,4 +58,44 @@ func (s *SubjectService) GetByID(ctx context.Context, id string) (model.Subject,
 func (s *SubjectService) List(ctx context.Context, page, perPage int) ([]model.Subject, int, error) {
 	offset := (page - 1) * perPage
 	return s.repo.FindAll(ctx, offset, perPage)
+}
+
+// Update mengubah data mata pelajaran, lalu mengembalikan data terbarunya.
+func (s *SubjectService) Update(ctx context.Context, id string, req dto.UpdateSubjectRequest) (model.Subject, error) {
+	if !isValidID(id) {
+		return model.Subject{}, model.ErrSubjectNotFound
+	}
+
+	subject := model.Subject{
+		ID:        id,
+		Code:      normalizeCode(req.Code),
+		Name:      strings.TrimSpace(req.Name),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := s.repo.Update(ctx, subject); err != nil {
+		return model.Subject{}, err
+	}
+
+	// Ambil ulang dari database supaya created_at ikut terisi di response.
+	return s.repo.FindByID(ctx, id)
+}
+
+// Delete menghapus mata pelajaran.
+func (s *SubjectService) Delete(ctx context.Context, id string) error {
+	if !isValidID(id) {
+		return model.ErrSubjectNotFound
+	}
+	return s.repo.Delete(ctx, id)
+}
+
+// normalizeCode adalah aturan bisnis: kode selalu huruf besar tanpa spasi di ujung.
+func normalizeCode(code string) string {
+	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+// isValidID mengecek apakah id berformat UUID.
+// Kolom id di database bertipe UUID, jadi query dengan id yang bukan UUID
+// akan error di PostgreSQL. Lebih baik langsung dianggap "tidak ditemukan".
+func isValidID(id string) bool {
+	return uuid.Validate(id) == nil
 }

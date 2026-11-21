@@ -43,6 +43,8 @@ func New(h Handlers) *gin.Engine {
 	api.GET("/subjects", h.Subject.List)
 	api.POST("/subjects", h.Subject.Create)
 	api.GET("/subjects/:id", h.Subject.GetByID)
+	api.PUT("/subjects/:id", h.Subject.Update)
+	api.DELETE("/subjects/:id", h.Subject.Delete)
 
 	return r
 }

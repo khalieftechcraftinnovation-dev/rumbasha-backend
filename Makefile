@@ -1,4 +1,4 @@
-.PHONY: run build test vet fmt tidy check
+.PHONY: run build test vet fmt tidy check migrate-up migrate-down migrate-version
 
 # Menjalankan API (membaca file .env kalau ada)
 run:
@@ -8,9 +8,10 @@ run:
 build:
 	go build -o bin/ ./cmd/...
 
-# Menjalankan semua test
+# Menjalankan semua test (memakai database test, lihat DB_NAME_TEST di .env).
+# -p 1 = package dites satu per satu, supaya test tidak berebut database yang sama.
 test:
-	go test ./...
+	go test -p 1 ./...
 
 # Mengecek kode yang mencurigakan
 vet:
@@ -26,3 +27,15 @@ tidy:
 
 # Jalankan sebelum push: vet + test
 check: vet test
+
+# Menjalankan semua migration yang belum dijalankan
+migrate-up:
+	go run ./cmd/migrate up
+
+# Membatalkan 1 migration terakhir
+migrate-down:
+	go run ./cmd/migrate down
+
+# Melihat versi migration saat ini
+migrate-version:
+	go run ./cmd/migrate version

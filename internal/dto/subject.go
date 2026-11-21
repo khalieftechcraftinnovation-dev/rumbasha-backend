@@ -1,5 +1,5 @@
 // Package dto (Data Transfer Object) berisi bentuk request dan response JSON.
-// Dipisah dari model supaya format API bisa berubah tanpa mengubah struktur data internal.
+// Dipisah dari model supaya format API bisa berubah tanpa mengubah struktur tabel.
 package dto
 
 import (
@@ -14,6 +14,14 @@ import (
 //   - json:"code"      → nama field di JSON
 //   - binding:"..."    → aturan validasi (required = wajib, max=20 = maksimal 20 karakter)
 type CreateSubjectRequest struct {
+	Code string `json:"code" binding:"required,max=20"`
+	Name string `json:"name" binding:"required,max=100"`
+}
+
+// UpdateSubjectRequest adalah body JSON untuk PUT /api/v1/subjects/:id.
+// Isinya sama dengan Create untuk saat ini, tapi dibuat terpisah karena
+// aturan create dan update biasanya akan berbeda seiring waktu.
+type UpdateSubjectRequest struct {
 	Code string `json:"code" binding:"required,max=20"`
 	Name string `json:"name" binding:"required,max=100"`
 }

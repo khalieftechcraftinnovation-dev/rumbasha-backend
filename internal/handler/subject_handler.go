@@ -41,7 +41,7 @@ func (h *SubjectHandler) Create(c *gin.Context) {
 	}
 
 	// c.Request.Context() diteruskan ke service & repository. Kalau client
-	// membatalkan request, query database nanti ikut dibatalkan.
+	// membatalkan request, query database ikut dibatalkan.
 	subject, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
 		h.handleError(c, err)
@@ -53,9 +53,7 @@ func (h *SubjectHandler) Create(c *gin.Context) {
 
 // GetByID menangani GET /api/v1/subjects/:id.
 func (h *SubjectHandler) GetByID(c *gin.Context) {
-	id := c.Param("id")
-
-	subject, err := h.service.GetByID(c.Request.Context(), id)
+	subject, err := h.service.GetByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -86,6 +84,33 @@ func (h *SubjectHandler) List(c *gin.Context) {
 	})
 }
 
+// Update menangani PUT /api/v1/subjects/:id.
+func (h *SubjectHandler) Update(c *gin.Context) {
+	var req dto.UpdateSubjectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+
+	subject, err := h.service.Update(c.Request.Context(), c.Param("id"), req)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Mata pelajaran berhasil diubah", dto.ToSubjectResponse(subject))
+}
+
+// Delete menangani DELETE /api/v1/subjects/:id.
+func (h *SubjectHandler) Delete(c *gin.Context) {
+	if err := h.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Mata pelajaran berhasil dihapus", nil)
+}
+
 // handleError mengubah error dari service menjadi response HTTP yang sesuai.
 //
 // Catatan Go: Go tidak punya try/catch. Error dikembalikan sebagai nilai biasa,
@@ -97,9 +122,9 @@ func (h *SubjectHandler) handleError(c *gin.Context, err error) {
 	case errors.Is(err, model.ErrSubjectCodeTaken):
 		response.Error(c, http.StatusConflict, "Kode mata pelajaran sudah digunakan")
 	default:
-		// Error yang tidak dikenal: detailnya hanya dicatat di log,
-		// client cukup tahu ada kesalahan di server.
-		log.Printf("error tidak terduga di %s: %v", c.Request.URL.Path, err)
+		// Error yang tidak dikenal (misalnya database mati): detailnya hanya
+		// dicatat di log, client cukup tahu ada kesalahan di server.
+		log.Printf("error tidak terduga di %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
 		response.Error(c, http.StatusInternalServerError, "Terjadi kesalahan pada server")
 	}
 }
