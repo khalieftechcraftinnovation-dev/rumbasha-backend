@@ -17,7 +17,7 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
-	subjectrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subject"
+	// subjectrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subject"
 )
 
 // Handlers berisi semua handler aplikasi.
@@ -54,7 +54,7 @@ func New(h Handlers, jwtSecret string) *gin.Engine {
 
 	// Daftarkan route setiap fitur. Tambahkan baris baru setiap ada fitur baru.
 	loginrouter.Register(public, private, h.Login)
-	subjectrouter.Register(private, h.Subject)
+	// subjectrouter.Register(private, h.Subject)
 
 	return r
 }

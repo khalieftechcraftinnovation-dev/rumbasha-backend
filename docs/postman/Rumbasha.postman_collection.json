@@ -1,0 +1,548 @@
+{
+  "info": {
+    "name": "Rumbasha Backend",
+    "description": "Collection API Rumbasha Backend.\n\n## Cara pakai\n1. Jalankan server: `make run` (default http://localhost:8080). Ubah variable `base_url` kalau port/server berbeda.\n2. Pastikan data dummy sudah diisi: `make seed` (password semua akun: `password123`).\n3. Jalankan salah satu request **Login**. Access token & refresh token otomatis tersimpan di variable collection, jadi request lain langsung memakai akun itu.\n\n## Variable\n- `base_url`: alamat server\n- `username` / `password`: akun untuk request **Auth > Login**\n- `access_token`, `refresh_token`: diisi otomatis setelah login/refresh, dikosongkan setelah logout\n- `subject_id`: diisi otomatis setelah **Subject > Tambah subject**\n\n## Catatan sesi\nAccess token berlaku 15 menit; kalau habis (401), jalankan **Auth > Refresh token**. Semua sesi berakhir setiap tanggal 1 jam 00:00 WIB, setelah itu wajib login ulang.\n\n## Menjalankan otomatis dengan Postman CLI\n```\npostman collection run docs/postman/Rumbasha.postman_collection.json -i \"Auth\" -i \"Login per role (akun dummy)\"\n```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{access_token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "username", "value": "admin.sbytimur" },
+    { "key": "password", "value": "password123" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "subject_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Cek server",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "Cek apakah server hidup. Tidak perlu login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Login, data user, refresh, dan logout. Jalankan berurutan dari atas.",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Login dengan username + password (variable `username` & `password`).\n\nToken dari response otomatis disimpan ke variable `access_token` dan `refresh_token`.\n\n`refresh_token_expires_at` = akhir sesi, selalu tanggal 1 bulan berikutnya jam 00:00 WIB."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "// Simpan token supaya request lain langsung memakainya.",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);",
+                  "",
+                  "pm.test('sesi berakhir tanggal 1 jam 00:00 WIB', () => {",
+                  "  pm.expect(data.refresh_token_expires_at).to.match(/-01T00:00:00\\+07:00$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Data user yang login (me)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "description": "Data user yang sedang login. Wajib login.\n\nUntuk siswa, `access` berisi paket yang aktif HARI INI dan fitur yang terbuka (`features`). Untuk admin/tutor, `access` bernilai null."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const data = pm.response.json().data;",
+                  "pm.test('tidak mengirim password', () => pm.expect(data.user).to.not.have.property('password_hash'));",
+                  "",
+                  "if (data.user.role === 'student') {",
+                  "  pm.test('siswa punya data akses fitur', () => pm.expect(data.access.features).to.be.an('object'));",
+                  "} else {",
+                  "  pm.test('admin/tutor tidak punya data akses paket', () => pm.expect(data.access).to.be.null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/refresh",
+            "description": "Tukar refresh token dengan pasangan token baru. Dipakai saat access token habis (401).\n\nRefresh token sekali pakai: token lama langsung tidak berlaku. Akhir sesi tidak ikut diperpanjang."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const data = pm.response.json().data;",
+                  "pm.test('refresh token baru berbeda', () => {",
+                  "  pm.expect(data.refresh_token).to.not.eql(pm.collectionVariables.get('refresh_token'));",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/logout",
+            "description": "Tutup sesi. Setelah ini refresh token tidak bisa dipakai lagi. Token di variable dikosongkan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.collectionVariables.set('access_token', '');",
+                  "pm.collectionVariables.set('refresh_token', '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me tanpa login (harus 401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "description": "Contoh request tanpa token: ditolak dengan 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Login per role (akun dummy)",
+      "description": "Satu request login untuk setiap akun dummy dari `make seed`. Request yang berhasil menyimpan token-nya, jadi request berikutnya (misalnya **Auth > Data user yang login**) memakai akun tersebut.",
+      "item": [
+        {
+          "name": "Super admin (superadmin)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"superadmin\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Super admin, semua cabang."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('role super_admin', () => pm.expect(data.user.role).to.eql('super_admin'));",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin (admin.sbytimur)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin.sbytimur\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Admin cabang Surabaya Timur."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('role admin', () => pm.expect(data.user.role).to.eql('admin'));",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tutor (tutor.rina)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"tutor.rina\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Tutor cabang Surabaya Timur."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('role tutor', () => pm.expect(data.user.role).to.eql('tutor'));",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Siswa paket offline (siswa.budi)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.budi\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "SMP Kelas 7, paket OFFLINE Reguler SMP aktif bulan ini (Modul, Daily Quiz, Uji Kom), 100 coin.\n\nSetelah login, jalankan **Auth > Data user yang login** untuk melihat aksesnya."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('role student', () => pm.expect(data.user.role).to.eql('student'));",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Siswa paket online + akses khusus (siswa.citra)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.citra\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "SD Kelas 5, paket ONLINE Reguler SD aktif (Modul, Daily Quiz) + akses khusus RUMATH dari admin."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Siswa paket expired (siswa.dimas)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.dimas\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "SMA Kelas 10, paket online sudah expired kemarin. Login tetap boleh, tapi semua fitur tertutup (lihat **Auth > Data user yang login**)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 (paket expired tetap boleh login)', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Siswa nonaktif (siswa.eka, harus 403)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.eka\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Akun dinonaktifkan admin: login ditolak dengan 403. Token di variable tidak berubah."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Password salah (harus 401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin.sbytimur\",\n  \"password\": \"salah\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Password salah dan username tidak terdaftar sengaja mendapat pesan yang sama, supaya username tidak bisa ditebak."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validasi gagal (harus 422)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin.sbytimur\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Field password tidak dikirim: 422 dengan daftar `errors` per field."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error di field password', () => {",
+                  "  const fields = pm.response.json().errors.map(e => e.field);",
+                  "  pm.expect(fields).to.include('password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Subject",
+      "description": "CRUD mata pelajaran (contoh). Wajib login. Melihat: semua role. Tambah/ubah/hapus: hanya admin & super admin (role lain 403).\n\nLogin dulu sebagai admin (**Login per role > Admin**).\n\n**Catatan:** saat ini route subject sedang dimatikan di `internal/router/router.go` (baris `subjectrouter.Register` di-comment), jadi semua request di folder ini mendapat 404 sampai baris itu diaktifkan lagi.",
+      "item": [
+        {
+          "name": "Daftar subject",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/subjects?page=1&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subjects"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Halaman, mulai dari 1" },
+                { "key": "per_page", "value": "20", "description": "Jumlah data per halaman, maksimal 100" }
+              ]
+            },
+            "description": "Daftar subject dengan pagination. Info halaman ada di `meta`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah subject (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"MTK\",\n  \"name\": \"Matematika\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/subjects",
+            "description": "Tambah subject. Kode otomatis diubah ke huruf besar. Kode kembar → 409. ID hasilnya disimpan ke variable `subject_id`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('subject_id', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail subject",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/subjects/{{subject_id}}",
+            "description": "Detail satu subject berdasarkan `subject_id`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah subject (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"MTK\",\n  \"name\": \"Matematika Dasar\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/subjects/{{subject_id}}",
+            "description": "Ubah subject berdasarkan `subject_id`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus subject (admin)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/subjects/{{subject_id}}",
+            "description": "Hapus subject secara permanen berdasarkan `subject_id`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('subject_id', '');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

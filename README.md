@@ -47,7 +47,12 @@ curl http://localhost:8080/health
 
 ## Akun dummy
 
-Setelah `make seed`, semua akun memakai password **`password123`**. Isinya ada di [cmd/seed/dummy_data.sql](cmd/seed/dummy_data.sql).
+Setelah `make seed`, semua akun memakai password **`password123`**. Total 55 user, mengikuti contoh desain menu User: 47 siswa, 4 tutor, 3 admin, 1 super admin.
+
+- [cmd/seed/dummy_data.sql](cmd/seed/dummy_data.sql): cabang, akun utama di bawah, paket, dan coin (dijalankan sekali).
+- [cmd/seed/dummy_users.sql](cmd/seed/dummy_users.sql): 2 admin, 3 tutor, dan 43 siswa tambahan yang tersebar di semua cabang dan jenjang (aman dijalankan ulang). Siswa tambahan memakai username `siswa.<nama depan>`, contoh `siswa.adit`. Siswa tambahan belum punya paket.
+
+Akun utama untuk dicoba:
 
 | Username         | Role        | Keterangan                                                              |
 |------------------|-------------|-------------------------------------------------------------------------|
@@ -245,6 +250,18 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
 
 "Admin" = role `admin` atau `super_admin`.
+
+### Postman
+
+Collection lengkap ada di [docs/postman/Rumbasha.postman_collection.json](docs/postman/Rumbasha.postman_collection.json). Import ke Postman (File → Import), lalu jalankan salah satu request **Login**: token otomatis tersimpan dan dipakai request lain. Folder **Login per role (akun dummy)** berisi satu request untuk setiap akun dari `make seed`.
+
+Uji semua endpoint sekaligus dengan Postman CLI (server harus sudah jalan):
+
+```bash
+postman collection run docs/postman/Rumbasha.postman_collection.json -i "Health" -i "Auth" -i "Login per role (akun dummy)"
+```
+
+Setiap ada endpoint baru, tambahkan juga request-nya ke collection ini.
 
 ## Format response
 

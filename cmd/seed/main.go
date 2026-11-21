@@ -4,7 +4,9 @@
 //
 //	make seed     (atau: go run ./cmd/seed)
 //
-// Isinya ada di dummy_data.sql (folder yang sama), yang juga bisa dibuka di DBeaver.
+// File SQL yang dijalankan (urut), bisa juga dibuka di DBeaver:
+//  1. dummy_data.sql  → cabang, akun utama tiap role, paket, coin (hanya sekali)
+//  2. dummy_users.sql → akun tambahan sampai total 55 user (aman diulang)
 package main
 
 import (
@@ -16,11 +18,14 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/database"
 )
 
-// dummySQL berisi seluruh isi file dummy_data.sql.
-// Baris //go:embed membuat isi file itu ikut dibundel ke dalam program.
-//
-//go:embed dummy_data.sql
-var dummySQL string
+// Isi file SQL dibundel ke dalam program lewat //go:embed.
+var (
+	//go:embed dummy_data.sql
+	dummyDataSQL string
+
+	//go:embed dummy_users.sql
+	dummyUsersSQL string
+)
 
 func main() {
 	cfg := config.Load()
@@ -37,23 +42,40 @@ func main() {
 	}
 	defer database.Close(db)
 
-	// Supaya aman dijalankan berkali-kali: kalau akun superadmin sudah ada, berhenti.
+	// 1. dummy_data.sql: tidak aman diulang, jadi hanya dijalankan kalau akun superadmin belum ada.
 	var count int64
 	if err := db.Raw(`SELECT COUNT(*) FROM users WHERE username = 'superadmin'`).Scan(&count).Error; err != nil {
 		log.Fatalf("gagal mengecek data: %v (sudah menjalankan make migrate-up?)", err)
 	}
-	if count > 0 {
-		log.Println("data dummy sudah ada, tidak ada yang diubah")
-		return
+	if count == 0 {
+		if err := db.Exec(dummyDataSQL).Error; err != nil {
+			log.Fatalf("gagal mengisi dummy_data.sql: %v", err)
+		}
+		log.Println("dummy_data.sql berhasil diisi")
+	} else {
+		log.Println("dummy_data.sql sudah pernah diisi, dilewati")
 	}
 
-	if err := db.Exec(dummySQL).Error; err != nil {
-		log.Fatalf("gagal mengisi data dummy: %v", err)
+	// 2. dummy_users.sql: aman diulang (username yang sudah ada dilewati).
+	if err := db.Exec(dummyUsersSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_users.sql: %v", err)
 	}
+	log.Println("dummy_users.sql berhasil diisi")
 
-	log.Printf("data dummy berhasil diisi ke database %s", cfg.DBName)
+	// Ringkasan jumlah user per role.
+	type roleCount struct {
+		Role  string
+		Total int
+	}
+	var counts []roleCount
+	db.Raw(`SELECT role, COUNT(*) AS total FROM users GROUP BY role ORDER BY role`).Scan(&counts)
+
+	fmt.Printf("\nData dummy di database %s (password semua: password123)\n", cfg.DBName)
+	for _, c := range counts {
+		fmt.Printf("  %-12s %d user\n", c.Role, c.Total)
+	}
 	fmt.Println(`
-Akun dummy (password semua: password123)
+Akun utama untuk dicoba:
   superadmin      super_admin
   admin.sbytimur  admin  (Surabaya Timur)
   tutor.rina      tutor  (Surabaya Timur)
