@@ -543,6 +543,36 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Laporan bug (kirim log)",
+      "description": "Admin & super admin mengirim deskripsi bug + file log API hari ini (logs/api-YYYY-MM-DD.txt) ke email developer (LOG_REPORT_EMAIL di .env).\n\nLogin dulu sebagai admin (**Login per role > Admin**). SMTP harus sudah diisi di .env; kalau belum, response 503.\n\nJeda minimal 1 menit antar pengiriman (kirim ulang terlalu cepat → 429).",
+      "item": [
+        {
+          "name": "Kirim log hari ini (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Siswa tidak bisa login sekitar jam 10 pagi, muncul pesan error server\",\n  \"request_id\": \"\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/log-reports",
+            "description": "Kirim log hari ini ke email developer.\n\n- `description` (wajib, maks 2000 karakter): apa yang dilakukan, apa yang terjadi, kira-kira jam berapa.\n- `request_id` (opsional): isi header `X-Request-ID` dari response yang error, supaya developer langsung menemukan baris lognya.\n\nFile di atas 5 MB dikirim sebagai `.txt.gz`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

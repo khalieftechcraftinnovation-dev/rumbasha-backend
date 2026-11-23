@@ -116,6 +116,8 @@ func (h *SubjectHandler) Delete(c *gin.Context) {
 
 // handleError mengubah error dari service menjadi response HTTP yang sesuai.
 func (h *SubjectHandler) handleError(c *gin.Context, err error) {
+	_ = c.Error(err) // dicatat di log API (field "process")
+
 	switch {
 	case errors.Is(err, subjectmodel.ErrSubjectNotFound):
 		response.Error(c, http.StatusNotFound, "Mata pelajaran tidak ditemukan")

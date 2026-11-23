@@ -90,7 +90,9 @@ internal/
     pagination.go           Dipakai bersama semua fitur.
     login/  subject/
 
-  middleware/             Cek login (RequireAuth) dan role (RequireRole) sebelum handler.
+  middleware/             Log API (APILog), cek login (RequireAuth) dan role (RequireRole).
+  apilog/                 Menulis log API ke file .txt harian + hapus file lama.
+  mailer/                 Kirim email lewat SMTP (dipakai fitur laporan bug).
   clock/                  Aturan waktu WIB (awal bulan, tanggal hari ini).
   token/                  Membuat & membaca access token (JWT) dan refresh token.
   response/               Helper format JSON (sukses, error, validasi).
@@ -168,11 +170,13 @@ Dengan `DB_DEBUG=true` di `.env`, setiap query SQL ikut tercetak di terminal.
 
 Contoh keduanya ada di [subject_repository.go](internal/repository/subject/subject_repository.go).
 
-| Kebutuhan                            | Pakai                                        |
-|--------------------------------------|----------------------------------------------|
-| Insert, update, delete, get by ID    | GORM: `Create`, `Updates`, `Delete`, `First` |
-| List dengan filter, JOIN 1–2 tabel   | GORM atau native SQL, mana yang lebih jelas  |
-| JOIN banyak tabel, agregasi, laporan | Native SQL: `db.Raw(...).Scan(...)`          |
+| Kebutuhan                                      | Pakai                                          |
+|------------------------------------------------|------------------------------------------------|
+| Insert, update, delete, get by ID              | GORM: `Create`, `Updates`, `Delete`, `First`   |
+| List dengan filter, JOIN 1–2 tabel             | GORM atau native SQL, mana yang lebih jelas    |
+| **JOIN lebih dari 2 tabel**, agregasi, laporan | **Wajib native SQL**: `db.Raw(...).Scan(...)`  |
+
+Tabel yang di-JOIN lebih dari sekali tetap dihitung per JOIN. Contoh: `users` + `master_data_items` (jenjang) + `master_data_items` (kelas) = 3 tabel, jadi wajib native SQL (lihat [user_repository.go](internal/repository/login/user_repository.go)).
 
 Di native SQL, selalu pakai `?` untuk nilai dari user, jangan sambung string:
 
@@ -214,6 +218,14 @@ Kalau migration gagal di tengah jalan (status `dirty`), perbaiki tabelnya, lalu 
 
 ## Aturan
 
+**Prioritas saat menulis kode** (kalau bertentangan, nomor lebih kecil menang):
+
+1. **Performa sistem.** Hindari query berulang (N+1), ambil data yang dibutuhkan dalam satu query, dan jangan membuat request menunggu pekerjaan yang bisa dikerjakan di background (contoh: penulisan log).
+2. **Mudah di-debug.** Kode lurus dan mudah diikuti (handler → service → repository), error selalu dicatat ke log API lewat `c.Error(err)`, dan nama fungsi atau variabel jelas.
+3. **Logging API.** Setiap request tercatat di `logs/api-YYYY-MM-DD.txt` (lihat [Log API](#log-api)).
+
+**Aturan struktur:**
+
 1. **Arah panggilan hanya ke bawah:** handler → service → repository. Handler tidak boleh memanggil repository langsung.
 2. **Aturan bisnis hanya di service.** Handler cukup baca request dan kirim response.
 3. **Semua layer disusun di `main.go`.** Setiap layer menerima layer di bawahnya lewat parameter `New...()`.
@@ -248,6 +260,7 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | POST   | `/api/v1/subjects`     | Admin        | Tambah subject                                  |
 | PUT    | `/api/v1/subjects/:id` | Admin        | Ubah subject                                    |
 | DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
+| POST   | `/api/v1/log-reports`  | Admin        | Laporan bug: kirim log hari ini ke email dev    |
 
 "Admin" = role `admin` atau `super_admin`.
 
@@ -266,8 +279,70 @@ Setiap ada endpoint baru, tambahkan juga request-nya ke collection ini.
 ## Format response
 
 ```json
-{ "success": true,  "message": "...", "data": {}, "meta": { "page": 1, "per_page": 20, "total": 1 } }
-{ "success": false, "message": "Validasi gagal", "errors": [{ "field": "code", "message": "wajib diisi" }] }
+{ "status_code": 200, "message": "...", "data": {}, "meta": { "page": 1, "per_page": 20, "total": 1 } }
+{ "status_code": 422, "message": "Validasi gagal", "data": null, "errors": [{ "field": "code", "message": "wajib diisi" }] }
 ```
 
+`status_code` selalu sama dengan HTTP status code. `data` selalu ada (`null` kalau kosong). `meta` hanya muncul di endpoint list, `errors` hanya muncul saat validasi gagal.
+
 Status: 401 belum login / sesi habis, 403 tidak punya akses / akun nonaktif, 422 validasi gagal, 400 JSON rusak, 404 data tidak ada, 409 data kembar, 500 error server (detail hanya di log).
+
+## Log API
+
+Setiap request dicatat ke `logs/api-YYYY-MM-DD.txt` (satu file per hari, tanggal WIB). File yang lebih lama dari 15 hari dihapus otomatis. Folder dan batas harinya diatur lewat `LOG_DIR` dan `LOG_RETENTION_DAYS` di `.env`.
+
+Satu baris = satu request (JSON). Contoh (dirapikan supaya mudah dibaca):
+
+```json
+{
+  "time": "2026-11-23 17:18:16.595",
+  "request_id": "fc8b1118-9208-4481-8081-85483d0864a7",
+  "method": "POST",
+  "endpoint": "/api/v1/auth/login",
+  "route": "/api/v1/auth/login",
+  "status": 422,
+  "duration_ms": 0.8,
+  "client_ip": "::1",
+  "user_agent": "PostmanRuntime/7.43.0",
+  "user_id": "",
+  "payload": { "username": "siswa.budi" },
+  "process": ["Key: 'LoginRequest.password' Error:Field validation for 'password' failed on the 'required' tag"],
+  "response": { "status_code": 422, "message": "Validasi gagal", "data": null, "errors": [ ... ] }
+}
+```
+
+- **`request_id`** juga dikirim di header response `X-Request-ID`. Kalau frontend melaporkan error, minta nilai header ini, lalu cari di file log (Ctrl+F).
+- **`process`** berisi catatan proses inti: error validasi, error dari service, alasan token ditolak, panic. Untuk menambah catatan dari handler, panggil `_ = c.Error(err)`. Fungsi `handleError` di setiap handler sudah melakukannya.
+- **Password dan token selalu disamarkan** (`"***"`). Daftar field rahasia ada di `sensitiveKeys` di [internal/apilog/entry.go](internal/apilog/entry.go). Tambahkan di sana kalau ada field rahasia baru.
+- Payload atau response di atas 10 KB hanya dicatat ukurannya. Upload file tidak dicatat isinya. `/health` tidak dicatat.
+- Log ditulis di background, jadi request tidak menunggu disk. Hentikan server dengan **Ctrl+C** (bukan menutup terminal) supaya sisa log sempat ditulis.
+
+### Laporan bug: kirim log ke email
+
+Admin dan super admin bisa mengirim deskripsi bug beserta file log hari ini ke email developer:
+
+```text
+POST /api/v1/log-reports   {"description": "Siswa tidak bisa login jam 10 pagi", "request_id": "fc8b1118-..."}
+  → email ke LOG_REPORT_EMAIL, lampiran logs/api-YYYY-MM-DD.txt (di atas 5 MB dikirim sebagai .txt.gz)
+```
+
+Setting di `.env` (contoh untuk Gmail):
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=akun.pengirim@gmail.com
+SMTP_PASSWORD=abcdefghijklmnop        # App Password 16 huruf, BUKAN password Gmail
+SMTP_FROM=akun.pengirim@gmail.com
+LOG_REPORT_EMAIL=khalieftechcraftinnovation@gmail.com
+```
+
+App Password dibuat di <https://myaccount.google.com/apppasswords>. Akun Gmail pengirim harus sudah memakai verifikasi 2 langkah. Kalau `SMTP_HOST` atau `LOG_REPORT_EMAIL` kosong, server tetap jalan dan endpoint ini membalas 503.
+
+| Status | Arti                                                        |
+|--------|-------------------------------------------------------------|
+| 200    | Email terkirim                                              |
+| 404    | Belum ada log hari ini                                      |
+| 429    | Baru saja mengirim; tunggu 1 menit                          |
+| 502    | Server email menolak / tidak bisa dihubungi (detail di log) |
+| 503    | SMTP belum diisi di `.env`                                  |

@@ -35,6 +35,8 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 
 		claims, err := token.ParseAccessToken(accessToken, jwtSecret)
 		if err != nil {
+			// Alasan aslinya (kedaluwarsa, tanda tangan salah, dsb.) dicatat di log API.
+			_ = c.Error(err)
 			// Termasuk token kedaluwarsa: client sebaiknya memanggil /auth/refresh.
 			response.Error(c, http.StatusUnauthorized, "Sesi tidak valid atau sudah berakhir")
 			return

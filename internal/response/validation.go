@@ -16,6 +16,10 @@ import (
 //   - Kalau ada field yang melanggar aturan validasi → 422 + daftar field-nya.
 //   - Kalau body-nya bukan JSON yang valid → 400.
 func ValidationError(c *gin.Context, err error) {
+	// Error asli dicatat di log API (field "process"), contoh:
+	// "Key: 'LoginRequest.Password' Error:Field validation for 'password' failed on the 'required' tag"
+	_ = c.Error(err)
+
 	var validationErrors validator.ValidationErrors
 	if !errors.As(err, &validationErrors) {
 		Error(c, http.StatusBadRequest, "Format request tidak valid")
@@ -30,11 +34,7 @@ func ValidationError(c *gin.Context, err error) {
 		})
 	}
 
-	c.AbortWithStatusJSON(http.StatusUnprocessableEntity, Body{
-		Success: false,
-		Message: "Validasi gagal",
-		Errors:  fields,
-	})
+	ErrorWithFields(c, http.StatusUnprocessableEntity, "Validasi gagal", fields)
 }
 
 // validationMessage menerjemahkan aturan validasi yang gagal menjadi pesan bahasa Indonesia.

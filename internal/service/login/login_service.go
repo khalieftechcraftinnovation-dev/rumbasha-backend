@@ -49,8 +49,8 @@ type Session struct {
 	AccessToken           string
 	AccessTokenExpiresAt  time.Time
 	RefreshToken          string
-	RefreshTokenExpiresAt time.Time // = akhir sesi (tanggal 1 bulan berikutnya, 00:00 WIB)
-	User                  loginmodel.User
+	RefreshTokenExpiresAt time.Time             // = akhir sesi (tanggal 1 bulan berikutnya, 00:00 WIB)
+	User                  loginmodel.UserDetail // user + jenjang & kelas
 }
 
 // Login mengecek username & password, lalu membuat sesi baru.
@@ -143,13 +143,13 @@ func (s *LoginService) Logout(ctx context.Context, refreshToken string) error {
 	return s.refreshTokenRepo.RevokeByHash(ctx, token.HashRefreshToken(refreshToken), time.Now())
 }
 
-// GetUser mengambil data user yang sedang login.
-func (s *LoginService) GetUser(ctx context.Context, userID string) (loginmodel.User, error) {
+// GetUser mengambil data user yang sedang login, beserta jenjang & kelasnya.
+func (s *LoginService) GetUser(ctx context.Context, userID string) (loginmodel.UserDetail, error) {
 	return s.userRepo.FindByID(ctx, userID)
 }
 
 // newSession membuat access token, lalu menyusun Session.
-func (s *LoginService) newSession(user loginmodel.User, refreshToken string, sessionEnd, now time.Time) (Session, error) {
+func (s *LoginService) newSession(user loginmodel.UserDetail, refreshToken string, sessionEnd, now time.Time) (Session, error) {
 	// Access token tidak boleh berlaku melewati akhir sesi. Contoh: login
 	// 31 Jan 23:55 → access token berakhir 1 Feb 00:00, bukan 00:10.
 	accessExpiresAt := clock.Earliest(now.Add(s.accessTokenTTL), sessionEnd)

@@ -34,18 +34,26 @@ type SessionResponse struct {
 
 // UserResponse adalah data user yang aman dikirim ke client (tanpa password_hash).
 type UserResponse struct {
-	ID               string     `json:"id"`
-	Role             string     `json:"role"`
-	Username         string     `json:"username"`
-	RealName         string     `json:"real_name"`
-	Email            *string    `json:"email"`
-	Phone            *string    `json:"phone"`
-	ParentPhone      *string    `json:"parent_phone"`
-	SchoolOrigin     *string    `json:"school_origin"`
-	BranchID         *string    `json:"branch_id"`
-	EducationLevelID *string    `json:"education_level_id"`
-	GradeID          *string    `json:"grade_id"`
-	LastLoginAt      *time.Time `json:"last_login_at"`
+	ID             string              `json:"id"`
+	Role           string              `json:"role"`
+	Username       string              `json:"username"`
+	RealName       string              `json:"real_name"`
+	Email          *string             `json:"email"`
+	Phone          *string             `json:"phone"`
+	ParentPhone    *string             `json:"parent_phone"`
+	SchoolOrigin   *string             `json:"school_origin"`
+	BranchID       *string             `json:"branch_id"`
+	EducationLevel *MasterDataResponse `json:"education_level"` // jenjang; null kalau tidak ada
+	Grade          *MasterDataResponse `json:"grade"`           // kelas; null kalau tidak ada
+	LastLoginAt    *time.Time          `json:"last_login_at"`
+}
+
+// MasterDataResponse adalah satu item dari tabel master_data_items (contoh: jenjang SMP, Kelas 7).
+type MasterDataResponse struct {
+	ID   string  `json:"id"`
+	Type string  `json:"type"` // education_level atau grade
+	Code *string `json:"code"` // contoh: SMP, GRADE_7. Boleh null untuk item buatan admin
+	Name string  `json:"name"` // contoh: SMP, Kelas 7
 }
 
 // MeResponse adalah response GET /api/v1/auth/me.
@@ -70,7 +78,7 @@ type SubscriptionResponse struct {
 }
 
 // ToSessionResponse mengubah hasil login/refresh menjadi SessionResponse.
-func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time, user loginmodel.User) SessionResponse {
+func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time, user loginmodel.UserDetail) SessionResponse {
 	return SessionResponse{
 		AccessToken:           accessToken,
 		AccessTokenExpiresAt:  accessExpiresAt,
@@ -80,21 +88,35 @@ func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshTok
 	}
 }
 
-// ToUserResponse mengubah loginmodel.User menjadi UserResponse.
-func ToUserResponse(user loginmodel.User) UserResponse {
+// ToUserResponse mengubah loginmodel.UserDetail menjadi UserResponse.
+func ToUserResponse(user loginmodel.UserDetail) UserResponse {
 	return UserResponse{
-		ID:               user.ID,
-		Role:             user.Role,
-		Username:         user.Username,
-		RealName:         user.RealName,
-		Email:            user.Email,
-		Phone:            user.Phone,
-		ParentPhone:      user.ParentPhone,
-		SchoolOrigin:     user.SchoolOrigin,
-		BranchID:         user.BranchID,
-		EducationLevelID: user.EducationLevelID,
-		GradeID:          user.GradeID,
-		LastLoginAt:      user.LastLoginAt,
+		ID:             user.ID,
+		Role:           user.Role,
+		Username:       user.Username,
+		RealName:       user.RealName,
+		Email:          user.Email,
+		Phone:          user.Phone,
+		ParentPhone:    user.ParentPhone,
+		SchoolOrigin:   user.SchoolOrigin,
+		BranchID:       user.BranchID,
+		EducationLevel: toMasterDataResponse(user.EducationLevelID, user.EducationLevelType, user.EducationLevelCode, user.EducationLevelName),
+		Grade:          toMasterDataResponse(user.GradeID, user.GradeType, user.GradeCode, user.GradeName),
+		LastLoginAt:    user.LastLoginAt,
+	}
+}
+
+// toMasterDataResponse menyusun MasterDataResponse dari kolom hasil JOIN.
+// Kalau id-nya nil (user tidak punya jenjang/kelas), hasilnya nil → null di JSON.
+func toMasterDataResponse(id, itemType, code, name *string) *MasterDataResponse {
+	if id == nil || itemType == nil || name == nil {
+		return nil
+	}
+	return &MasterDataResponse{
+		ID:   *id,
+		Type: *itemType,
+		Code: code,
+		Name: *name,
 	}
 }
 

@@ -3,8 +3,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/config"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/database"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router"
@@ -16,6 +24,10 @@ import (
 	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
 	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
+
+	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
+	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 
 	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
 	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
@@ -57,13 +69,50 @@ func main() {
 	subjectService := subjectservice.NewSubjectService(subjectrepo.NewSubjectRepository(db))
 	subjectHandler := subjecthandler.NewSubjectHandler(subjectService)
 
-	r := router.New(router.Handlers{
-		Login:   loginHandler,
-		Subject: subjectHandler,
-	}, cfg.JWTSecret)
+	// Fitur: kirim log ke email (laporan bug dari admin).
+	// Kalau SMTP belum diisi di .env, server tetap jalan; endpoint-nya saja yang membalas 503.
+	emailSender := mailer.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
+	if !emailSender.IsConfigured() || cfg.LogReportEmail == "" {
+		log.Println("info: SMTP / LOG_REPORT_EMAIL belum diisi di .env, fitur kirim log ke email nonaktif")
+	}
+	logReportService := logreportservice.NewLogReportService(emailSender, cfg.LogDir, cfg.LogReportEmail, cfg.AppEnv)
+	logReportHandler := logreporthandler.NewLogReportHandler(logReportService, loginService)
 
-	log.Printf("server berjalan di http://localhost:%s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("server gagal berjalan: %v", err)
+	// Log API harian: logs/api-YYYY-MM-DD.txt, disimpan LOG_RETENTION_DAYS hari terakhir.
+	apiLog, err := apilog.NewWriter(cfg.LogDir, cfg.LogRetentionDays)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer apiLog.Close() // menulis sisa log di antrean sebelum aplikasi berhenti
+
+	r := router.New(router.Handlers{
+		Login:     loginHandler,
+		Subject:   subjectHandler,
+		LogReport: logReportHandler,
+	}, cfg.JWTSecret, apiLog)
+
+	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}
+
+	// Server dijalankan di goroutine (background), supaya main() bisa menunggu Ctrl+C.
+	go func() {
+		log.Printf("server berjalan di http://localhost:%s", cfg.Port)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server gagal berjalan: %v", err)
+		}
+	}()
+
+	// Tunggu sampai ada sinyal berhenti (Ctrl+C di terminal, atau SIGTERM dari server).
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+
+	// Graceful shutdown: berhenti menerima request baru, tunggu request yang sedang
+	// berjalan selesai (maksimal 10 detik). Setelah itu semua defer di atas dijalankan:
+	// sisa log ditulis ke file, lalu koneksi database ditutup.
+	log.Println("server berhenti...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("gagal menghentikan server dengan rapi: %v", err)
 	}
 }

@@ -32,6 +32,18 @@ type Config struct {
 	// Aturan Daily Quiz, berlaku sama untuk semua siswa (BR-019).
 	DailyQuizFreeQuota int // jatah gratis per hari
 	DailyQuizCoinCost  int // biaya coin per quiz setelah jatah gratis habis
+
+	// Log API: satu file .txt per hari di folder LogDir.
+	LogDir           string
+	LogRetentionDays int // file log yang lebih lama dari ini dihapus otomatis
+
+	// Email (SMTP), dipakai untuk mengirim log ke developer saat admin melaporkan bug.
+	SMTPHost       string
+	SMTPPort       string
+	SMTPUsername   string
+	SMTPPassword   string // untuk Gmail: App Password, bukan password akun
+	SMTPFrom       string // alamat pengirim
+	LogReportEmail string // alamat tujuan laporan bug + log
 }
 
 // IsProduction bernilai true kalau aplikasi berjalan di production.
@@ -62,6 +74,16 @@ func Load() Config {
 
 		DailyQuizFreeQuota: getEnvInt("DAILY_QUIZ_FREE_QUOTA", 2),
 		DailyQuizCoinCost:  getEnvInt("DAILY_QUIZ_COIN_COST", 10),
+
+		LogDir:           getEnv("LOG_DIR", "logs"),
+		LogRetentionDays: getEnvInt("LOG_RETENTION_DAYS", 15),
+
+		SMTPHost:       getEnv("SMTP_HOST", ""),
+		SMTPPort:       getEnv("SMTP_PORT", "587"),
+		SMTPUsername:   getEnv("SMTP_USERNAME", ""),
+		SMTPPassword:   getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:       getEnv("SMTP_FROM", ""),
+		LogReportEmail: getEnv("LOG_REPORT_EMAIL", ""),
 	}
 }
 

@@ -20,3 +20,6 @@ coverage.html
 *.swp
 .DS_Store
 Thumbs.db
+
+# Log API harian (berisi data request user, jangan di-commit)
+/logs/

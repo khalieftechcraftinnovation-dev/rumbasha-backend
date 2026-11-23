@@ -311,3 +311,65 @@ func TestMe_SiswaPaketExpiredKemarin(t *testing.T) {
 		}
 	}
 }
+
+// masterData adalah bentuk JSON jenjang/kelas di data user.
+type masterData struct {
+	ID   string  `json:"id"`
+	Type string  `json:"type"`
+	Code *string `json:"code"`
+	Name string  `json:"name"`
+}
+
+func TestLogin_SiswaMendapatJenjangDanKelas(t *testing.T) {
+	r, db := setupRouter(t)
+	studentID := createUser(t, db, loginmodel.RoleStudent, "siswa.test", loginmodel.UserStatusActive)
+
+	// Jenjang & kelas diambil dari data awal migration (master_data_items).
+	err := db.Exec(`
+		UPDATE users
+		SET education_level_id = (SELECT id FROM master_data_items WHERE type = 'education_level' AND code = 'SMP'),
+		    grade_id           = (SELECT id FROM master_data_items WHERE type = 'grade' AND code = 'GRADE_7')
+		WHERE id = ?`, studentID).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := sendRequest(r, http.MethodPost, "/api/v1/auth/login",
+		`{"username":"siswa.test","password":"`+testPassword+`"}`, "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("login gagal: status %d, body: %s", res.Code, res.Body)
+	}
+
+	var session struct {
+		User struct {
+			EducationLevel *masterData `json:"education_level"`
+			Grade          *masterData `json:"grade"`
+		} `json:"user"`
+	}
+	decodeData(t, res, &session)
+
+	level := session.User.EducationLevel
+	if level == nil || level.Type != "education_level" || level.Code == nil || *level.Code != "SMP" || level.Name != "SMP" || level.ID == "" {
+		t.Errorf("education_level salah: %+v. body: %s", level, res.Body)
+	}
+	grade := session.User.Grade
+	if grade == nil || grade.Type != "grade" || grade.Code == nil || *grade.Code != "GRADE_7" || grade.Name != "Kelas 7" || grade.ID == "" {
+		t.Errorf("grade salah: %+v. body: %s", grade, res.Body)
+	}
+}
+
+func TestLogin_AdminTanpaJenjangDanKelas(t *testing.T) {
+	r, db := setupRouter(t)
+	createUser(t, db, loginmodel.RoleAdmin, "admin.test", loginmodel.UserStatusActive)
+
+	res := sendRequest(r, http.MethodPost, "/api/v1/auth/login",
+		`{"username":"admin.test","password":"`+testPassword+`"}`, "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("login gagal: status %d, body: %s", res.Code, res.Body)
+	}
+
+	// LEFT JOIN: admin tetap bisa login, jenjang & kelasnya null.
+	if !strings.Contains(res.Body.String(), `"education_level":null`) || !strings.Contains(res.Body.String(), `"grade":null`) {
+		t.Errorf("education_level dan grade seharusnya null. body: %s", res.Body)
+	}
+}

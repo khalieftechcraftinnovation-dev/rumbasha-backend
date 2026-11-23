@@ -1,4 +1,5 @@
-// Package login (repository) mengakses tabel untuk fitur login: users dan refresh_tokens.
+// Package login (repository) mengakses tabel untuk fitur login: users dan refresh_tokens
+// (ditambah master_data_items untuk nama jenjang & kelas user).
 //
 // Di package lain, import dengan alias loginrepo:
 //
@@ -7,7 +8,6 @@ package login
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -25,32 +25,57 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// FindByUsername mencari user (yang belum dihapus) berdasarkan username. [GORM]
+// userDetailQuery mengambil user (yang belum dihapus) beserta jenjang & kelasnya.
+// Tabel master_data_items di-JOIN 2 kali dengan alias berbeda: "level" untuk jenjang, "grade" untuk kelas.
 //
-//	SELECT * FROM users WHERE username = ? AND deleted_at IS NULL LIMIT 1
-func (r *UserRepository) FindByUsername(ctx context.Context, username string) (loginmodel.User, error) {
-	var user loginmodel.User
-	err := r.db.WithContext(ctx).
-		Where("username = ? AND deleted_at IS NULL", username).
-		Take(&user).Error
+// LEFT JOIN (bukan JOIN): user tanpa jenjang/kelas (admin, tutor) tetap ditemukan,
+// kolom jenjang/kelasnya saja yang bernilai NULL.
+//
+// Kondisi pencarian (username / id) ditambahkan oleh masing-masing fungsi di bawah.
+const userDetailQuery = `
+	SELECT u.*,
+	       level.type AS education_level_type,
+	       level.code AS education_level_code,
+	       level.name AS education_level_name,
+	       grade.type AS grade_type,
+	       grade.code AS grade_code,
+	       grade.name AS grade_name
+	FROM users u
+	LEFT JOIN master_data_items AS level ON level.id = u.education_level_id
+	LEFT JOIN master_data_items AS grade ON grade.id = u.grade_id
+	WHERE u.deleted_at IS NULL`
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return loginmodel.User{}, loginmodel.ErrUserNotFound
+// FindByUsername mencari user berdasarkan username, beserta jenjang & kelasnya. [Native SQL]
+func (r *UserRepository) FindByUsername(ctx context.Context, username string) (loginmodel.UserDetail, error) {
+	var user loginmodel.UserDetail
+	err := r.db.WithContext(ctx).
+		Raw(userDetailQuery+` AND u.username = ? LIMIT 1`, username).
+		Scan(&user).Error
+	if err != nil {
+		return loginmodel.UserDetail{}, err
 	}
-	return user, err
+
+	// Raw + Scan tidak mengembalikan error kalau datanya tidak ada, jadi dicek dari ID-nya.
+	if user.ID == "" {
+		return loginmodel.UserDetail{}, loginmodel.ErrUserNotFound
+	}
+	return user, nil
 }
 
-// FindByID mencari user (yang belum dihapus) berdasarkan ID. [GORM]
-func (r *UserRepository) FindByID(ctx context.Context, id string) (loginmodel.User, error) {
-	var user loginmodel.User
+// FindByID mencari user berdasarkan ID, beserta jenjang & kelasnya. [Native SQL]
+func (r *UserRepository) FindByID(ctx context.Context, id string) (loginmodel.UserDetail, error) {
+	var user loginmodel.UserDetail
 	err := r.db.WithContext(ctx).
-		Where("id = ? AND deleted_at IS NULL", id).
-		Take(&user).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return loginmodel.User{}, loginmodel.ErrUserNotFound
+		Raw(userDetailQuery+` AND u.id = ? LIMIT 1`, id).
+		Scan(&user).Error
+	if err != nil {
+		return loginmodel.UserDetail{}, err
 	}
-	return user, err
+
+	if user.ID == "" {
+		return loginmodel.UserDetail{}, loginmodel.ErrUserNotFound
+	}
+	return user, nil
 }
 
 // UpdateLastLogin mencatat waktu login terakhir. [GORM]

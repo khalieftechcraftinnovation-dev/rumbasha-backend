@@ -120,6 +120,8 @@ func (h *LoginHandler) Me(c *gin.Context) {
 // Catatan Go: Go tidak punya try/catch. Error dikembalikan sebagai nilai biasa,
 // lalu dicek dengan errors.Is untuk tahu jenis error-nya.
 func (h *LoginHandler) handleError(c *gin.Context, err error) {
+	_ = c.Error(err) // dicatat di log API (field "process")
+
 	switch {
 	case errors.Is(err, loginmodel.ErrInvalidCredentials):
 		response.Error(c, http.StatusUnauthorized, "Username atau kata sandi salah")

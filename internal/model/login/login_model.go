@@ -54,6 +54,26 @@ func (User) TableName() string {
 	return "users"
 }
 
+// UserDetail adalah User + data jenjang & kelasnya dari tabel master_data_items.
+// Ini hasil JOIN (bukan satu tabel), jadi hanya dipakai untuk membaca data.
+//
+// Catatan Go: "User" ditulis tanpa nama field = embedding. Semua field & method
+// User ikut bisa dipakai langsung, contoh: detail.Role, detail.IsActive().
+// Mirip "extends" di PHP.
+type UserDetail struct {
+	User
+
+	// Jenjang (master_data_items type education_level). NULL kalau user tidak punya jenjang.
+	EducationLevelType *string
+	EducationLevelCode *string
+	EducationLevelName *string
+
+	// Kelas (master_data_items type grade). NULL kalau user tidak punya kelas.
+	GradeType *string
+	GradeCode *string
+	GradeName *string
+}
+
 // IsActive bernilai true kalau akun boleh dipakai login.
 func (u User) IsActive() bool {
 	return u.Status == UserStatusActive && u.DeletedAt == nil
