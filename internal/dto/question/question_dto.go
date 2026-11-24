@@ -328,6 +328,11 @@ type ListQuestionsQuery struct {
 	Search     string `form:"search" binding:"omitempty,max=100"` // kode soal / teks soal
 	Type       string `form:"type" binding:"omitempty,oneof=single_choice multiple_choice true_false free_text"`
 	Difficulty string `form:"difficulty" binding:"omitempty,oneof=easy medium hard"` // kolom "Level"
+	// Untuk memilih soal quiz: soal yang peruntukannya berisi nilai ini, dan status soal.
+	UsedFor string `form:"used_for" binding:"omitempty,oneof=daily_quiz uji_kom tryout rumath"`
+	Status  string `form:"status" binding:"omitempty,oneof=active inactive"`
+	// Isi 1 bundle (quiz): hanya soal yang ada di quiz ini. Daftar bundle: GET /api/v1/quiz-bundles.
+	QuizID string `form:"quiz_id" binding:"omitempty,uuid"`
 
 	EducationLevelID string `form:"education_level_id" binding:"omitempty,uuid"`
 	GradeID          string `form:"grade_id" binding:"omitempty,uuid"`
@@ -354,6 +359,15 @@ type QuestionListItemResponse struct {
 	CreatedAt  time.Time               `json:"created_at"`
 	UpdatedBy  *RefResponse            `json:"updated_by"` // null kalau belum pernah diubah
 	UpdatedAt  time.Time               `json:"updated_at"`
+	// Quiz yang sudah memakai soal ini ("bundle"), terbaru dulu. [] = belum pernah dipakai.
+	Quizzes []QuizRefResponse `json:"quizzes"`
+}
+
+// QuizRefResponse adalah quiz yang memakai soal, contoh {"id": "...", "name": "Uji Kom Pecahan", "type": "uji_kom"}.
+type QuizRefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 // QuestionMediaResponse menandai isi tambahan di soal (untuk label "+N media" di tabel).
@@ -368,6 +382,11 @@ type QuestionMediaResponse struct {
 func ToQuestionListResponses(items []questionmodel.QuestionListItem) []QuestionListItemResponse {
 	result := make([]QuestionListItemResponse, 0, len(items))
 	for _, it := range items {
+		quizzes := make([]QuizRefResponse, 0, len(it.Quizzes))
+		for _, z := range it.Quizzes {
+			quizzes = append(quizzes, QuizRefResponse{ID: z.ID, Name: z.Name, Type: z.Type})
+		}
+
 		result = append(result, QuestionListItemResponse{
 			ID:       it.ID,
 			Code:     it.Code,
@@ -390,6 +409,7 @@ func ToQuestionListResponses(items []questionmodel.QuestionListItem) []QuestionL
 			CreatedAt:  it.CreatedAt,
 			UpdatedBy:  optionalRef(it.UpdatedBy, it.UpdatedByName),
 			UpdatedAt:  it.UpdatedAt,
+			Quizzes:    quizzes,
 		})
 	}
 	return result

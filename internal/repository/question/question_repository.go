@@ -418,12 +418,29 @@ func listWhere(f questionmodel.ListFilter) (string, []any) {
 		{"q.chapter_id", f.ChapterID},
 		{"q.subchapter_id", f.SubchapterID},
 		{"q.topic_id", f.TopicID},
+		{"q.status", f.Status},
 	}
 	for _, e := range equals {
 		if e.value != "" {
 			conds = append(conds, e.column+" = ?")
 			args = append(args, e.value)
 		}
+	}
+
+	// Peruntukan: used_for berisi nilai ini, contoh used_for @> '["uji_kom"]' (index GIN questions_used_for_idx).
+	if f.UsedFor != "" {
+		conds = append(conds, "q.used_for @> ?::jsonb")
+		args = append(args, `["`+f.UsedFor+`"]`) // aman: nilai sudah dibatasi oneof di binding
+	}
+
+	// Isi 1 bundle: soal yang ada di quiz ini (quiz belum dihapus). Pakai primary key
+	// quiz_questions (quiz_id, question_id), jadi cepat.
+	if f.QuizID != "" {
+		conds = append(conds, `EXISTS (
+			SELECT 1 FROM quiz_questions qq
+			JOIN quizzes z ON z.id = qq.quiz_id AND z.deleted_at IS NULL
+			WHERE qq.quiz_id = ? AND qq.question_id = q.id)`)
+		args = append(args, f.QuizID)
 	}
 
 	// Pencarian: cocok di bagian mana saja dari kode / teks soal (pakai index trigram).
@@ -437,7 +454,7 @@ func listWhere(f questionmodel.ListFilter) (string, []any) {
 }
 
 // likeEscaper membuat %, _, dan \ yang diketik user dicari apa adanya (bukan wildcard LIKE).
-var likeEscaper = strings.NewReplacer(`\`, `\`, `%`, `\%`, `_`, `\_`)
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 func escapeLike(s string) string {
 	return likeEscaper.Replace(s)
@@ -475,7 +492,8 @@ const questionListQuery = `
 		q.status,
 		q.created_by,         u.real_name  AS created_by_name,
 		q.updated_by,         uu.real_name AS updated_by_name,
-		q.created_at, q.updated_at
+		q.created_at, q.updated_at,
+		used.quizzes::text    AS quizzes
 	FROM page p
 	JOIN      questions         AS q       ON q.id       = p.id
 	JOIN      master_data_items AS level   ON level.id   = q.education_level_id
@@ -487,9 +505,20 @@ const questionListQuery = `
 	LEFT JOIN master_data_items AS topic   ON topic.id   = q.topic_id
 	LEFT JOIN users             AS u       ON u.id       = q.created_by
 	LEFT JOIN users             AS uu      ON uu.id      = q.updated_by
+	-- Quiz yang sudah memakai soal ini (penanda "bundle"), terbaru dulu. Dihitung hanya untuk
+	-- soal di halaman ini, lewat index quiz_questions_question_idx. Quiz terhapus tidak ikut.
+	LEFT JOIN LATERAL (
+		SELECT COALESCE(
+			json_agg(json_build_object('id', z.id, 'name', z.name, 'type', z.type)
+			         ORDER BY z.created_at DESC),
+			'[]') AS quizzes
+		FROM quiz_questions qq
+		JOIN quizzes z ON z.id = qq.quiz_id AND z.deleted_at IS NULL
+		WHERE qq.question_id = q.id
+	) AS used ON TRUE
 	ORDER BY p.created_at DESC, p.id DESC`
 
-// questionListRow menampung 1 baris questionListQuery apa adanya (used_for masih teks JSON).
+// questionListRow menampung 1 baris questionListQuery apa adanya (used_for & quizzes masih teks JSON).
 type questionListRow struct {
 	ID, Code, Type, QuestionText   string
 	HasFormula, HasImage, HasTable bool
@@ -507,6 +536,7 @@ type questionListRow struct {
 	CreatedByName               *string
 	UpdatedBy, UpdatedByName    *string
 	CreatedAt, UpdatedAt        time.Time
+	Quizzes                     string
 }
 
 // List mengambil 1 halaman soal sesuai filter, urut terbaru dulu, beserta total soal
@@ -540,6 +570,9 @@ func (r *QuestionRepository) List(ctx context.Context, f questionmodel.ListFilte
 		}
 		if err := json.Unmarshal([]byte(row.UsedFor), &item.UsedFor); err != nil {
 			return nil, 0, fmt.Errorf("soal %s: used_for rusak: %w", row.Code, err)
+		}
+		if err := json.Unmarshal([]byte(row.Quizzes), &item.Quizzes); err != nil {
+			return nil, 0, fmt.Errorf("soal %s: daftar quiz rusak: %w", row.Code, err)
 		}
 		items = append(items, item)
 	}

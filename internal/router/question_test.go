@@ -22,9 +22,16 @@ type testPlacement struct {
 	LevelID, GradeID, OtherGradeID, SubjectID, FieldID, ChapterID, SubchapterID, TopicID string
 }
 
-// seedPlacement membuat hierarki mapel di database test. Nama diberi akhiran acak supaya
+// seedPlacement membuat hierarki mapel di database test (Kelas 4). Nama diberi akhiran acak supaya
 // tidak bentrok dengan test lain (tabel master_data_items tidak dikosongkan antar test).
 func seedPlacement(t *testing.T, db *gorm.DB) testPlacement {
+	t.Helper()
+	return seedPlacementInGrade(t, db, "GRADE_4")
+}
+
+// seedPlacementInGrade sama seperti seedPlacement, tapi di kelas tertentu (code master data,
+// contoh "GRADE_6" untuk Uji Kom). OtherGradeID selalu Kelas 5.
+func seedPlacementInGrade(t *testing.T, db *gorm.DB, gradeCode string) testPlacement {
 	t.Helper()
 	var p testPlacement
 	suffix := uuid.NewString()[:8]
@@ -35,7 +42,7 @@ func seedPlacement(t *testing.T, db *gorm.DB) testPlacement {
 			t.Fatalf("gagal menyiapkan master data: %v\nSQL: %s", err, sql)
 		}
 	}
-	mustScan(&p.GradeID, `SELECT id FROM master_data_items WHERE type = 'grade' AND code = 'GRADE_4'`)
+	mustScan(&p.GradeID, `SELECT id FROM master_data_items WHERE type = 'grade' AND code = ?`, gradeCode)
 	mustScan(&p.OtherGradeID, `SELECT id FROM master_data_items WHERE type = 'grade' AND code = 'GRADE_5'`)
 	mustScan(&p.LevelID, `SELECT parent_id FROM master_data_items WHERE id = ?`, p.GradeID)
 	mustScan(&p.SubjectID, `INSERT INTO master_data_items (type, name) VALUES ('subject', ?) RETURNING id`, "Matematika "+suffix)
@@ -53,6 +60,7 @@ func seedPlacement(t *testing.T, db *gorm.DB) testPlacement {
 
 	t.Cleanup(func() {
 		// Urutan penting: soal & gambar menunjuk ke master data, jadi dihapus lebih dulu.
+		db.Exec(`DELETE FROM quizzes`) // quiz_questions ikut terhapus (ON DELETE CASCADE)
 		db.Exec(`DELETE FROM questions`)
 		db.Exec(`DELETE FROM media_assets`)
 		db.Exec(`DELETE FROM master_data_items WHERE id IN ?`, []string{p.TopicID, p.SubchapterID, p.ChapterID})

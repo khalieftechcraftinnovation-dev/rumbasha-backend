@@ -58,6 +58,8 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			student_feature_overrides,
 			coin_packages,
 			coin_transactions,
+			quiz_questions,
+			quizzes,
 			questions,
 			media_assets
 		RESTART IDENTITY`).Error

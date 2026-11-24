@@ -289,6 +289,8 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | GET    | `/api/v1/questions`    | Admin        | List Bank Soal: filter, search, pagination      |
 | GET    | `/api/v1/questions/type-counts` | Admin | Jumlah soal per tipe (angka di tab)     |
 | GET    | `/api/v1/dropdowns/:type` | Login (semua role) | Pilihan dropdown dari master data  |
+| POST   | `/api/v1/quizzes`      | Admin        | Buat quiz Uji Kom / Tryout + soal yang dipilih  |
+| GET    | `/api/v1/quiz-bundles` | Admin        | Daftar bundle (quiz lama) untuk dipakai ulang   |
 | GET    | `/api/v1/questions/:id`| Admin        | Detail soal + kunci jawaban & pembahasan        |
 | PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
 | DELETE | `/api/v1/questions`    | Admin        | Hapus 1-100 soal sekaligus (soft delete)        |
@@ -364,6 +366,9 @@ Tabel Bank Soal, **urut terbaru dulu** (`created_at DESC`). Semua query string o
 | `search` | Cari di **kode soal** dan **teks soal**, bagian mana saja, tidak peka huruf besar/kecil (maks 100 karakter). `%` dan `_` dicari apa adanya |
 | `type` | `single_choice` / `multiple_choice` / `true_false` / `free_text` |
 | `difficulty` | Kolom "Level": `easy` / `medium` / `hard` |
+| `used_for` | Peruntukan: `daily_quiz` / `uji_kom` / `tryout` / `rumath` (soal yang `used_for`-nya berisi nilai ini) |
+| `status` | `active` / `inactive` |
+| `quiz_id` | Isi 1 bundle: hanya soal yang ada di quiz ini (lihat [Bundle soal](#bundle-soal-pakai-ulang-soal-quiz-lama)) |
 | `education_level_id`, `grade_id`, `subject_id`, `subject_field_id`, `chapter_id`, `subchapter_id`, `topic_id` | Filter per tingkat hierarki (UUID) |
 
 ```http
@@ -387,7 +392,8 @@ GET /api/v1/questions?page=1&per_page=20&subject_id=...&difficulty=easy&search=g
     },
     "difficulty": "easy", "used_for": ["uji_kom"], "status": "active",
     "created_by": { "id": "...", "name": "Admin Surabaya Timur" }, "created_at": "...",
-    "updated_by": null, "updated_at": "..."
+    "updated_by": null, "updated_at": "...",
+    "quizzes": [{ "id": "...", "name": "Uji Kompetensi Matematika - Bilangan Bulat", "type": "uji_kom" }]
   }],
   "meta": { "page": 1, "per_page": 20, "total": 2 }
 }
@@ -398,6 +404,8 @@ GET /api/v1/questions?page=1&per_page=20&subject_id=...&difficulty=easy&search=g
 - `updated_by: null` = soal belum pernah diubah (`updated_at` = waktu dibuat).
 - **Tanpa** kunci jawaban & pembahasan supaya response kecil; ambil lewat detail kalau perlu.
 - Soal yang dihapus (soft delete) tidak pernah tampil. Hasil kosong → `data: []`.
+- `quizzes` = penanda **"sudah dipakai di quiz"**: quiz (belum dihapus) yang memakai soal ini, terbaru dulu; `[]` = belum pernah dipakai. Diambil dari tabel `quiz_questions` lewat index `question_id`, hanya untuk soal di halaman ini (bukan seluruh bank soal).
+- Untuk layar **pilih soal quiz**: `?used_for=uji_kom&status=active&subject_id=...&grade_id=...` → hanya soal yang boleh dipilih ke quiz tersebut.
 - Performa: halaman dipotong dulu di tabel `questions` (CTE), baru JOIN nama untuk ≤ `per_page` soal itu saja. Pencarian memakai index trigram `pg_trgm` (migration 000013). Uji 20.000 soal: ~1 ms dengan index vs ~350 ms tanpa index. Total (`meta.total`) dihitung dengan `COUNT(*)` terpisah, kecuali sudah pasti dari halaman terakhir yang tidak penuh.
 - Soal dari 1 request bulk create punya `created_at` yang sama; urutannya tetap sesuai request (id soal memakai UUID v7 yang berurutan).
 - Tab tipe dipilih (`type=...`): index `questions_type_created_at_idx` (migration 000014) langsung memberi 20 soal terbaru tipe itu tanpa sorting (uji 100.000 soal: < 0,1 ms).
@@ -538,6 +546,96 @@ Setiap ada endpoint baru, tambahkan juga request-nya ke collection ini.
 `status_code` selalu sama dengan HTTP status code. `data` selalu ada (`null` kalau kosong). `meta` hanya muncul di endpoint list, `errors` hanya muncul saat validasi gagal.
 
 Status: 401 belum login / sesi habis, 403 tidak punya akses / akun nonaktif, 422 validasi gagal, 400 JSON rusak, 404 data tidak ada, 409 data kembar, 500 error server (detail hanya di log).
+
+## Quiz (Uji Kom & Tryout)
+
+Tabel (migration 000016 & 000017):
+
+| Tabel | Isi |
+| ----- | --- |
+| `quizzes` | Info quiz: nama, tipe, letak (jenjang, kelas, mapel wajib; bidang materi s/d topik opsional), `start_at` (waktu mulai), durasi, biaya coin, `total_questions`, status (`draft`/`published`), `access_code` (kode akses) |
+| `quiz_questions` | Soal yang dipilih: `(quiz_id, question_id, sort_order)`. 1 soal tidak bisa dipilih 2x di quiz yang sama; boleh dipakai di banyak quiz |
+
+`total_questions` disimpan di `quizzes` (selalu = jumlah baris `quiz_questions`) supaya list quiz tidak perlu `COUNT`. Penanda "soal sudah dipakai quiz" di list Bank Soal juga dibaca dari `quiz_questions` (index `quiz_questions_question_idx`), jadi tidak ada kolom tambahan di `questions` yang harus selalu disinkronkan.
+
+### Buat quiz (`POST /api/v1/quizzes`)
+
+```json
+{
+  "name": "Uji Kompetensi Matematika - KPK dan FPB",
+  "type": "uji_kom",
+  "placement": {
+    "education_level_id": "...", "grade_id": "...", "subject_id": "...",
+    "subject_field_id": "...", "chapter_id": "..."
+  },
+  "start_at": "2026-12-01T08:00",
+  "duration_minutes": 60,
+  "coin_cost": 0,
+  "total_questions": 12,
+  "bundle_quiz_ids": ["..."],
+  "question_ids": ["...", "..."]
+}
+```
+
+| Field | Aturan |
+| ----- | ------ |
+| `name` | Wajib, maks 200 karakter (spasi di awal/akhir dibuang) |
+| `type` | `uji_kom` / `tryout` (Daily Quiz & RUMATH dibuat otomatis, bukan lewat API ini) |
+| `placement` | Jenjang, kelas, mapel **wajib**. Bidang materi, bab, sub bab, topik opsional tapi berurutan (bab butuh bidang materi, dst). Kelas harus milik jenjang; bidang materi harus milik mapel & kelas; semua harus aktif. **Uji Kom hanya untuk Kelas 6, 9, dan 12** (Tryout bebas) |
+| `start_at` | **Wajib**, waktu mulai dalam **WIB**, harus setelah sekarang. `"2026-12-01T08:00"` / `"2026-12-01 08:00"` (tanpa zona = WIB, sama dengan nilai input HTML `datetime-local`), atau RFC3339 dengan zona (`"2026-12-01T01:00:00Z"` = 08:00 WIB) |
+| `duration_minutes` | Wajib, 1-600 menit |
+| `coin_cost` | Opsional, default 0 (gratis) |
+| `bundle_quiz_ids` | Opsional, maks 20. **Semua** soal dari quiz-quiz ini (bundle) ikut masuk |
+| `question_ids` | Opsional, soal satuan. Minimal salah satu dari `bundle_quiz_ids` / `question_ids` diisi |
+| `total_questions` | Wajib, harus **sama** dengan jumlah soal akhir (soal bundle + soal satuan, setelah soal kembar dibuang). Maks 200 |
+
+Urutan soal: soal bundle (urut bundle di `bundle_quiz_ids`, lalu nomor soal di bundle itu), lalu `question_ids`. Soal yang muncul lebih dari sekali (di 2 bundle, atau di bundle + satuan) hanya diambil sekali, di posisi pertamanya.
+
+Syarat setiap soal (error di field asalnya, `bundle_quiz_ids[i]` atau `question_ids[i]`, dengan kode soal, contoh `"Q-12: soal tidak aktif"`):
+
+- ada & belum dihapus (`"Q-12: soal sudah dihapus"` untuk soal lama di bundle), status `active`;
+- `used_for` berisi tipe quiz (quiz Uji Kom hanya boleh memakai soal bertanda Uji Kom);
+- mapel & kelas sama dengan quiz; kalau quiz mengisi bidang materi/bab/sub bab/topik, soal juga harus di tingkat yang sama.
+
+Respons 201 = detail quiz (`status: "draft"`), letak dengan nama, `start_at` & `end_at` (= mulai + durasi) dalam WIB (`"2026-12-01T08:00:00+07:00"`), `access_code`, dan `questions: [{no, id, code, type, question, difficulty}]` urut nomor soal. Semua kesalahan dikembalikan sekaligus (422); kalau letak quiz salah, soal tidak dibandingkan ke letak itu (supaya error tidak berlipat).
+
+Performa: soal bundle 1 query, cek letak 1 query, cek semua soal 1 query, simpan 1 transaksi (1 INSERT quiz + 1 INSERT banyak baris untuk soal), ambil detail 2 query.
+
+### Bundle soal (pakai ulang soal quiz lama)
+
+Bundle = quiz yang sudah dibuat (belum dihapus). Saat membuat quiz baru, admin bisa:
+
+1. **Ambil bundle utuh**: kirim ID-nya di `bundle_quiz_ids`.
+2. **Pilih sebagian soal dari bundle**: buka isinya lewat `GET /api/v1/questions?quiz_id=<id>` (semua kolom, filter, dan pagination list soal tetap berlaku, contoh `&used_for=uji_kom&status=active`), centang soal yang mau dipakai, kirim sebagai `question_ids`.
+
+Daftar bundle: `GET /api/v1/quiz-bundles` (admin), terbaru dulu.
+
+| Query | Isi |
+| ----- | --- |
+| `page`, `per_page` | Default 1 & 20, `per_page` maks 100 |
+| `search` | Nama quiz (sebagian kata, tidak peka huruf besar/kecil) |
+| `type` | `uji_kom` / `tryout` |
+| `education_level_id`, `grade_id`, `subject_id` | Filter letak |
+
+```json
+{
+  "data": [{
+    "id": "...", "name": "Uji Kompetensi Matematika - KPK dan FPB", "type": "uji_kom",
+    "education_level": { "id": "...", "name": "SD" }, "grade": { "id": "...", "name": "Kelas 6" },
+    "subject": { "id": "...", "name": "Matematika" }, "total_questions": 12, "created_at": "..."
+  }],
+  "meta": { "page": 1, "per_page": 20, "total": 1 }
+}
+```
+
+### Kode akses & pergantian per jam
+
+- Setiap quiz Uji Kom & Tryout mendapat `access_code` acak saat dibuat: **6 karakter A-Z dan 0-9** (contoh `K7Q2ZD`), dibuat dengan `crypto/rand` (tidak bisa ditebak). Kode **unik** di antara quiz yang belum dihapus (index unik `quizzes_access_code_unique`); kalau kebetulan bentrok, kode dibuat ulang otomatis.
+- **Scheduler** di dalam proses API ([internal/scheduler](internal/scheduler/scheduler.go), library `robfig/cron`) mengganti kode akses **setiap jam tepat (WIB)** untuk quiz yang **belum selesai** (`start_at + durasi > sekarang`, termasuk yang belum mulai & yang sedang berjalan). Quiz yang sudah selesai atau dihapus tidak diubah.
+- Jadwal diatur `ACCESS_CODE_REFRESH_CRON` di `.env` (format cron 5 kolom, default `0 * * * *`; `off` = mati).
+- **Aman untuk beberapa server**: setiap jalan memakai advisory lock PostgreSQL (`pg_try_advisory_xact_lock`), jadi hanya 1 server yang mengganti kode; server lain mencatat "dilewati".
+- Performa: 1 transaksi, quiz dicari lewat index `start_at` (durasi maks 600 menit → quiz yang belum selesai pasti mulai < 10 jam lalu), kode baru dicek sekaligus ke database, lalu UPDATE banyak baris per 1.000 quiz.
+- Hasil setiap jalan dicetak di terminal server, contoh `scheduler: kode akses 12 quiz diganti (35ms)`.
 
 ## Dropdown (`GET /api/v1/dropdowns/:type`)
 

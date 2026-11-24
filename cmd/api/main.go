@@ -16,6 +16,7 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/config"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/database"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scheduler"
 
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
@@ -30,11 +31,14 @@ import (
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
-	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
-	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
+	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
+	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
+	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
+	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
+	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
@@ -100,6 +104,18 @@ func main() {
 		imageservice.NewImageService(imagerepo.NewImageRepository(db), storage.NewLocal(cfg.StorageDir, cfg.AppURL)),
 	)
 
+	// Fitur: Quiz (Uji Kom & Tryout). Service juga dipakai scheduler (ganti kode akses tiap jam).
+	quizService := quizservice.NewQuizService(quizrepo.NewQuizRepository(db))
+
+	// Scheduler (cron di dalam proses API): ganti kode akses quiz yang belum selesai.
+	// Jadwal dari ACCESS_CODE_REFRESH_CRON (default setiap jam tepat, WIB).
+	jobs, err := scheduler.Start(cfg.AccessCodeRefreshCron, quizService)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Saat berhenti: tunggu pekerjaan terjadwal yang sedang jalan selesai (sebelum database ditutup).
+	defer func() { <-jobs.Stop().Done() }()
+
 	// Log API harian: logs/api-YYYY-MM-DD.txt, disimpan LOG_RETENTION_DAYS hari terakhir.
 	apiLog, err := apilog.NewWriter(cfg.LogDir, cfg.LogRetentionDays)
 	if err != nil {
@@ -114,6 +130,7 @@ func main() {
 		Question:  questionHandler,
 		Image:     imageHandler,
 		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
+		Quiz:      quizhandler.NewQuizHandler(quizService),
 	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

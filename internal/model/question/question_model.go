@@ -254,6 +254,10 @@ type ListFilter struct {
 	SubchapterID     string
 	TopicID          string
 
+	UsedFor string // peruntukan, contoh "uji_kom" (soal yang used_for-nya berisi nilai ini)
+	Status  string // active / inactive
+	QuizID  string // isi 1 bundle: hanya soal yang ada di quiz ini
+
 	Search string // dicari di kode soal & teks soal (tidak peka huruf besar/kecil)
 
 	Page    int
@@ -284,4 +288,13 @@ type QuestionListItem struct {
 	CreatedByName            *string
 	UpdatedBy, UpdatedByName *string // NULL kalau belum pernah diubah
 	CreatedAt, UpdatedAt     time.Time
+
+	Quizzes []QuizRef // quiz yang sudah memakai soal ini ("bundle"), terbaru dulu
+}
+
+// QuizRef adalah quiz yang memakai sebuah soal (tag json karena dibaca dari json_agg).
+type QuizRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 }

@@ -38,6 +38,9 @@ type Config struct {
 	DailyQuizFreeQuota int // jatah gratis per hari
 	DailyQuizCoinCost  int // biaya coin per quiz setelah jatah gratis habis
 
+	// Jadwal ganti kode akses quiz (format cron 5 kolom, waktu WIB). Kosong = scheduler mati.
+	AccessCodeRefreshCron string
+
 	// Log API: satu file .txt per hari di folder LogDir.
 	LogDir           string
 	LogRetentionDays int // file log yang lebih lama dari ini dihapus otomatis
@@ -82,6 +85,9 @@ func Load() Config {
 
 		DailyQuizFreeQuota: getEnvInt("DAILY_QUIZ_FREE_QUOTA", 2),
 		DailyQuizCoinCost:  getEnvInt("DAILY_QUIZ_COIN_COST", 10),
+
+		// Default: setiap jam tepat (menit 0). Isi "off" untuk mematikan scheduler.
+		AccessCodeRefreshCron: getEnv("ACCESS_CODE_REFRESH_CRON", "0 * * * *"),
 
 		LogDir:           getEnv("LOG_DIR", "logs"),
 		LogRetentionDays: getEnvInt("LOG_RETENTION_DAYS", 15),

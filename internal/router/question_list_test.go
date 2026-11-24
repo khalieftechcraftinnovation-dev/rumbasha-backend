@@ -221,6 +221,7 @@ func TestListQuestions_FilterDanSearch(t *testing.T) {
 		{"search kode", url.Values{"search": {strings.ToLower(hardTF)}}, []string{hardTF}},
 		{"search % dicari apa adanya", url.Values{"search": {"50%"}}, []string{hardTF}},
 		{"search _ bukan wildcard", url.Values{"search": {"_"}}, []string{}},
+		{"search \\ dicari apa adanya (bukan karakter escape)", url.Values{"search": {`\o`}}, []string{}},
 		{"search + filter digabung", url.Values{"search": {"  garis  "}, "subject_id": {p.SubjectID}}, []string{easySC}},
 	}
 	for _, tc := range cases {
