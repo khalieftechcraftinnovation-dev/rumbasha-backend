@@ -19,7 +19,7 @@
 | 1.0       | 1 November 2026 | Draf awal BRD.                                                                                                                                                                                                                                                        |
 | 1.1       | 9 November 2026 | Penyesuaian dengan desain UI: login, beranda siswa, modul, Daily Quiz, isi quiz, Uji Kom & Tryout, RUMATH, peringkat, paket & coin, notifikasi, profil, dan beranda admin. Fitur admin lainnya menyusul.                                                              |
 | 1.2       | 9 November 2026 | Penyesuaian dengan desain panel admin: Materi, Bank Soal, Image, Master Data, Quiz, RUMATH, Leaderboard, Report Quiz, Report RUMATH, User, Coin & Akses, Paket, Landing Page, dan Task. Ditambahkan Bagian 3.16-3.20, BR-024 sampai BR-028, dan BD-025 sampai BD-033. |
-| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel. Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-028 sampai FR-QUIZ-031, BR-029, 8.12, dan BD-031. |
+| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text". Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. |
 
 Catatan v1.2: perubahan v1.2 ditandai sebagai tracked changes (perubahan v1.1 sudah diterima). Hal yang diambil dari desain tetapi belum pasti dicatat di Bagian 15 (Business Decisions Pending).
 
@@ -627,21 +627,29 @@ Functional requirements:
 
 - FR-QUIZ-027: Setiap soal ditandai "Dipakai untuk": Daily Quiz, Uji Kom, Tryout, dan/atau RUMATH (boleh lebih dari satu). Kolom "Dipakai di" pada daftar menampilkan peruntukan tersebut.
 
-- FR-QUIZ-028 (baru v1.3): Isi soal terdiri dari teks pertanyaan (boleh berisi rumus LaTeX), dan opsional: rumus LaTeX terpisah, satu gambar dari Image library, satu tabel (judul kolom opsional, maksimal 10 kolom dan 50 baris), serta pembahasan. Urutan tampil bagian soal (pertanyaan, rumus, gambar, tabel) dapat diatur admin.
+- FR-QUIZ-033 (baru v1.3): Isi soal terdiri dari teks pertanyaan (boleh berisi rumus LaTeX) dan pembahasan, keduanya wajib untuk semua tipe soal. Setiap tipe soal juga dapat memiliki rumus LaTeX terpisah, satu gambar (dari Image library atau link gambar dari luar http/https, salah satu saja), dan satu tabel (judul kolom opsional, maksimal 10 kolom dan 50 baris); ketiganya opsional dan boleh dipakai sendiri-sendiri atau sekaligus. Urutan tampil bagian soal (pertanyaan, rumus, gambar, tabel) dapat diatur admin.
 
-- FR-QUIZ-029 (baru v1.3): Tingkat kesulitan soal: easy (mudah), medium (sedang), hard (sulit).
+- FR-QUIZ-034 (baru v1.3): Tingkat kesulitan soal: easy (mudah), medium (sedang), hard (sulit).
 
-- FR-QUIZ-030 (baru v1.3): Status soal: active (dapat dipakai quiz) atau inactive. Default active.
+- FR-QUIZ-035 (baru v1.3): Status soal: active (dapat dipakai quiz) atau inactive. Default active.
 
-- FR-QUIZ-031 (baru v1.3): Setiap soal mendapat kode otomatis berurutan (contoh Q-1256) dan mencatat admin pembuatnya. Hanya Admin dan Super Admin yang dapat membuat soal.
+- FR-QUIZ-036 (baru v1.3): Setiap soal mendapat kode otomatis berurutan (contoh Q-1256) dan mencatat admin pembuatnya. Hanya Admin dan Super Admin yang dapat membuat soal.
+
+- FR-QUIZ-037 (baru v1.3): Admin dapat membuat banyak soal sekaligus dalam satu kali simpan (maksimal 100 soal), dengan syarat semua soal bertipe sama. Penyimpanan bersifat semua-atau-tidak-sama-sekali: jika ada satu soal yang salah, tidak ada soal yang tersimpan, dan setiap kesalahan ditandai dengan nomor soalnya.
+
+- FR-QUIZ-038 (baru v1.3): Admin dan Super Admin dapat melihat detail satu soal, termasuk kunci jawaban, pembahasan, nama letak soal (jenjang, kelas, mapel, bidang materi, bab, subbab, topik), dan nama admin pembuatnya. Detail soal berisi kunci jawaban sehingga tidak boleh diakses siswa maupun tutor.
+
+- FR-QUIZ-039 (baru v1.3): Admin dan Super Admin dapat mengubah satu soal per sekali simpan (seluruh isi soal, termasuk tipe, letak, kunci jawaban, dan pembahasan; aturan sama dengan saat membuat soal). Sistem mencatat admin yang terakhir mengubah soal.
+
+- FR-QUIZ-040 (baru v1.3): Admin dan Super Admin dapat menghapus satu atau banyak soal sekaligus (maksimal 100). Penghapusan bersifat soft delete: soal tidak tampil lagi, tetapi datanya tetap tersimpan beserta waktu dan admin yang menghapus. Jika ada satu soal yang tidak ditemukan atau sudah dihapus, tidak ada soal yang terhapus. Perlakuan soal yang sudah dipakai pada quiz masih mengikuti BD-026.
 
 - FR-QUIZ-028: Pertanyaan dan opsi jawaban mendukung rumus yang ditulis di antara tanda \$ ... \$ (LaTeX). Form menyediakan tombol rumus (pecahan, pangkat, akar, pi, kali, bagi) dan panel Pratinjau yang menampilkan soal seperti pada HP siswa.
 
 - FR-QUIZ-029: Admin dapat mengubah dan menghapus soal. Perlakuan soal yang sudah dipakai pada quiz atau sudah dikerjakan siswa dikonfirmasi (lihat BD-026).
 
-- FR-QUIZ-030: Gambar untuk soal diambil dari Image library (3.17). Cara menyisipkan gambar pada form soal tidak terlihat pada desain.
+- FR-QUIZ-030 (diubah v1.3): Gambar untuk soal dan opsi jawaban diambil dari Image library (3.17) atau berupa link gambar dari luar (http/https); satu gambar hanya boleh memakai salah satu sumber. Opsi jawaban boleh hanya berisi gambar tanpa teks. Cara menyisipkan gambar pada form soal tidak terlihat pada desain.
 
-- FR-QUIZ-031: Import Excel memvalidasi setiap baris (tipe soal, kunci jawaban, letak soal, dan peruntukan) dan menampilkan baris yang gagal beserta alasannya. Format template dirinci saat implementasi.
+- FR-QUIZ-031 (diubah v1.3): Upload soal lewat Excel memakai 4 template (single choice, multiple choice, true/false, free text; satu file satu tipe soal, maksimal 100 soal). Upload hanya MENGECEK isi file tanpa menyimpan: letak soal ditulis dengan nama (jenjang, kelas, mapel, bidang materi, bab, subbab, topik) lalu dicocokkan ke Master Data, dan setiap baris dicek dengan aturan yang sama dengan Tambah soal ditambah aturan template (urutan tampil wajib; opsi wajib: single choice A-D, multiple choice A-C, true/false A-B). Jika ada kesalahan, semua kesalahan ditampilkan sekaligus lengkap dengan nomor baris dan kolom Excel, dan seluruh isi file ditolak. Jika valid, sistem mengembalikan data soal (letak soal sudah berisi ID dan nama) untuk ditinjau admin lalu disimpan lewat Tambah soal.
 
 - FR-QUIZ-032: Soal isian bertipe angka dan dipakai antara lain oleh RUMATH (lihat 3.7 dan BD-029).
 

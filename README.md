@@ -280,51 +280,163 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | PUT    | `/api/v1/subjects/:id` | Admin        | Ubah subject                                    |
 | DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
 | POST   | `/api/v1/log-reports`  | Admin        | Laporan bug: kirim log hari ini ke email dev    |
-| POST   | `/api/v1/questions`    | Admin        | Tambah soal (4 tipe, lihat di bawah)            |
+| POST   | `/api/v1/questions`    | Admin        | Tambah 1-100 soal sekaligus (1 tipe)            |
+| GET    | `/api/v1/questions/:id`| Admin        | Detail soal + kunci jawaban & pembahasan        |
+| PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
+| DELETE | `/api/v1/questions`    | Admin        | Hapus 1-100 soal sekaligus (soft delete)        |
+| POST   | `/api/v1/questions/import/check` | Admin | Cek file Excel soal (tidak menyimpan)  |
 
 "Admin" = role `admin` atau `super_admin`.
 
 ### Tambah soal (`POST /api/v1/questions`)
 
-Bagian umum sama untuk semua tipe; hanya isi `answer` yang berbeda. Contoh lengkap ada di Postman (folder **Bank soal**).
+Membuat 1 sampai 100 soal sekaligus, **semuanya 1 tipe** (`type` ditulis sekali di level atas). Bagian umum soal sama untuk semua tipe; hanya isi `answer` yang berbeda. Contoh lengkap ada di Postman (folder **Bank soal**).
 
 ```json
 {
   "type": "single_choice",
-  "question": "Hasil dari $\\frac{1}{2} + \\frac{1}{4}$ adalah ...",
-  "formula": null,
-  "image_id": null,
-  "table": { "headers": ["Nama", "Nilai"], "rows": [["Andi", "80"]] },
-  "explanation": "Samakan penyebut ...",
-  "display_order": ["question", "table"],
-  "placement": {
-    "education_level_id": "...", "grade_id": "...", "subject_id": "...",
-    "subject_field_id": "...", "chapter_id": "...",
-    "subchapter_id": null, "topic_id": null
-  },
-  "difficulty": "easy",
-  "used_for": ["daily_quiz", "uji_kom"],
-  "status": "active",
-  "answer": { "options": [{ "key": "A", "content": "...", "image_id": null }], "correct_key": "A" }
+  "questions": [
+    {
+      "question": "Hasil dari $\\frac{1}{2} + \\frac{1}{4}$ adalah ...",
+      "formula": null,
+      "image_id": null,
+      "table": { "headers": ["Nama", "Nilai"], "rows": [["Andi", "80"]] },
+      "explanation": "Samakan penyebut ...",
+      "display_order": ["question", "table"],
+      "placement": {
+        "education_level_id": "...", "grade_id": "...", "subject_id": "...",
+        "subject_field_id": "...", "chapter_id": "...",
+        "subchapter_id": null, "topic_id": null
+      },
+      "difficulty": "easy",
+      "used_for": ["daily_quiz", "uji_kom"],
+      "status": "active",
+      "answer": { "options": [{ "key": "A", "content": "...", "image_id": null }], "correct_key": "A" }
+    },
+    { "question": "Soal kedua ...", "...": "..." }
+  ]
 }
 ```
+
+Response 201: `"message": "2 soal berhasil dibuat"`, `data` = daftar soal (dengan `id` & `code`) urut sesuai request.
+
+- **Tidak boleh bercampur tipe.** `type` per soal tidak perlu diisi; kalau diisi dan berbeda dari `type` atas → 422 di `questions[i].type`.
+- **Semua atau tidak sama sekali.** 1 soal salah → tidak ada yang tersimpan. Field error diawali nomor soal (mulai 0), contoh `questions[2].answer.correct_key`.
+- **Hemat query**, berapa pun jumlah soalnya: 1 query cek master data, 1 query cek gambar, 1 query `INSERT` banyak baris.
 
 | `type`            | Isi `answer`                                                                                              |
 |-------------------|-----------------------------------------------------------------------------------------------------------|
 | `single_choice`   | `options` (2-5, key urut A, B, ...) + `correct_key`                                                       |
 | `multiple_choice` | `options` (2-5) + `correct_keys` (min 1) + `scoring` (`all_or_nothing` default / `partial`)               |
 | `true_false`      | `options` (1-10 pernyataan) + `correct_keys: [{"key": "A", "correct": true}, ...]` untuk SETIAP opsi       |
-| `free_text`       | `input_type` (`number` / `string`) + `accepted_answers` (1-20) + `tolerance` (number) / `case_sensitive` (string) |
+| `free_text`       | `input_type` (`number` / `text`) + `accepted_answers` (1-20) + `tolerance` (number) / `case_sensitive` (text)   |
 
 Aturan penting:
 
+- `question` dan `explanation` (pembahasan) **wajib** untuk semua tipe; isi spasi saja ditolak.
+- `formula`, gambar, dan `table` opsional dan berlaku untuk **semua tipe** (ada di level soal, bukan di `answer`): boleh salah satu, beberapa, atau ketiganya sekaligus.
 - Placement wajib sampai `chapter_id`; `subchapter_id` & `topic_id` opsional (topik butuh sub bab). Jenjang, kelas, mapel, dan bidang materi harus cocok dengan bab.
 - `display_order` opsional. Kalau diisi, harus berisi `question` + PERSIS bagian yang diisi (`formula`, `image`, `table`).
 - Field yang tidak dikenal di `answer` ditolak (contoh `correct_key` di soal `multiple_choice`), supaya salah ketik langsung ketahuan.
-- Free text `string`: jawaban siswa benar jika **mengandung salah satu** kata kunci di `accepted_answers`.
-- `image_id` (soal & opsi) harus ada di tabel `media_assets`. API upload gambar belum dibuat.
-- Semua kesalahan dikembalikan sekaligus (422) dengan `field` lengkap, contoh `answer.options[1].content`, `placement.grade_id`.
+- Free text `text`: jawaban siswa benar jika **mengandung salah satu** kata kunci di `accepted_answers`.
+- Gambar soal & opsi: `image_id` (harus ada di tabel `media_assets`, API upload gambar belum dibuat) **atau** `image_url` (link luar http/https, maks 2000 karakter). Tidak boleh dua-duanya. Opsi boleh tanpa teks kalau punya gambar.
+- Semua kesalahan dikembalikan sekaligus (422) dengan `field` lengkap, contoh `questions[0].answer.options[1].content`, `questions[1].placement.grade_id`.
 - `answer` disimpan dalam bentuk rapi di kolom JSONB `questions.answer` (spasi dibuang, default diisi, `correct_keys` true/false diurutkan sesuai opsi).
+
+### Detail soal (`GET /api/v1/questions/:id`)
+
+Khusus admin & super admin karena berisi **kunci jawaban** (`answer`) dan **pembahasan** (`explanation`). Bentuknya sama dengan data create, ditambah nama placement & pembuat:
+
+```json
+{
+  "id": "...", "code": "Q-12", "type": "single_choice",
+  "question": "KPK dari 4 dan 6 adalah ...", "formula": null, "image_id": null, "table": null,
+  "explanation": "Kelipatan persekutuan terkecil dari 4 dan 6 adalah 12",
+  "display_order": ["question"],
+  "placement": {
+    "education_level": { "id": "...", "name": "SD" },
+    "grade":           { "id": "...", "name": "Kelas 4" },
+    "subject":         { "id": "...", "name": "Matematika" },
+    "subject_field":   { "id": "...", "name": "Bilangan" },
+    "chapter":         { "id": "...", "name": "KPK dan FPB" },
+    "subchapter": null,
+    "topic": null
+  },
+  "difficulty": "easy", "used_for": ["daily_quiz"], "status": "active",
+  "answer": { "options": [ ... ], "correct_key": "B" },
+  "created_by": { "id": "...", "name": "Admin Surabaya Timur" },
+  "created_at": "...", "updated_at": "..."
+}
+```
+
+- 1 query native SQL (`questions` + 7× `master_data_items` + `users`, semua JOIN lewat primary key). SQL-nya ada di `questionDetailQuery` ([question_repository.go](internal/repository/question/question_repository.go)), bisa dicoba di DBeaver.
+- ID tidak ada, bukan UUID, atau soal sudah dihapus → 404 `Soal tidak ditemukan`.
+
+### Ubah soal (`PUT /api/v1/questions/:id`)
+
+Hanya **1 soal per request**. Body = 1 soal (bentuk sama dengan item `questions[]` di create) + `type` **wajib**:
+
+```json
+{ "type": "multiple_choice", "question": "...", "explanation": "...", "placement": { ... }, "difficulty": "medium", "used_for": ["daily_quiz"], "answer": { ... } }
+```
+
+- **Ganti penuh**: field opsional yang tidak dikirim (`formula`, `image_id`, `table`, `subchapter_id`, `topic_id`) menjadi kosong. Kirim ulang semua field dari detail soal, lalu ubah yang perlu.
+- Tipe soal boleh diganti; `answer` dicek sesuai tipe baru. Semua aturan create berlaku, field error tanpa awalan (contoh `answer.correct_key`).
+- `id`, `code`, `created_by` tidak berubah. `updated_by` & `updated_at` diisi otomatis.
+- Response 200 = detail terbaru (sama dengan GET detail). Soal tidak ada / sudah dihapus → 404.
+
+### Hapus soal (`DELETE /api/v1/questions`)
+
+**Soft delete** 1 sampai 100 soal sekaligus: `deleted_at` & `deleted_by` diisi, baris tetap ada di database (bisa dipulihkan manual / untuk laporan).
+
+```json
+{ "ids": ["uuid-soal-1", "uuid-soal-2"] }
+```
+
+- **Semua atau tidak sama sekali**: kalau ada ID yang tidak ada atau sudah dihapus → 422 dengan error di `ids[i]`, dan tidak ada soal yang terhapus.
+- ID harus UUID huruf kecil dan tidak boleh kembar.
+- Response 200: `"message": "2 soal berhasil dihapus"`, `data.deleted_ids`.
+- Soal yang sudah dihapus tidak muncul lagi di detail, update, maupun hapus (404 / 422).
+
+### Cek file Excel soal (`POST /api/v1/questions/import/check`)
+
+Upload Excel **hanya mengecek**, tidak menyimpan. Template ada di [docs/Template Upload/](docs/Template%20Upload/) (`template_single_choice.xlsx`, `template_multiple_choice.xlsx`, `template_true_false.xlsx`, `template_free_text.xlsx`); 1 file = 1 tipe soal.
+
+Request: `multipart/form-data`, field `file` (.xlsx, maks 5 MB, maks 100 soal).
+
+- **Tipe soal dideteksi dari header** (`correct_key` → single choice, `correct_keys` → multiple choice, `statement_a_content` → true/false, `input_type` → free text). Nama kolom tidak boleh diubah.
+- **Placement diisi nama**, bukan ID. Nama dicocokkan ke master data mengikuti hierarki (tidak peka huruf besar/kecil): kelas dicari di jenjangnya, bidang materi di mapel + kelasnya, dst. Semua nama di file diambil dengan **1 query**.
+- Setiap baris dicek dengan aturan yang **sama persis** dengan create, ditambah aturan template: `display_order` wajib, opsi wajib (single choice A-D, multiple choice A-C, true/false A-B), `scoring` wajib, tabel butuh `table_headers` + `table_rows`.
+- `image_link` → `image_url`. Baris kosong dilewati.
+
+Valid (200) → `data` berbentuk body create + `row` & nama placement. FE bisa langsung mengirim `{"type": data.type, "questions": data.questions}` ke `POST /api/v1/questions` (field tambahan diabaikan):
+
+```json
+{
+  "type": "single_choice", "total": 1,
+  "questions": [{
+    "row": 2, "question": "KPK dari 4 dan 6 adalah ...", "image_url": null, "table": { ... },
+    "placement": { "education_level_id": "...", "education_level_name": "SD", "grade_id": "...", "grade_name": "Kelas 4", "...": "..." },
+    "answer": { "options": [ ... ], "correct_key": "B" }, "...": "..."
+  }]
+}
+```
+
+Ada error (422) → **semua data ditolak**, semua error dikembalikan sekaligus, urut per baris lalu kolom:
+
+```json
+{
+  "status_code": 422,
+  "message": "File Excel berisi 2 kesalahan, semua data ditolak",
+  "data": null,
+  "errors": [
+    { "field": "grade_name", "message": "kelas \"Kelas 9\" tidak ada di jenjang SD", "row": 3, "column": "I" },
+    { "field": "used_for", "message": "nilai ke-2: harus salah satu dari: daily_quiz, uji_kom, tryout, rumath", "row": 5, "column": "P" }
+  ]
+}
+```
+
+Masalah file (bukan .xlsx, header diubah, tanpa data, > 100 soal) → 422 dengan `field: "file"`.
 
 ### Postman
 

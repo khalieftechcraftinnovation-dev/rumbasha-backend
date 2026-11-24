@@ -23,7 +23,8 @@
     { "key": "q_subject_field_id", "value": "" },
     { "key": "q_chapter_id", "value": "" },
     { "key": "q_subchapter_id", "value": "" },
-    { "key": "q_topic_id", "value": "" }
+    { "key": "q_topic_id", "value": "" },
+    { "key": "question_id", "value": "" }
   ],
   "item": [
     {
@@ -583,7 +584,7 @@
     },
     {
       "name": "Bank soal",
-      "description": "Tambah soal (admin & super admin). Login dulu sebagai admin (**Login per role > Admin**).\n\n## Isi variable placement dulu\nAPI master data belum ada, jadi ambil ID dari database (DBeaver), lalu salin ke variable collection `q_...`:\n\n```sql\nSELECT c.education_level_id AS q_education_level_id, c.grade_id AS q_grade_id, c.subject_id AS q_subject_id,\n       c.parent_id AS q_subject_field_id, c.id AS q_chapter_id, sc.id AS q_subchapter_id, t.id AS q_topic_id\nFROM master_data_items c\nJOIN master_data_items sc ON sc.parent_id = c.id AND sc.type = 'subchapter'\nJOIN master_data_items t  ON t.parent_id = sc.id AND t.type = 'topic'\nWHERE c.type = 'chapter' AND c.name = 'KPK dan FPB'\nLIMIT 1;\n```\n\nData berasal dari `make seed` (Matematika SD Kelas 4).",
+      "description": "Tambah 1-100 soal sekaligus, semua 1 tipe: `{\"type\": \"single_choice\", \"questions\": [ {...}, {...} ]}`. Semua tersimpan atau tidak sama sekali. Admin & super admin. Login dulu sebagai admin (**Login per role > Admin**).\n\n## Isi variable placement dulu\nAPI master data belum ada, jadi ambil ID dari database (DBeaver), lalu salin ke variable collection `q_...`:\n\n```sql\nSELECT c.education_level_id AS q_education_level_id, c.grade_id AS q_grade_id, c.subject_id AS q_subject_id,\n       c.parent_id AS q_subject_field_id, c.id AS q_chapter_id, sc.id AS q_subchapter_id, t.id AS q_topic_id\nFROM master_data_items c\nJOIN master_data_items sc ON sc.parent_id = c.id AND sc.type = 'subchapter'\nJOIN master_data_items t  ON t.parent_id = sc.id AND t.type = 'topic'\nWHERE c.type = 'chapter' AND c.name = 'KPK dan FPB'\nLIMIT 1;\n```\n\nData berasal dari `make seed` (Matematika SD Kelas 4).",
       "item": [
         {
           "name": "Tambah soal single choice",
@@ -592,7 +593,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"single_choice\",\n  \"question\": \"KPK dari 4 dan 6 adalah ...\",\n  \"formula\": null,\n  \"image_id\": null,\n  \"table\": {\n    \"headers\": [\"Bilangan\", \"Kelipatan\"],\n    \"rows\": [[\"4\", \"4, 8, 12, 16\"], [\"6\", \"6, 12, 18\"]]\n  },\n  \"explanation\": \"Kelipatan persekutuan terkecil dari 4 dan 6 adalah 12\",\n  \"display_order\": [\"question\", \"table\"],\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\",\n    \"subchapter_id\": \"{{q_subchapter_id}}\",\n    \"topic_id\": \"{{q_topic_id}}\"\n  },\n  \"difficulty\": \"easy\",\n  \"used_for\": [\"daily_quiz\", \"uji_kom\"],\n  \"status\": \"active\",\n  \"answer\": {\n    \"options\": [\n      { \"key\": \"A\", \"content\": \"2\", \"image_id\": null },\n      { \"key\": \"B\", \"content\": \"12\", \"image_id\": null },\n      { \"key\": \"C\", \"content\": \"24\", \"image_id\": null },\n      { \"key\": \"D\", \"content\": \"10\", \"image_id\": null }\n    ],\n    \"correct_key\": \"B\"\n  }\n}"
+              "raw": "{\n  \"type\": \"single_choice\",\n  \"questions\": [\n    {\n      \"question\": \"KPK dari 4 dan 6 adalah ...\",\n      \"formula\": null,\n      \"image_id\": null,\n      \"table\": {\n        \"headers\": [\"Bilangan\", \"Kelipatan\"],\n        \"rows\": [[\"4\", \"4, 8, 12, 16\"], [\"6\", \"6, 12, 18\"]]\n      },\n      \"explanation\": \"Kelipatan persekutuan terkecil dari 4 dan 6 adalah 12\",\n      \"display_order\": [\"question\", \"table\"],\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\",\n        \"subchapter_id\": \"{{q_subchapter_id}}\",\n        \"topic_id\": \"{{q_topic_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\", \"uji_kom\"],\n      \"status\": \"active\",\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"2\", \"image_id\": null },\n          { \"key\": \"B\", \"content\": \"12\", \"image_id\": null },\n          { \"key\": \"C\", \"content\": \"24\", \"image_id\": null },\n          { \"key\": \"D\", \"content\": \"10\", \"image_id\": null }\n        ],\n        \"correct_key\": \"B\"\n      }\n    }\n  ]\n}"
             },
             "url": "{{base_url}}/api/v1/questions",
             "description": "Pilihan ganda 1 jawaban benar. `options` 2-5, key urut A, B, C, ...; `correct_key` harus salah satu key.\n\nPlacement lengkap sampai topik. Contoh ini juga memakai tabel."
@@ -604,7 +605,119 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "pm.test('kode soal Q-...', () => pm.expect(pm.response.json().data.code).to.match(/^Q-\\d+$/));"
+                  "pm.test('kode soal Q-...', () => pm.expect(pm.response.json().data[0].code).to.match(/^Q-\\d+$/));",
+                  "",
+                  "// Simpan ID soal untuk request Detail soal.",
+                  "pm.collectionVariables.set('question_id', pm.response.json().data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail soal (kunci jawaban + pembahasan)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/questions/{{question_id}}",
+            "description": "Detail 1 soal termasuk kunci jawaban (`answer`) dan pembahasan (`explanation`). Hanya admin & super admin.\n\n`question_id` otomatis terisi setelah **Tambah soal single choice**.\n\nPlacement dan `created_by` berisi `{id, name}`; `subchapter` & `topic` null kalau tidak diisi. ID tidak ada / bukan UUID / sudah dihapus → 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('ada kunci jawaban & pembahasan', () => {",
+                  "  pm.expect(data.answer.correct_key).to.eql('B');",
+                  "  pm.expect(data.explanation).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('placement berisi nama', () => pm.expect(data.placement.chapter.name).to.eql('KPK dan FPB'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah soal (ganti penuh)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"multiple_choice\",\n  \"question\": \"Manakah yang merupakan kelipatan persekutuan dari 4 dan 6?\",\n  \"explanation\": \"Kelipatan persekutuan 4 dan 6 adalah kelipatan 12: 12, 24, 36, ...\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\",\n    \"subchapter_id\": \"{{q_subchapter_id}}\",\n    \"topic_id\": \"{{q_topic_id}}\"\n  },\n  \"difficulty\": \"medium\",\n  \"used_for\": [\"daily_quiz\", \"uji_kom\"],\n  \"status\": \"active\",\n  \"answer\": {\n    \"options\": [\n      { \"key\": \"A\", \"content\": \"12\", \"image_id\": null },\n      { \"key\": \"B\", \"content\": \"18\", \"image_id\": null },\n      { \"key\": \"C\", \"content\": \"24\", \"image_id\": null }\n    ],\n    \"correct_keys\": [\"A\", \"C\"]\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/questions/{{question_id}}",
+            "description": "Ubah 1 soal. Body = 1 soal (sama seperti item create) + `type` WAJIB. Tipe boleh diganti (contoh ini: single choice → multiple choice).\n\nGanti penuh: field opsional yang tidak dikirim (formula, image_id, table, subchapter_id, topic_id) menjadi kosong.\n\nResponse = detail terbaru (sama dengan GET detail), termasuk `updated_by`. Soal tidak ada / sudah dihapus → 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('tipe & kunci berubah', () => {",
+                  "  pm.expect(data.type).to.eql('multiple_choice');",
+                  "  pm.expect(data.answer.correct_keys).to.eql(['A', 'C']);",
+                  "});",
+                  "pm.test('updated_by terisi', () => pm.expect(data.updated_by).to.not.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah banyak soal sekaligus (3 single choice)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"single_choice\",\n  \"questions\": [\n    {\n      \"question\": \"KPK dari 2 dan 3 adalah ...\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\"],\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"5\" },\n          { \"key\": \"B\", \"content\": \"6\" },\n          { \"key\": \"C\", \"content\": \"1\" }\n        ],\n        \"correct_key\": \"B\"\n      }\n    },\n    {\n      \"question\": \"FPB dari 12 dan 18 adalah ...\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"medium\",\n      \"used_for\": [\"daily_quiz\", \"uji_kom\"],\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"3\" },\n          { \"key\": \"B\", \"content\": \"6\" },\n          { \"key\": \"C\", \"content\": \"36\" }\n        ],\n        \"correct_key\": \"B\"\n      }\n    },\n    {\n      \"question\": \"Bilangan prima pertama adalah ...\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\"],\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"1\" },\n          { \"key\": \"B\", \"content\": \"2\" }\n        ],\n        \"correct_key\": \"B\"\n      }\n    }\n  ]\n}"
+            },
+            "url": "{{base_url}}/api/v1/questions",
+            "description": "3 soal single choice dalam 1 request. `data` berisi 3 soal urut sesuai request, masing-masing dengan `code` sendiri."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('3 soal dibuat', () => pm.expect(pm.response.json().data).to.have.lengthOf(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tipe bercampur (harus 422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"single_choice\",\n  \"questions\": [\n    {\n      \"question\": \"Soal pilihan ganda\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\"],\n      \"answer\": { \"options\": [{ \"key\": \"A\", \"content\": \"1\" }, { \"key\": \"B\", \"content\": \"2\" }], \"correct_key\": \"A\" }\n    },\n    {\n      \"type\": \"free_text\",\n      \"question\": \"Soal isian yang terselip\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\"],\n      \"answer\": { \"input_type\": \"number\", \"accepted_answers\": [\"12\"] }\n    }\n  ]\n}"
+            },
+            "url": "{{base_url}}/api/v1/questions",
+            "description": "Soal kedua bertipe free_text di dalam request single_choice → ditolak, dan soal pertama juga tidak tersimpan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error di questions[1].type', () => {",
+                  "  const fields = pm.response.json().errors.map(e => e.field);",
+                  "  pm.expect(fields).to.include('questions[1].type');",
+                  "});"
                 ]
               }
             }
@@ -617,7 +730,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"multiple_choice\",\n  \"question\": \"Manakah yang merupakan bilangan prima?\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\",\n    \"subchapter_id\": null,\n    \"topic_id\": null\n  },\n  \"difficulty\": \"medium\",\n  \"used_for\": [\"daily_quiz\"],\n  \"answer\": {\n    \"options\": [\n      { \"key\": \"A\", \"content\": \"2\", \"image_id\": null },\n      { \"key\": \"B\", \"content\": \"4\", \"image_id\": null },\n      { \"key\": \"C\", \"content\": \"7\", \"image_id\": null },\n      { \"key\": \"D\", \"content\": \"9\", \"image_id\": null },\n      { \"key\": \"E\", \"content\": \"11\", \"image_id\": null }\n    ],\n    \"correct_keys\": [\"A\", \"C\", \"E\"],\n    \"scoring\": \"all_or_nothing\"\n  }\n}"
+              "raw": "{\n  \"type\": \"multiple_choice\",\n  \"questions\": [\n    {\n      \"question\": \"Manakah yang merupakan bilangan prima?\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\",\n        \"subchapter_id\": null,\n        \"topic_id\": null\n      },\n      \"difficulty\": \"medium\",\n      \"used_for\": [\"daily_quiz\"],\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"2\", \"image_id\": null },\n          { \"key\": \"B\", \"content\": \"4\", \"image_id\": null },\n          { \"key\": \"C\", \"content\": \"7\", \"image_id\": null },\n          { \"key\": \"D\", \"content\": \"9\", \"image_id\": null },\n          { \"key\": \"E\", \"content\": \"11\", \"image_id\": null }\n        ],\n        \"correct_keys\": [\"A\", \"C\", \"E\"],\n        \"scoring\": \"all_or_nothing\"\n      }\n    }\n  ]\n}"
             },
             "url": "{{base_url}}/api/v1/questions",
             "description": "Pilihan ganda lebih dari 1 jawaban benar. `scoring`: `all_or_nothing` (default) atau `partial`.\n\nPlacement hanya sampai bab (sub bab & topik opsional). `status` tidak dikirim → default `active`."
@@ -639,7 +752,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"true_false\",\n  \"question\": \"Tentukan benar atau salah pernyataan berikut!\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"difficulty\": \"easy\",\n  \"used_for\": [\"daily_quiz\", \"tryout\"],\n  \"answer\": {\n    \"options\": [\n      { \"key\": \"A\", \"content\": \"2 adalah bilangan prima\", \"image_id\": null },\n      { \"key\": \"B\", \"content\": \"9 adalah bilangan prima\", \"image_id\": null },\n      { \"key\": \"C\", \"content\": \"FPB dari 8 dan 12 adalah 4\", \"image_id\": null }\n    ],\n    \"correct_keys\": [\n      { \"key\": \"A\", \"correct\": true },\n      { \"key\": \"B\", \"correct\": false },\n      { \"key\": \"C\", \"correct\": true }\n    ]\n  }\n}"
+              "raw": "{\n  \"type\": \"true_false\",\n  \"questions\": [\n    {\n      \"question\": \"Tentukan benar atau salah pernyataan berikut!\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\", \"tryout\"],\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"2 adalah bilangan prima\", \"image_id\": null },\n          { \"key\": \"B\", \"content\": \"9 adalah bilangan prima\", \"image_id\": null },\n          { \"key\": \"C\", \"content\": \"FPB dari 8 dan 12 adalah 4\", \"image_id\": null }\n        ],\n        \"correct_keys\": [\n          { \"key\": \"A\", \"correct\": true },\n          { \"key\": \"B\", \"correct\": false },\n          { \"key\": \"C\", \"correct\": true }\n        ]\n      }\n    }\n  ]\n}"
             },
             "url": "{{base_url}}/api/v1/questions",
             "description": "Setiap opsi adalah pernyataan (1-10). `correct_keys` wajib berisi kunci benar/salah untuk SETIAP pernyataan."
@@ -661,10 +774,10 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"free_text\",\n  \"question\": \"Hasil dari $\\\\frac{1}{2} + \\\\frac{1}{4}$ adalah ...\",\n  \"explanation\": \"Samakan penyebut: $\\\\frac{2}{4} + \\\\frac{1}{4} = \\\\frac{3}{4}$\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"difficulty\": \"hard\",\n  \"used_for\": [\"uji_kom\"],\n  \"answer\": {\n    \"input_type\": \"number\",\n    \"accepted_answers\": [\"0.75\", \"0,75\", \"3/4\"],\n    \"tolerance\": 0\n  }\n}"
+              "raw": "{\n  \"type\": \"free_text\",\n  \"questions\": [\n    {\n      \"question\": \"Hasil dari $\\\\frac{1}{2} + \\\\frac{1}{4}$ adalah ...\",\n      \"explanation\": \"Samakan penyebut: $\\\\frac{2}{4} + \\\\frac{1}{4} = \\\\frac{3}{4}$\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"hard\",\n      \"used_for\": [\"uji_kom\"],\n      \"answer\": {\n        \"input_type\": \"number\",\n        \"accepted_answers\": [\"0.75\", \"0,75\", \"3/4\"],\n        \"tolerance\": 0\n      }\n    }\n  ]\n}"
             },
             "url": "{{base_url}}/api/v1/questions",
-            "description": "Isian angka: `accepted_answers` boleh angka, desimal (titik/koma), atau pecahan. `tolerance` = selisih maksimal.\n\nUntuk isian teks: `\"input_type\": \"string\"`, `accepted_answers` = kata kunci (jawaban benar jika mengandung salah satunya), `case_sensitive` (default false)."
+            "description": "Isian angka: `accepted_answers` boleh angka, desimal (titik/koma), atau pecahan. `tolerance` = selisih maksimal.\n\nUntuk isian teks: `\"input_type\": \"text\"`, `accepted_answers` = kata kunci (jawaban benar jika mengandung salah satunya), `case_sensitive` (default false)."
           },
           "event": [
             {
@@ -683,7 +796,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"single_choice\",\n  \"question\": \"Soal dengan kunci yang salah\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"difficulty\": \"easy\",\n  \"used_for\": [\"daily_quiz\"],\n  \"answer\": {\n    \"options\": [\n      { \"key\": \"A\", \"content\": \"1\" },\n      { \"key\": \"C\", \"content\": \"\" }\n    ],\n    \"correct_key\": \"E\"\n  }\n}"
+              "raw": "{\n  \"type\": \"single_choice\",\n  \"questions\": [\n    {\n      \"question\": \"Soal dengan kunci yang salah\",\n      \"explanation\": \"Pembahasan: tuliskan langkah penyelesaiannya di sini\",\n      \"placement\": {\n        \"education_level_id\": \"{{q_education_level_id}}\",\n        \"grade_id\": \"{{q_grade_id}}\",\n        \"subject_id\": \"{{q_subject_id}}\",\n        \"subject_field_id\": \"{{q_subject_field_id}}\",\n        \"chapter_id\": \"{{q_chapter_id}}\"\n      },\n      \"difficulty\": \"easy\",\n      \"used_for\": [\"daily_quiz\"],\n      \"answer\": {\n        \"options\": [\n          { \"key\": \"A\", \"content\": \"1\" },\n          { \"key\": \"C\", \"content\": \"\" }\n        ],\n        \"correct_key\": \"E\"\n      }\n    }\n  ]\n}"
             },
             "url": "{{base_url}}/api/v1/questions",
             "description": "Contoh error: semua kesalahan dikembalikan sekaligus di `errors` (key tidak urut, opsi kosong, kunci tidak ada di opsi)."
@@ -695,9 +808,68 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 422', () => pm.response.to.have.status(422));",
-                  "pm.test('ada error answer.correct_key', () => {",
+                  "pm.test('ada error questions[0].answer.correct_key', () => {",
                   "  const fields = pm.response.json().errors.map(e => e.field);",
-                  "  pm.expect(fields).to.include('answer.correct_key');",
+                  "  pm.expect(fields).to.include('questions[0].answer.correct_key');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cek file Excel (upload soal, tidak menyimpan)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "docs/Template Upload/template_single_choice.xlsx" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/questions/import/check",
+            "description": "Upload Excel soal (field `file`, .xlsx maks 5 MB, maks 100 soal). HANYA mengecek, tidak menyimpan.\n\nTemplate: `docs/Template Upload/` (1 file = 1 tipe soal, tipe dideteksi dari header).\n\n- Valid → 200, `data.questions` berbentuk body create + `row` & nama placement. Kirim `{\"type\": data.type, \"questions\": data.questions}` ke **Tambah soal** untuk menyimpan.\n- Ada error → 422, semua data ditolak, `errors` berisi `row` & `column` Excel setiap kesalahan.\n\nCatatan: contoh di template memakai Kelas 5, padahal bab \"KPK dan FPB\" di data dummy ada di Kelas 4, jadi template asli menghasilkan 422 di kolom L (chapter_name). Kalau dijalankan dari Postman app, pilih ulang file-nya di tab Body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 atau 422', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));",
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 422) {",
+                  "  pm.test('setiap error punya baris', () => body.errors.forEach(e => pm.expect(e.row).to.be.above(0)));",
+                  "} else {",
+                  "  pm.test('ada soal hasil cek', () => pm.expect(body.data.questions.length).to.be.above(0));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus soal (soft delete, bisa banyak)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"{{question_id}}\"]\n}"
+            },
+            "url": "{{base_url}}/api/v1/questions",
+            "description": "Hapus 1-100 soal sekaligus dengan soft delete (`deleted_at` & `deleted_by` diisi, data tetap ada di database).\n\nSemua atau tidak sama sekali: kalau ada ID yang tidak ada / sudah dihapus → 422 dengan error di `ids[i]`, dan tidak ada soal yang terhapus.\n\nContoh ini menghapus soal dari **Tambah soal single choice**. Jalankan sekali lagi → 422 (sudah dihapus)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ID terhapus dikembalikan', () => {",
+                  "  pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('question_id')]);",
                   "});"
                 ]
               }

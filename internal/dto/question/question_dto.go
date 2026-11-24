@@ -12,20 +12,36 @@ import (
 	questionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/question"
 )
 
-// CreateQuestionRequest adalah body JSON untuk POST /api/v1/questions.
+// CreateQuestionsRequest adalah body JSON untuk POST /api/v1/questions.
+// Bisa membuat 1 sampai 100 soal sekaligus (batas di tag max=100), tapi SEMUANYA harus 1 tipe yang sama:
+// tipe ditulis sekali di level atas, bukan per soal.
+//
+//	{"type": "single_choice", "questions": [{...}, {...}]}
+//
+// Disimpan semua atau tidak sama sekali: kalau ada 1 soal yang salah, tidak ada yang tersimpan.
+type CreateQuestionsRequest struct {
+	Type      string                  `json:"type" binding:"required,oneof=single_choice multiple_choice true_false free_text"`
+	Questions []CreateQuestionRequest `json:"questions" binding:"required,min=1,max=100,dive"`
+}
+
+// CreateQuestionRequest adalah satu soal di dalam CreateQuestionsRequest.
 //
 // Aturan di tag binding hanya mengecek bentuk dasar. Aturan yang bergantung pada
 // field lain (isi answer per type, display_order, kecocokan placement) dicek di service.
 //
 // Field "answer" dibiarkan mentah (json.RawMessage) karena bentuknya berbeda per type;
-// service yang membacanya sesuai type.
+// service yang membacanya sesuai type di level atas.
+//
+// Type per soal TIDAK perlu diisi. Kalau diisi, harus sama dengan type di level atas
+// (supaya soal bertipe lain yang terselip langsung ditolak, bukan diam-diam dianggap sama).
 type CreateQuestionRequest struct {
-	Type         string           `json:"type" binding:"required,oneof=single_choice multiple_choice true_false free_text"`
+	Type         string           `json:"type"`
 	Question     string           `json:"question" binding:"required,max=5000"`
 	Formula      *string          `json:"formula" binding:"omitempty,max=2000"`
-	ImageID      *string          `json:"image_id" binding:"omitempty,uuid"`
+	ImageID      *string          `json:"image_id" binding:"omitempty,uuid"`      // gambar dari Image Library
+	ImageURL     *string          `json:"image_url" binding:"omitempty,max=2000"` // ATAU link gambar luar (http/https)
 	Table        *TableRequest    `json:"table"`
-	Explanation  *string          `json:"explanation" binding:"omitempty,max=5000"`
+	Explanation  string           `json:"explanation" binding:"required,max=5000"` // pembahasan, wajib untuk semua tipe
 	DisplayOrder []string         `json:"display_order" binding:"omitempty,unique,dive,oneof=question formula image table"`
 	Placement    PlacementRequest `json:"placement" binding:"required"`
 	Difficulty   string           `json:"difficulty" binding:"required,oneof=easy medium hard"`
@@ -60,8 +76,9 @@ type QuestionResponse struct {
 	Question     string               `json:"question"`
 	Formula      *string              `json:"formula"`
 	ImageID      *string              `json:"image_id"`
+	ImageURL     *string              `json:"image_url"`
 	Table        *questionmodel.Table `json:"table"`
-	Explanation  *string              `json:"explanation"`
+	Explanation  string               `json:"explanation"`
 	DisplayOrder []string             `json:"display_order"`
 	Placement    PlacementResponse    `json:"placement"`
 	Difficulty   string               `json:"difficulty"`
@@ -93,6 +110,7 @@ func ToQuestionResponse(q questionmodel.Question) QuestionResponse {
 		Question:     q.QuestionText,
 		Formula:      q.Formula,
 		ImageID:      q.ImageID,
+		ImageURL:     q.ImageURL,
 		Table:        q.Table,
 		Explanation:  q.Explanation,
 		DisplayOrder: q.DisplayOrder,
@@ -113,4 +131,185 @@ func ToQuestionResponse(q questionmodel.Question) QuestionResponse {
 		CreatedAt:  q.CreatedAt,
 		UpdatedAt:  q.UpdatedAt,
 	}
+}
+
+// QuestionDetailResponse adalah data GET /api/v1/questions/:id.
+// Sama seperti QuestionResponse, tapi placement & pembuat dilengkapi nama, supaya
+// halaman detail/edit admin tidak perlu request tambahan.
+// Berisi kunci jawaban (answer) & pembahasan, jadi HANYA untuk admin.
+type QuestionDetailResponse struct {
+	ID           string                  `json:"id"`
+	Code         string                  `json:"code"`
+	Type         string                  `json:"type"`
+	Question     string                  `json:"question"`
+	Formula      *string                 `json:"formula"`
+	ImageID      *string                 `json:"image_id"`
+	ImageURL     *string                 `json:"image_url"`
+	Table        *questionmodel.Table    `json:"table"`
+	Explanation  string                  `json:"explanation"`
+	DisplayOrder []string                `json:"display_order"`
+	Placement    PlacementDetailResponse `json:"placement"`
+	Difficulty   string                  `json:"difficulty"`
+	UsedFor      []string                `json:"used_for"`
+	Status       string                  `json:"status"`
+	Answer       json.RawMessage         `json:"answer"`
+	CreatedBy    RefResponse             `json:"created_by"`
+	UpdatedBy    *RefResponse            `json:"updated_by"` // null kalau belum pernah diubah
+	CreatedAt    time.Time               `json:"created_at"`
+	UpdatedAt    time.Time               `json:"updated_at"`
+}
+
+// PlacementDetailResponse adalah letak soal lengkap dengan nama. Sub bab & topik null kalau kosong.
+type PlacementDetailResponse struct {
+	EducationLevel RefResponse  `json:"education_level"`
+	Grade          RefResponse  `json:"grade"`
+	Subject        RefResponse  `json:"subject"`
+	SubjectField   RefResponse  `json:"subject_field"`
+	Chapter        RefResponse  `json:"chapter"`
+	Subchapter     *RefResponse `json:"subchapter"`
+	Topic          *RefResponse `json:"topic"`
+}
+
+// RefResponse adalah pasangan id + nama, contoh {"id": "...", "name": "Kelas 4"}.
+// name bisa null (contoh: user pembuat sudah dihapus permanen).
+type RefResponse struct {
+	ID   string  `json:"id"`
+	Name *string `json:"name"`
+}
+
+// ToQuestionDetailResponse mengubah questionmodel.QuestionDetail menjadi QuestionDetailResponse.
+func ToQuestionDetailResponse(d questionmodel.QuestionDetail) QuestionDetailResponse {
+	return QuestionDetailResponse{
+		ID:           d.ID,
+		Code:         d.Code,
+		Type:         d.Type,
+		Question:     d.QuestionText,
+		Formula:      d.Formula,
+		ImageID:      d.ImageID,
+		ImageURL:     d.ImageURL,
+		Table:        d.Table,
+		Explanation:  d.Explanation,
+		DisplayOrder: d.DisplayOrder,
+		Placement: PlacementDetailResponse{
+			EducationLevel: ref(d.EducationLevelID, &d.EducationLevelName),
+			Grade:          ref(d.GradeID, &d.GradeName),
+			Subject:        ref(d.SubjectID, &d.SubjectName),
+			SubjectField:   ref(d.SubjectFieldID, &d.SubjectFieldName),
+			Chapter:        ref(d.ChapterID, &d.ChapterName),
+			Subchapter:     optionalRef(d.SubchapterID, d.SubchapterName),
+			Topic:          optionalRef(d.TopicID, d.TopicName),
+		},
+		Difficulty: d.Difficulty,
+		UsedFor:    d.UsedFor,
+		Status:     d.Status,
+		Answer:     d.Answer,
+		CreatedBy:  ref(d.CreatedBy, d.CreatedByName),
+		UpdatedBy:  optionalRef(d.UpdatedBy, d.UpdatedByName),
+		CreatedAt:  d.CreatedAt,
+		UpdatedAt:  d.UpdatedAt,
+	}
+}
+
+func ref(id string, name *string) RefResponse {
+	return RefResponse{ID: id, Name: name}
+}
+
+// optionalRef mengembalikan nil (JSON null) kalau id kosong.
+func optionalRef(id, name *string) *RefResponse {
+	if id == nil {
+		return nil
+	}
+	r := ref(*id, name)
+	return &r
+}
+
+// UpdateQuestionRequest: body PUT /api/v1/questions/:id memakai CreateQuestionRequest
+// (bentuk 1 soal yang sama dengan create), dengan "type" WAJIB diisi.
+// Update bersifat ganti penuh: field opsional yang tidak dikirim (formula, image_id, table,
+// subchapter_id, topic_id) menjadi kosong.
+
+// DeleteQuestionsRequest adalah body DELETE /api/v1/questions: hapus 1 sampai 100 soal (soft delete).
+type DeleteQuestionsRequest struct {
+	IDs []string `json:"ids" binding:"required,min=1,max=100,unique,dive,uuid"`
+}
+
+// DeleteQuestionsResponse berisi ID soal yang berhasil dihapus.
+type DeleteQuestionsResponse struct {
+	DeletedIDs []string `json:"deleted_ids"`
+}
+
+// ImportCheckResponse adalah data POST /api/v1/questions/import/check (cek file Excel).
+// Soal BELUM disimpan. Bentuk "questions" sama dengan body create, jadi FE bisa langsung
+// mengirim {"type": type, "questions": questions} ke POST /api/v1/questions.
+// Field tambahan (row, *_name di placement) otomatis diabaikan oleh create.
+type ImportCheckResponse struct {
+	Type      string                     `json:"type"`
+	Total     int                        `json:"total"`
+	Questions []ImportedQuestionResponse `json:"questions"`
+}
+
+// ImportedQuestionResponse adalah 1 soal hasil cek Excel. row = nomor baris di Excel.
+type ImportedQuestionResponse struct {
+	Row          int                       `json:"row"`
+	Question     string                    `json:"question"`
+	Formula      *string                   `json:"formula"`
+	ImageID      *string                   `json:"image_id"`
+	ImageURL     *string                   `json:"image_url"`
+	Table        *questionmodel.Table      `json:"table"`
+	Explanation  string                    `json:"explanation"`
+	DisplayOrder []string                  `json:"display_order"`
+	Placement    ImportedPlacementResponse `json:"placement"`
+	Difficulty   string                    `json:"difficulty"`
+	UsedFor      []string                  `json:"used_for"`
+	Status       string                    `json:"status"`
+	Answer       json.RawMessage           `json:"answer"`
+}
+
+// ImportedPlacementResponse berisi ID (untuk create) + nama dari database (untuk ditampilkan).
+type ImportedPlacementResponse struct {
+	EducationLevelID   string  `json:"education_level_id"`
+	EducationLevelName string  `json:"education_level_name"`
+	GradeID            string  `json:"grade_id"`
+	GradeName          string  `json:"grade_name"`
+	SubjectID          string  `json:"subject_id"`
+	SubjectName        string  `json:"subject_name"`
+	SubjectFieldID     string  `json:"subject_field_id"`
+	SubjectFieldName   string  `json:"subject_field_name"`
+	ChapterID          string  `json:"chapter_id"`
+	ChapterName        string  `json:"chapter_name"`
+	SubchapterID       *string `json:"subchapter_id"`
+	SubchapterName     *string `json:"subchapter_name"`
+	TopicID            *string `json:"topic_id"`
+	TopicName          *string `json:"topic_name"`
+}
+
+// ToImportCheckResponse mengubah hasil cek Excel menjadi response.
+func ToImportCheckResponse(questionType string, items []questionmodel.ImportedQuestion) ImportCheckResponse {
+	questions := make([]ImportedQuestionResponse, 0, len(items))
+	for _, it := range items {
+		questions = append(questions, ImportedQuestionResponse{
+			Row:          it.Row,
+			Question:     it.QuestionText,
+			Formula:      it.Formula,
+			ImageID:      it.ImageID,
+			ImageURL:     it.ImageURL,
+			Table:        it.Table,
+			Explanation:  it.Explanation,
+			DisplayOrder: it.DisplayOrder,
+			Placement: ImportedPlacementResponse{
+				EducationLevelID: it.EducationLevelID, EducationLevelName: it.EducationLevelName,
+				GradeID: it.GradeID, GradeName: it.GradeName,
+				SubjectID: it.SubjectID, SubjectName: it.SubjectName,
+				SubjectFieldID: it.SubjectFieldID, SubjectFieldName: it.SubjectFieldName,
+				ChapterID: it.ChapterID, ChapterName: it.ChapterName,
+				SubchapterID: it.SubchapterID, SubchapterName: it.SubchapterName,
+				TopicID: it.TopicID, TopicName: it.TopicName,
+			},
+			Difficulty: it.Difficulty,
+			UsedFor:    it.UsedFor,
+			Status:     it.Status,
+			Answer:     it.Answer,
+		})
+	}
+	return ImportCheckResponse{Type: questionType, Total: len(questions), Questions: questions}
 }

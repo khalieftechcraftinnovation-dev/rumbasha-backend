@@ -8,6 +8,7 @@ package question
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -36,9 +37,10 @@ type Question struct {
 	Type         string
 	QuestionText string
 	Formula      *string
-	ImageID      *string
+	ImageID      *string // gambar dari Image Library (media_assets)
+	ImageURL     *string // ATAU link gambar dari luar (http/https); tidak boleh dua-duanya
 	Table        *Table
-	Explanation  *string
+	Explanation  string // pembahasan, wajib
 	DisplayOrder []string
 
 	EducationLevelID string
@@ -55,6 +57,7 @@ type Question struct {
 	Answer     json.RawMessage // isi sesuai Type, lihat struct *Answer di bawah
 
 	CreatedBy string
+	UpdatedBy *string // NULL kalau belum pernah diubah
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -70,10 +73,13 @@ type Table struct {
 // ----------------------------------------------------------------------------
 
 // ChoiceOption adalah satu opsi jawaban (A, B, C, ...). Boleh teks, gambar, atau keduanya.
+// Gambar opsi: image_id (Image Library) ATAU image_url (link luar), tidak boleh dua-duanya.
+// image_url memakai omitempty supaya opsi tanpa link luar tidak menampilkan field ini.
 type ChoiceOption struct {
-	Key     string  `json:"key"`
-	Content string  `json:"content"`
-	ImageID *string `json:"image_id"`
+	Key      string  `json:"key"`
+	Content  string  `json:"content"`
+	ImageID  *string `json:"image_id"`
+	ImageURL *string `json:"image_url,omitempty"`
 }
 
 // SingleChoiceAnswer: pilihan ganda dengan 1 kunci jawaban.
@@ -111,20 +117,63 @@ type TrueFalseKey struct {
 // Jenis isian pada soal free_text.
 const (
 	InputTypeNumber = "number"
-	InputTypeString = "string"
+	InputTypeText   = "text"
 )
 
 // FreeTextAnswer: soal isian.
 //   - number: jawaban siswa dibandingkan sebagai angka (boleh pecahan "3/4"), dengan selisih maksimal Tolerance.
-//   - string: jawaban siswa dianggap benar jika MENGANDUNG salah satu kata kunci di AcceptedAnswers.
+//   - text: jawaban siswa dianggap benar jika MENGANDUNG salah satu kata kunci di AcceptedAnswers.
 //
 // omitempty: pengaturan yang tidak berlaku untuk input_type-nya tidak ikut disimpan
-// (tolerance hanya untuk number, case_sensitive hanya untuk string).
+// (tolerance hanya untuk number, case_sensitive hanya untuk text).
 type FreeTextAnswer struct {
 	InputType       string   `json:"input_type"`
 	AcceptedAnswers []string `json:"accepted_answers"`
 	Tolerance       *float64 `json:"tolerance,omitempty"`
 	CaseSensitive   *bool    `json:"case_sensitive,omitempty"`
+}
+
+// ----------------------------------------------------------------------------
+// Detail soal (endpoint GET /questions/:id)
+// ----------------------------------------------------------------------------
+
+// QuestionDetail adalah soal lengkap dengan NAMA placement dan nama pembuatnya.
+type QuestionDetail struct {
+	Question
+
+	EducationLevelName string
+	GradeName          string
+	SubjectName        string
+	SubjectFieldName   string
+	ChapterName        string
+	SubchapterName     *string // NULL kalau soal tidak punya sub bab
+	TopicName          *string // NULL kalau soal tidak punya topik
+	CreatedByName      *string // NULL kalau user pembuat sudah tidak ada
+	UpdatedByName      *string // NULL kalau belum pernah diubah
+}
+
+// CanonicalAnswer merapikan JSON answer dari database supaya urutan field-nya sama
+// dengan saat create. (PostgreSQL JSONB mengurutkan ulang key object, contoh
+// "correct_key" bisa muncul sebelum "options".)
+func CanonicalAnswer(questionType string, raw []byte) (json.RawMessage, error) {
+	var target any
+	switch questionType {
+	case TypeSingleChoice:
+		target = &SingleChoiceAnswer{}
+	case TypeMultipleChoice:
+		target = &MultipleChoiceAnswer{}
+	case TypeTrueFalse:
+		target = &TrueFalseAnswer{}
+	case TypeFreeText:
+		target = &FreeTextAnswer{}
+	default:
+		return nil, errors.New("type soal tidak dikenal: " + questionType)
+	}
+
+	if err := json.Unmarshal(raw, target); err != nil {
+		return nil, err
+	}
+	return json.Marshal(target)
 }
 
 // ----------------------------------------------------------------------------
@@ -135,6 +184,7 @@ type FreeTextAnswer struct {
 type MasterDataItem struct {
 	ID               string
 	Type             string
+	Name             string // hanya diisi saat mencari berdasarkan nama (upload Excel)
 	ParentID         *string
 	SubjectID        *string
 	EducationLevelID *string
@@ -151,23 +201,38 @@ type MasterDataItem struct {
 type FieldError struct {
 	Field   string
 	Message string
+	Row     int    // khusus upload Excel: nomor baris (mulai 1, baris 1 = header)
+	Column  string // khusus upload Excel: huruf kolom, contoh "AB"
 }
 
 // ValidationError berisi semua kesalahan isi soal. Handler mengubahnya menjadi response 422.
+// Message boleh kosong (handler memakai "Validasi gagal").
 type ValidationError struct {
-	Fields []FieldError
+	Message string
+	Fields  []FieldError
 }
 
 // Error membuat ValidationError memenuhi interface error.
 // Teksnya ikut tercatat di log API (field "process"), contoh:
-// "validasi soal gagal: answer.correct_key: harus salah satu key opsi".
+// "validasi soal gagal: answer.correct_key: harus salah satu key opsi"
+// atau untuk Excel: "validasi soal gagal: AB3 correct_key: harus salah satu key di options".
 func (e *ValidationError) Error() string {
 	parts := make([]string, 0, len(e.Fields))
 	for _, f := range e.Fields {
-		parts = append(parts, f.Field+": "+f.Message)
+		location := f.Field
+		if f.Row > 0 {
+			location = fmt.Sprintf("%s%d %s", f.Column, f.Row, f.Field)
+		}
+		parts = append(parts, location+": "+f.Message)
 	}
 	return "validasi soal gagal: " + strings.Join(parts, "; ")
 }
 
-// ErrQuestionNotFound dipakai saat soal tidak ada (untuk endpoint get/update nanti).
+// ImportedQuestion adalah 1 soal hasil cek file Excel (belum disimpan).
+// Placement sudah berisi ID + nama (nama diambil dari database, bukan dari Excel).
+type ImportedQuestion struct {
+	Row int // nomor baris di Excel
+	QuestionDetail
+}
+
 var ErrQuestionNotFound = errors.New("soal tidak ditemukan")

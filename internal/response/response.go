@@ -32,9 +32,13 @@ type Meta struct {
 }
 
 // FieldError menjelaskan kesalahan pada satu field request.
+// Row & Column hanya diisi untuk error dari file Excel (contoh row 3, column "AB"),
+// selain itu tidak ditampilkan (omitempty).
 type FieldError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
+	Row     int    `json:"row,omitempty"`
+	Column  string `json:"column,omitempty"`
 }
 
 // Success mengirim response sukses.

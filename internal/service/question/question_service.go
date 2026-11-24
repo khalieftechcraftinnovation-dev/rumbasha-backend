@@ -1,12 +1,13 @@
 // Package question (service) berisi aturan bisnis bank soal.
 //
-// Alur Create (urutannya disengaja supaya hemat query):
-//  1. Cek isi soal & jawaban (tanpa database). Kalau ada yang salah → berhenti.
-//  2. Cek placement & gambar ke database (2 query kecil, 1 tabel masing-masing).
-//  3. Simpan (1 query INSERT).
+// Alur CreateMany (urutannya disengaja supaya hemat query, berapa pun jumlah soalnya):
+//  1. Cek isi setiap soal & jawaban (tanpa database). Kalau ada yang salah → berhenti.
+//  2. Cek placement & gambar SEMUA soal ke database: 1 query master data + 1 query gambar.
+//  3. Simpan semua soal dengan 1 query INSERT (semua tersimpan atau tidak sama sekali).
 //
-// Semua kesalahan isi dikumpulkan dulu, lalu dikembalikan sekaligus sebagai
-// *questionmodel.ValidationError, supaya admin bisa memperbaiki semuanya dalam sekali kirim.
+// Semua kesalahan dikumpulkan dulu, lalu dikembalikan sekaligus sebagai
+// *questionmodel.ValidationError. Nama field diawali nomor soalnya (mulai dari 0), contoh
+// "questions[2].answer.correct_key", supaya admin tahu soal mana yang perlu diperbaiki.
 //
 // Di package lain, import dengan alias questionservice:
 //
@@ -17,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/google/uuid"
 
 	questiondto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/question"
 	questionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/question"
@@ -33,17 +36,72 @@ func NewQuestionService(repo *questionrepo.QuestionRepository) *QuestionService 
 	return &QuestionService{repo: repo}
 }
 
-// Create membuat soal baru. createdBy = ID user (admin) yang membuat.
-func (s *QuestionService) Create(ctx context.Context, req questiondto.CreateQuestionRequest, createdBy string) (questionmodel.Question, error) {
+// CreateMany membuat 1 atau banyak soal dengan tipe yang sama. createdBy = ID admin pembuat.
+// Hasilnya urut sesuai urutan di request.
+func (s *QuestionService) CreateMany(ctx context.Context, req questiondto.CreateQuestionsRequest, createdBy string) ([]questionmodel.Question, error) {
 	errs := &fieldErrors{}
 
-	// ---- 1. Cek isi tanpa database ----------------------------------------
+	// imageFields: field request → ID gambar, dicek keberadaannya di langkah 2.
+	imageFields := map[string]string{}
+
+	// ---- 1. Cek isi setiap soal tanpa database ------------------------------
+	questions := make([]questionmodel.Question, 0, len(req.Questions))
+	for i, item := range req.Questions {
+		errs.prefix = questionPrefix(i)
+		q, err := buildQuestion(req.Type, item, createdBy, errs, imageFields)
+		if err != nil {
+			return nil, err
+		}
+		questions = append(questions, q)
+	}
+	errs.prefix = ""
+	if errs.any() {
+		return nil, errs.toError()
+	}
+
+	// ---- 2. Cek ke database (sekali untuk semua soal) -----------------------
+	if err := s.validatePlacements(ctx, req.Questions, questionPrefix, errs); err != nil {
+		return nil, err
+	}
+	if err := s.validateImages(ctx, imageFields, errs); err != nil {
+		return nil, err
+	}
+	if errs.any() {
+		return nil, errs.toError()
+	}
+
+	// ---- 3. Simpan semua dalam 1 query ---------------------------------------
+	if err := s.repo.CreateMany(ctx, questions); err != nil {
+		return nil, fmt.Errorf("gagal menyimpan %d soal: %w", len(questions), err)
+	}
+	return questions, nil
+}
+
+// questionPrefix adalah awalan nama field error untuk soal ke-i pada create banyak soal.
+func questionPrefix(i int) string {
+	return fmt.Sprintf("questions[%d].", i)
+}
+
+// noPrefix dipakai update (hanya 1 soal, field error tanpa awalan).
+func noPrefix(int) string {
+	return ""
+}
+
+// buildQuestion mengubah 1 soal dari request menjadi model, sambil mengecek isinya.
+// Kesalahan dicatat di errs (sudah diberi awalan "questions[i]." oleh pemanggil).
+func buildQuestion(questionType string, req questiondto.CreateQuestionRequest, createdBy string, errs *fieldErrors, imageFields map[string]string) (questionmodel.Question, error) {
+	// 1 request = 1 tipe. Type per soal boleh kosong, tapi kalau diisi harus sama.
+	if req.Type != "" && req.Type != questionType {
+		errs.add("type", fmt.Sprintf("harus %s (1 request hanya boleh 1 tipe soal)", questionType))
+	}
+
 	q := questionmodel.Question{
-		Type:         req.Type,
+		Type:         questionType,
 		QuestionText: strings.TrimSpace(req.Question),
 		Formula:      trimOptional(req.Formula),
 		ImageID:      req.ImageID,
-		Explanation:  trimOptional(req.Explanation),
+		ImageURL:     trimOptional(req.ImageURL),
+		Explanation:  strings.TrimSpace(req.Explanation),
 
 		EducationLevelID: req.Placement.EducationLevelID,
 		GradeID:          req.Placement.GradeID,
@@ -61,8 +119,13 @@ func (s *QuestionService) Create(ctx context.Context, req questiondto.CreateQues
 	if q.Status == "" {
 		q.Status = "active"
 	}
+	// Teks soal & pembahasan wajib untuk semua tipe. Isi spasi saja dianggap kosong
+	// (binding "required" hanya menolak string yang benar-benar kosong).
 	if q.QuestionText == "" {
 		errs.add("question", "wajib diisi")
+	}
+	if q.Explanation == "" {
+		errs.add("explanation", "wajib diisi")
 	}
 	if req.Table != nil {
 		q.Table = &questionmodel.Table{Headers: req.Table.Headers, Rows: req.Table.Rows}
@@ -70,10 +133,14 @@ func (s *QuestionService) Create(ctx context.Context, req questiondto.CreateQues
 	}
 	q.DisplayOrder = validateDisplayOrder(req.DisplayOrder, q, errs)
 
-	// imageFields: field request → ID gambar, dicek keberadaannya di langkah 2.
-	imageFields := map[string]string{}
-	if q.ImageID != nil {
-		imageFields["image_id"] = *q.ImageID
+	// Gambar soal: image_id (Image Library) ATAU image_url (link luar), tidak boleh dua-duanya.
+	switch {
+	case q.ImageID != nil && q.ImageURL != nil:
+		errs.add("image_url", "pilih salah satu: image_id atau image_url")
+	case q.ImageID != nil:
+		imageFields[errs.prefix+"image_id"] = *q.ImageID // keberadaannya dicek di validateImages
+	case q.ImageURL != nil && !isHTTPURL(*q.ImageURL):
+		errs.add("image_url", "harus link http/https yang valid")
 	}
 
 	answer, err := validateAnswer(q.Type, req.Answer, errs, imageFields)
@@ -81,48 +148,50 @@ func (s *QuestionService) Create(ctx context.Context, req questiondto.CreateQues
 		return questionmodel.Question{}, err
 	}
 	q.Answer = answer
-
-	if errs.any() {
-		return questionmodel.Question{}, errs.toError()
-	}
-
-	// ---- 2. Cek ke database --------------------------------------------------
-	if err := s.validatePlacement(ctx, req.Placement, errs); err != nil {
-		return questionmodel.Question{}, err
-	}
-	if err := s.validateImages(ctx, imageFields, errs); err != nil {
-		return questionmodel.Question{}, err
-	}
-	if errs.any() {
-		return questionmodel.Question{}, errs.toError()
-	}
-
-	// ---- 3. Simpan -----------------------------------------------------------
-	if err := s.repo.Create(ctx, &q); err != nil {
-		return questionmodel.Question{}, fmt.Errorf("gagal menyimpan soal: %w", err)
-	}
 	return q, nil
 }
 
-// validatePlacement mengecek letak soal dengan 1 query ke master_data_items.
-//
-// Cukup bab, sub bab, dan topik yang dicek isinya: bab sudah menyimpan mapel, jenjang,
-// dan kelasnya sendiri (kolom bantu migration 000007), jadi tinggal dibandingkan.
-// Mapel & bidang materi ikut diambil hanya untuk mengecek statusnya masih aktif.
-func (s *QuestionService) validatePlacement(ctx context.Context, p questiondto.PlacementRequest, errs *fieldErrors) error {
-	ids := []string{p.SubjectID, p.SubjectFieldID, p.ChapterID}
-	if p.SubchapterID != nil {
-		ids = append(ids, *p.SubchapterID)
+// validatePlacements mengambil master data placement SEMUA soal dengan 1 query
+// (ID yang sama hanya diambil sekali), lalu mengecek placement setiap soal.
+// prefixFor menentukan awalan nama field error soal ke-i (create: "questions[i].", update: "").
+func (s *QuestionService) validatePlacements(ctx context.Context, items []questiondto.CreateQuestionRequest, prefixFor func(i int) string, errs *fieldErrors) error {
+	unique := map[string]bool{}
+	for _, item := range items {
+		p := item.Placement
+		unique[p.SubjectID] = true
+		unique[p.SubjectFieldID] = true
+		unique[p.ChapterID] = true
+		if p.SubchapterID != nil {
+			unique[*p.SubchapterID] = true
+		}
+		if p.TopicID != nil {
+			unique[*p.TopicID] = true
+		}
 	}
-	if p.TopicID != nil {
-		ids = append(ids, *p.TopicID)
+	ids := make([]string, 0, len(unique))
+	for id := range unique {
+		ids = append(ids, id)
 	}
 
-	items, err := s.repo.FindMasterDataByIDs(ctx, ids)
+	masterData, err := s.repo.FindMasterDataByIDs(ctx, ids)
 	if err != nil {
 		return fmt.Errorf("gagal membaca master data placement: %w", err)
 	}
 
+	for i, item := range items {
+		errs.prefix = prefixFor(i)
+		checkPlacement(masterData, item.Placement, errs)
+	}
+	errs.prefix = ""
+	return nil
+}
+
+// checkPlacement mengecek letak 1 soal terhadap master data yang sudah diambil.
+//
+// Cukup bab, sub bab, dan topik yang dicek isinya: bab sudah menyimpan mapel, jenjang,
+// dan kelasnya sendiri (kolom bantu migration 000007), jadi tinggal dibandingkan.
+// Mapel & bidang materi hanya dicek statusnya masih aktif.
+func checkPlacement(items map[string]questionmodel.MasterDataItem, p questiondto.PlacementRequest, errs *fieldErrors) {
 	// Mapel & bidang materi: cukup dicek masih aktif (kecocokannya dicek lewat bab di bawah).
 	checkActive(items, p.SubjectID, "placement.subject_id", "mapel", errs)
 	checkActive(items, p.SubjectFieldID, "placement.subject_field_id", "bidang materi", errs)
@@ -131,7 +200,7 @@ func (s *QuestionService) validatePlacement(ctx context.Context, p questiondto.P
 	chapter, ok := items[p.ChapterID]
 	if !ok || chapter.Type != "chapter" {
 		errs.add("placement.chapter_id", "bab tidak ditemukan")
-		return nil // field lain dibandingkan ke bab, jadi tidak bisa dilanjutkan
+		return // field lain dibandingkan ke bab, jadi tidak bisa dilanjutkan
 	}
 	if chapter.Status != "active" {
 		errs.add("placement.chapter_id", "bab tidak aktif")
@@ -176,10 +245,11 @@ func (s *QuestionService) validatePlacement(ctx context.Context, p questiondto.P
 			errs.add("placement.topic_id", "topik tidak aktif")
 		}
 	}
-	return nil
 }
 
-// validateImages mengecek semua image_id (soal & opsi) ada di media_assets, dengan 1 query.
+// validateImages mengecek semua image_id (soal & opsi, semua soal) ada di media_assets, dengan 1 query.
+// Key imageFields sudah berisi nama field lengkap (dengan awalan "questions[i]."),
+// jadi errs.prefix harus kosong saat fungsi ini dipanggil.
 func (s *QuestionService) validateImages(ctx context.Context, imageFields map[string]string, errs *fieldErrors) error {
 	if len(imageFields) == 0 {
 		return nil
@@ -223,7 +293,7 @@ func validateDisplayOrder(order []string, q questionmodel.Question, errs *fieldE
 	filled := map[string]bool{
 		questionmodel.PartQuestion: true,
 		questionmodel.PartFormula:  q.Formula != nil,
-		questionmodel.PartImage:    q.ImageID != nil,
+		questionmodel.PartImage:    q.ImageID != nil || q.ImageURL != nil,
 		questionmodel.PartTable:    q.Table != nil,
 	}
 	defaultOrder := []string{questionmodel.PartQuestion, questionmodel.PartFormula, questionmodel.PartImage, questionmodel.PartTable}
@@ -279,12 +349,15 @@ func trimOptional(s *string) *string {
 }
 
 // fieldErrors mengumpulkan kesalahan per field.
+// prefix ditempel di depan setiap nama field, contoh "questions[2]." → "questions[2].answer.correct_key".
+// Diatur oleh CreateMany sebelum mengecek tiap soal.
 type fieldErrors struct {
-	list []questionmodel.FieldError
+	list   []questionmodel.FieldError
+	prefix string
 }
 
 func (e *fieldErrors) add(field, message string) {
-	e.list = append(e.list, questionmodel.FieldError{Field: field, Message: message})
+	e.list = append(e.list, questionmodel.FieldError{Field: e.prefix + field, Message: message})
 }
 
 func (e *fieldErrors) any() bool {
@@ -293,4 +366,104 @@ func (e *fieldErrors) any() bool {
 
 func (e *fieldErrors) toError() error {
 	return &questionmodel.ValidationError{Fields: e.list}
+}
+
+// GetDetail mengambil 1 soal lengkap, termasuk kunci jawaban (answer) dan pembahasan.
+// ID yang bukan UUID langsung dianggap tidak ditemukan (tanpa query ke database).
+func (s *QuestionService) GetDetail(ctx context.Context, id string) (questionmodel.QuestionDetail, error) {
+	if uuid.Validate(id) != nil {
+		return questionmodel.QuestionDetail{}, questionmodel.ErrQuestionNotFound
+	}
+	return s.repo.FindDetailByID(ctx, id)
+}
+
+// validTypes adalah tipe soal yang dikenal (dipakai update, karena create mengecek lewat binding).
+var validTypes = map[string]bool{
+	questionmodel.TypeSingleChoice:   true,
+	questionmodel.TypeMultipleChoice: true,
+	questionmodel.TypeTrueFalse:      true,
+	questionmodel.TypeFreeText:       true,
+}
+
+// Update mengganti seluruh isi 1 soal, lalu mengembalikan detail terbarunya.
+// Aturan isi sama persis dengan create. Tipe soal boleh diganti (answer dicek sesuai tipe baru).
+//
+// Urutan: cek soal ada (1 query) → cek isi tanpa database → cek placement & gambar
+// (2 query) → UPDATE (1 query) → ambil detail (1 query).
+func (s *QuestionService) Update(ctx context.Context, id string, req questiondto.CreateQuestionRequest, updatedBy string) (questionmodel.QuestionDetail, error) {
+	if uuid.Validate(id) != nil {
+		return questionmodel.QuestionDetail{}, questionmodel.ErrQuestionNotFound
+	}
+	exists, err := s.repo.ExistsByID(ctx, id)
+	if err != nil {
+		return questionmodel.QuestionDetail{}, fmt.Errorf("gagal mengecek soal: %w", err)
+	}
+	if !exists {
+		return questionmodel.QuestionDetail{}, questionmodel.ErrQuestionNotFound
+	}
+
+	errs := &fieldErrors{}
+
+	// Tanpa tipe yang valid, answer tidak bisa dicek, jadi langsung berhenti.
+	switch {
+	case req.Type == "":
+		errs.add("type", "wajib diisi")
+		return questionmodel.QuestionDetail{}, errs.toError()
+	case !validTypes[req.Type]:
+		errs.add("type", "harus salah satu dari: single_choice, multiple_choice, true_false, free_text")
+		return questionmodel.QuestionDetail{}, errs.toError()
+	}
+
+	imageFields := map[string]string{}
+	q, err := buildQuestion(req.Type, req, "", errs, imageFields)
+	if err != nil {
+		return questionmodel.QuestionDetail{}, err
+	}
+	if errs.any() {
+		return questionmodel.QuestionDetail{}, errs.toError()
+	}
+
+	if err := s.validatePlacements(ctx, []questiondto.CreateQuestionRequest{req}, noPrefix, errs); err != nil {
+		return questionmodel.QuestionDetail{}, err
+	}
+	if err := s.validateImages(ctx, imageFields, errs); err != nil {
+		return questionmodel.QuestionDetail{}, err
+	}
+	if errs.any() {
+		return questionmodel.QuestionDetail{}, errs.toError()
+	}
+
+	q.ID = id
+	q.UpdatedBy = &updatedBy
+	if err := s.repo.Update(ctx, q); err != nil {
+		return questionmodel.QuestionDetail{}, err
+	}
+	return s.repo.FindDetailByID(ctx, id)
+}
+
+// DeleteMany menghapus 1 sampai 100 soal dengan soft delete (data tetap ada di database).
+// Semua atau tidak sama sekali: kalau ada ID yang tidak ada / sudah dihapus, tidak ada yang
+// terhapus dan ID tersebut dilaporkan per posisi, contoh "ids[1]".
+func (s *QuestionService) DeleteMany(ctx context.Context, ids []string, deletedBy string) ([]string, error) {
+	// Catatan: binding "uuid" hanya menerima huruf kecil (sama dengan format UUID dari
+	// PostgreSQL), jadi ids bisa langsung dibandingkan dengan hasil RETURNING di bawah.
+	found, ok, err := s.repo.SoftDeleteMany(ctx, ids, deletedBy)
+	if err != nil {
+		return nil, fmt.Errorf("gagal menghapus soal: %w", err)
+	}
+	if ok {
+		return ids, nil
+	}
+
+	foundSet := make(map[string]bool, len(found))
+	for _, id := range found {
+		foundSet[id] = true
+	}
+	errs := &fieldErrors{}
+	for i, id := range ids {
+		if !foundSet[id] {
+			errs.add(fmt.Sprintf("ids[%d]", i), "soal tidak ditemukan atau sudah dihapus")
+		}
+	}
+	return nil, errs.toError()
 }

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -178,6 +179,7 @@ func validateTrueFalse(a *questionmodel.TrueFalseAnswer, errs *fieldErrors, imag
 			errs.add(field+".key", "kunci untuk "+ck.Key+" sudah ada")
 		case ck.Correct == nil:
 			errs.add(field+".correct", "wajib diisi (true/false)")
+			byKey[ck.Key] = ck // tetap dicatat supaya tidak muncul lagi error "belum diisi" untuk key ini
 		default:
 			byKey[ck.Key] = ck
 		}
@@ -206,9 +208,9 @@ func validateFreeText(a *questionmodel.FreeTextAnswer, errs *fieldErrors) {
 	switch a.InputType {
 	case "":
 		errs.add("answer.input_type", "wajib diisi")
-	case questionmodel.InputTypeNumber, questionmodel.InputTypeString:
+	case questionmodel.InputTypeNumber, questionmodel.InputTypeText:
 	default:
-		errs.add("answer.input_type", "harus salah satu dari: number, string")
+		errs.add("answer.input_type", "harus salah satu dari: number, text")
 	}
 
 	switch {
@@ -254,7 +256,7 @@ func validateFreeText(a *questionmodel.FreeTextAnswer, errs *fieldErrors) {
 		}
 		a.CaseSensitive = nil // tidak berlaku untuk angka
 	}
-	if a.InputType == questionmodel.InputTypeString {
+	if a.InputType == questionmodel.InputTypeText {
 		if a.Tolerance != nil && *a.Tolerance != 0 {
 			errs.add("answer.tolerance", "hanya berlaku untuk input_type number")
 		}
@@ -285,7 +287,8 @@ func isNumberAnswer(s string) bool {
 // validateOptions mengecek daftar opsi dan mengembalikan set key yang valid.
 //   - Jumlah opsi antara minCount dan maxCount.
 //   - Key urut: A, B, C, ... (opsi ke-1 = A, ke-2 = B, dst.).
-//   - Setiap opsi wajib punya content atau image_id.
+//   - Setiap opsi wajib punya content atau gambar (image_id / image_url).
+//   - Gambar opsi: image_id ATAU image_url, tidak boleh dua-duanya.
 func validateOptions(options []questionmodel.ChoiceOption, minCount, maxCount int, errs *fieldErrors, imageFields map[string]string) map[string]bool {
 	keys := map[string]bool{}
 
@@ -308,21 +311,48 @@ func validateOptions(options []questionmodel.ChoiceOption, minCount, maxCount in
 			keys[opt.Key] = true
 		}
 
+		opt.ImageURL = trimOptional(opt.ImageURL)
 		opt.Content = strings.TrimSpace(opt.Content)
-		if opt.Content == "" && opt.ImageID == nil {
-			errs.add(field+".content", "wajib diisi jika image_id kosong")
+		if opt.Content == "" && opt.ImageID == nil && opt.ImageURL == nil {
+			errs.add(field+".content", "wajib diisi jika opsi tidak punya gambar")
 		}
 		if len([]rune(opt.Content)) > maxOptionContent {
 			errs.add(field+".content", fmt.Sprintf("maksimal %d karakter", maxOptionContent))
 		}
 
-		if opt.ImageID != nil {
-			if uuid.Validate(*opt.ImageID) != nil {
-				errs.add(field+".image_id", "format UUID tidak valid")
-			} else {
-				imageFields[field+".image_id"] = *opt.ImageID
-			}
-		}
+		checkOptionImage(*opt, field, errs, imageFields)
 	}
 	return keys
+}
+
+// checkOptionImage mengecek gambar 1 opsi: image_id harus UUID (keberadaannya dicek nanti
+// lewat imageFields), image_url harus link http/https, dan tidak boleh diisi dua-duanya.
+func checkOptionImage(opt questionmodel.ChoiceOption, field string, errs *fieldErrors, imageFields map[string]string) {
+	if opt.ImageID != nil {
+		if uuid.Validate(*opt.ImageID) != nil {
+			errs.add(field+".image_id", "format UUID tidak valid")
+		} else {
+			imageFields[errs.prefix+field+".image_id"] = *opt.ImageID // nama field lengkap, untuk validateImages
+		}
+	}
+	if opt.ImageURL != nil {
+		switch {
+		case opt.ImageID != nil:
+			errs.add(field+".image_url", "pilih salah satu: image_id atau image_url")
+		case !isHTTPURL(*opt.ImageURL):
+			errs.add(field+".image_url", "harus link http/https yang valid")
+		}
+	}
+}
+
+// maxImageURL adalah panjang maksimal link gambar.
+const maxImageURL = 2000
+
+// isHTTPURL mengecek link gambar: harus http/https, punya host, dan tidak terlalu panjang.
+func isHTTPURL(s string) bool {
+	if len(s) > maxImageURL {
+		return false
+	}
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }

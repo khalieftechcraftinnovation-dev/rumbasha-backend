@@ -2,14 +2,13 @@ package response
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"reflect"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/validation"
 )
 
 // ValidationError dipanggil handler saat ShouldBindJSON/ShouldBindQuery gagal.
@@ -29,63 +28,15 @@ func ValidationError(c *gin.Context, err error) {
 	fields := make([]FieldError, 0, len(validationErrors))
 	for _, fe := range validationErrors {
 		fields = append(fields, FieldError{
-			Field:   fieldPath(fe),
-			Message: validationMessage(fe),
+			Field:   validation.Path(fe),
+			Message: validation.Message(fe),
 		})
 	}
 
 	ErrorWithFields(c, http.StatusUnprocessableEntity, "Validasi gagal", fields)
 }
 
-// fieldPath mengembalikan lokasi lengkap field dengan nama JSON, tanpa nama struct paling luar.
-// Contoh: "CreateQuestionRequest.placement.chapter_id" → "placement.chapter_id",
-// "CreateQuestionRequest.used_for[1]" → "used_for[1]". Field biasa tetap: "username".
-func fieldPath(fe validator.FieldError) string {
-	_, path, found := strings.Cut(fe.Namespace(), ".")
-	if !found {
-		return fe.Field()
-	}
-	return path
-}
-
-// validationMessage menerjemahkan aturan validasi yang gagal menjadi pesan bahasa Indonesia.
-// Tambahkan case baru kalau memakai aturan validasi lain.
-func validationMessage(fe validator.FieldError) string {
-	isList := fe.Kind() == reflect.Slice || fe.Kind() == reflect.Array
-
-	switch fe.Tag() {
-	case "required":
-		return "wajib diisi"
-	case "max":
-		if fe.Kind() == reflect.String {
-			return fmt.Sprintf("maksimal %s karakter", fe.Param())
-		}
-		if isList {
-			return fmt.Sprintf("maksimal %s item", fe.Param())
-		}
-		return fmt.Sprintf("maksimal %s", fe.Param())
-	case "min":
-		if fe.Kind() == reflect.String {
-			return fmt.Sprintf("minimal %s karakter", fe.Param())
-		}
-		if isList {
-			return fmt.Sprintf("minimal %s item", fe.Param())
-		}
-		return fmt.Sprintf("minimal %s", fe.Param())
-	case "oneof":
-		return "harus salah satu dari: " + strings.ReplaceAll(fe.Param(), " ", ", ")
-	case "uuid":
-		return "format UUID tidak valid"
-	case "unique":
-		return "tidak boleh ada yang sama"
-	case "email":
-		return "format email tidak valid"
-	default:
-		return "tidak valid"
-	}
-}
-
-// UseJSONFieldNames membuat error validasi memakai nama field dari tag json/form
+// UseJSONFieldNames membuat error validasi Gin memakai nama field dari tag json/form
 // (misalnya "per_page"), bukan nama field struct Go ("PerPage").
 // Cukup dipanggil sekali saat router dibuat.
 func UseJSONFieldNames() {
@@ -93,14 +44,5 @@ func UseJSONFieldNames() {
 	if !ok {
 		return
 	}
-
-	v.RegisterTagNameFunc(func(field reflect.StructField) string {
-		for _, tag := range []string{"json", "form"} {
-			name, _, _ := strings.Cut(field.Tag.Get(tag), ",")
-			if name != "" && name != "-" {
-				return name
-			}
-		}
-		return field.Name
-	})
+	v.RegisterTagNameFunc(validation.JSONTagName)
 }
