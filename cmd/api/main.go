@@ -29,6 +29,10 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 
+	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
+	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
+	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/question"
+
 	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
 	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
 )
@@ -78,6 +82,11 @@ func main() {
 	logReportService := logreportservice.NewLogReportService(emailSender, cfg.LogDir, cfg.LogReportEmail, cfg.AppEnv)
 	logReportHandler := logreporthandler.NewLogReportHandler(logReportService, loginService)
 
+	// Fitur: bank soal
+	questionHandler := questionhandler.NewQuestionHandler(
+		questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db)),
+	)
+
 	// Log API harian: logs/api-YYYY-MM-DD.txt, disimpan LOG_RETENTION_DAYS hari terakhir.
 	apiLog, err := apilog.NewWriter(cfg.LogDir, cfg.LogRetentionDays)
 	if err != nil {
@@ -89,6 +98,7 @@ func main() {
 		Login:     loginHandler,
 		Subject:   subjectHandler,
 		LogReport: logReportHandler,
+		Question:  questionHandler,
 	}, cfg.JWTSecret, apiLog)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

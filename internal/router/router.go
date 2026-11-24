@@ -5,6 +5,7 @@
 //
 //	router/login/login_routes.go      → /auth/...
 //	router/subject/subject_routes.go  → /subjects/...
+//	router/question/question_routes.go → /questions/...
 package router
 
 import (
@@ -16,11 +17,13 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
+	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
 	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/logreport"
+	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/question"
 	// subjectrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subject"
 )
 
@@ -30,6 +33,7 @@ type Handlers struct {
 	Login     *loginhandler.LoginHandler
 	Subject   *subjecthandler.SubjectHandler
 	LogReport *logreporthandler.LogReportHandler
+	Question  *questionhandler.QuestionHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
@@ -77,6 +81,7 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer) *gin.Engine {
 	// Daftarkan route setiap fitur. Tambahkan baris baru setiap ada fitur baru.
 	loginrouter.Register(public, private, h.Login)
 	logreportrouter.Register(private, h.LogReport)
+	questionrouter.Register(private, h.Question)
 	// subjectrouter.Register(private, h.Subject)
 
 	return r

@@ -4,8 +4,8 @@
 
 **Project:** Rumbasha E-Learning Platform  
 **Client:** PT Rumbasha Menggapai Asa  
-**Document Version:** 1.2  
-**Date:** 9 November 2026  
+**Document Version:** 1.3  
+**Date:** 24 November 2026  
 **Backend:** Go (Gin Framework)  
 **Frontend:** React  
 **Database:** PostgreSQL  
@@ -19,8 +19,11 @@
 | 1.0       | 1 November 2026 | Draf awal BRD.                                                                                                                                                                                                                                                        |
 | 1.1       | 9 November 2026 | Penyesuaian dengan desain UI: login, beranda siswa, modul, Daily Quiz, isi quiz, Uji Kom & Tryout, RUMATH, peringkat, paket & coin, notifikasi, profil, dan beranda admin. Fitur admin lainnya menyusul.                                                              |
 | 1.2       | 9 November 2026 | Penyesuaian dengan desain panel admin: Materi, Bank Soal, Image, Master Data, Quiz, RUMATH, Leaderboard, Report Quiz, Report RUMATH, User, Coin & Akses, Paket, Landing Page, dan Task. Ditambahkan Bagian 3.16-3.20, BR-024 sampai BR-028, dan BD-025 sampai BD-033. |
+| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel. Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-028 sampai FR-QUIZ-031, BR-029, 8.12, dan BD-031. |
 
 Catatan v1.2: perubahan v1.2 ditandai sebagai tracked changes (perubahan v1.1 sudah diterima). Hal yang diambil dari desain tetapi belum pasti dicatat di Bagian 15 (Business Decisions Pending).
+
+Catatan v1.3: BRD ini adalah dasar awal dan detailnya belum lengkap. Jika ada perbedaan, keputusan langsung dari pemilik produk lebih berlaku daripada isi BRD atau desain, dan BRD diperbarui mengikuti keputusan tersebut.
 
 ## 1. PROJECT OVERVIEW
 
@@ -444,7 +447,15 @@ Contoh:
 
 Contoh pada desain: Mata Pelajaran Matematika, Bidang Materi Bilangan, Bab Pecahan. Bab Pecahan berisi PDF Penjumlahan Pecahan, Pengurangan Pecahan, Perkalian Pecahan, Pembagian Pecahan, dan Pecahan Campuran. Mata pelajaran pada desain: Matematika, IPA, B. Indonesia, B. Inggris, IPS. Bidang materi Matematika pada desain: Bilangan, Aljabar, Geometri, Statistika. Subbab dan Topik bersifat opsional pada pemilihan Daily Quiz. Nama bidang materi final mengikuti Master Data.
 
-Catatan desain admin: form Tambah materi dan Tambah soal hanya memakai Jenjang, Kelas, Mapel, Bidang materi, dan Bab. Subbab dan Topik tidak ada pada form admin sehingga belum jelas apakah dua tingkat itu tetap dipakai (lihat BD-031).
+Aturan hierarki (keputusan v1.3):
+
+- Mata Pelajaran sama untuk semua jenjang. Contoh: satu mapel Matematika dipakai SD, SMP, dan SMA. Mapel tidak terikat jenjang maupun kelas.
+- Mulai Bidang Materi ke bawah (Bidang Materi, Bab, Subbab, Topik), setiap item terhubung ke satu jenjang dan satu kelas. Contoh: Matematika → Bilangan (SD, Kelas 4) → KPK dan FPB → Menentukan KPK dan FPB → Menentukan KPK.
+- Bidang Materi dengan nama yang sama boleh ada di kelas berbeda (contoh: Bilangan Kelas 1 dan Bilangan Kelas 4 adalah dua item terpisah dengan isi bab yang berbeda), tetapi tidak boleh kembar dalam mapel dan kelas yang sama.
+- Jenjang dan kelas pada Bab, Subbab, dan Topik selalu sama dengan Bidang Materi induknya. Kelas harus milik jenjang yang dipilih.
+- Subbab dan Topik tetap dipakai (BD-031 dijawab).
+
+Catatan desain admin: form Tambah materi dan Tambah soal hanya memakai Jenjang, Kelas, Mapel, Bidang materi, dan Bab. Pilihan Bidang materi pada form disaring berdasarkan Mapel dan Kelas yang dipilih. Untuk soal, letak wajib diisi sampai Bab; Subbab dan Topik opsional (FR-QUIZ-026). Untuk materi masih perlu dikonfirmasi.
 
 #### 3.4.2 Functional Requirements
 
@@ -458,7 +469,9 @@ Catatan desain admin: form Tambah materi dan Tambah soal hanya memakai Jenjang, 
 
 - FR-LMS-005: Admin dapat membuat topik.
 
-- FR-LMS-006: Setiap entitas memiliki relasi hierarkis dengan parent-nya.
+- FR-LMS-006: Setiap entitas memiliki relasi hierarkis dengan parent-nya. Mapel tidak memiliki parent; Bidang Materi berinduk ke Mapel dan wajib memiliki jenjang dan kelas; Bab, Subbab, dan Topik mewarisi mapel, jenjang, dan kelas dari induknya.
+
+- FR-LMS-022: Daftar Bidang Materi, Bab, Subbab, dan Topik dapat difilter berdasarkan Mapel, Jenjang, dan Kelas.
 
 - FR-LMS-007: Admin dapat mengubah dan menghapus struktur materi.
 
@@ -602,11 +615,25 @@ Functional requirements:
 
 - FR-QUIZ-024: Admin menambah soal satu per satu lewat halaman "Tambah soal" (tombol Simpan soal, Simpan & tambah lagi, dan Batal), dan banyak soal sekaligus lewat Import Excel.
 
-- FR-QUIZ-025: Tipe soal adalah Pilihan ganda atau Isian angka; tampilan opsi jawaban mengikuti tipe. Soal pilihan ganda memiliki opsi A sampai E dan satu kunci jawaban. Hal ini melengkapi FR-QUIZ-004 yang semula hanya menyebut pilihan ganda.
+- FR-QUIZ-025 (diubah v1.3): Tipe soal ada 4, masing-masing dengan form jawaban sendiri:
+  - Single choice: opsi A sampai E (minimal 2), satu kunci jawaban.
+  - Multiple choice: opsi A sampai E (minimal 2), satu atau lebih kunci jawaban, dengan cara penilaian "all or nothing" (default) atau "partial".
+  - True/false: 1 sampai 10 pernyataan (A, B, C, ...), setiap pernyataan diberi kunci benar atau salah.
+  - Free text: isian angka atau teks. Isian angka menerima beberapa bentuk jawaban benar (contoh "0.75", "0,75", "3/4") dengan toleransi selisih. Isian teks memakai kata kunci: jawaban siswa benar jika mengandung salah satu kata kunci (huruf besar/kecil diabaikan kecuali diatur lain).
+  
+  Setiap opsi berisi teks, gambar, atau keduanya. Hal ini menggantikan versi sebelumnya (Pilihan ganda atau Isian angka).
 
-- FR-QUIZ-026: Letak soal diisi dengan Jenjang, Kelas, Mapel, Bidang materi, Bab (dipilih dari daftar atau diketik sebagai bab baru), dan Level (contoh desain: Mudah, Sedang). Letak soal dipakai untuk menyusun Daily Quiz otomatis.
+- FR-QUIZ-026 (diubah v1.3): Letak soal diisi dengan Jenjang, Kelas, Mapel, Bidang materi, dan Bab (wajib), serta Subbab dan Topik (opsional; Topik hanya bisa dipilih jika Subbab dipilih). Semua dipilih dari Master Data dan harus saling cocok (contoh: Bab harus milik Bidang materi dan Kelas yang dipilih). Letak soal dipakai untuk menyusun Daily Quiz otomatis.
 
 - FR-QUIZ-027: Setiap soal ditandai "Dipakai untuk": Daily Quiz, Uji Kom, Tryout, dan/atau RUMATH (boleh lebih dari satu). Kolom "Dipakai di" pada daftar menampilkan peruntukan tersebut.
+
+- FR-QUIZ-028 (baru v1.3): Isi soal terdiri dari teks pertanyaan (boleh berisi rumus LaTeX), dan opsional: rumus LaTeX terpisah, satu gambar dari Image library, satu tabel (judul kolom opsional, maksimal 10 kolom dan 50 baris), serta pembahasan. Urutan tampil bagian soal (pertanyaan, rumus, gambar, tabel) dapat diatur admin.
+
+- FR-QUIZ-029 (baru v1.3): Tingkat kesulitan soal: easy (mudah), medium (sedang), hard (sulit).
+
+- FR-QUIZ-030 (baru v1.3): Status soal: active (dapat dipakai quiz) atau inactive. Default active.
+
+- FR-QUIZ-031 (baru v1.3): Setiap soal mendapat kode otomatis berurutan (contoh Q-1256) dan mencatat admin pembuatnya. Hanya Admin dan Super Admin yang dapat membuat soal.
 
 - FR-QUIZ-028: Pertanyaan dan opsi jawaban mendukung rumus yang ditulis di antara tanda \$ ... \$ (LaTeX). Form menyediakan tombol rumus (pecahan, pangkat, akar, pi, kali, bagi) dan panel Pratinjau yang menampilkan soal seperti pada HP siswa.
 
@@ -1283,6 +1310,8 @@ Functional requirements:
 
 - FR-MST-007: Cabang pada desain: Surabaya Timur, Surabaya Barat, dan Sidoarjo. Cabang menjadi atribut akun admin, tutor, dan siswa; Super Admin tercatat "Semua cabang". Pembatasan data per cabang dikonfirmasi (lihat BD-025).
 
+- FR-MST-008: Master Data menyimpan hierarki Mapel → Bidang Materi → Bab → Subbab → Topik sesuai aturan 3.4.1. Saat menambah Bidang Materi, admin memilih Mapel, Jenjang, dan Kelas. Saat menambah Bab, Subbab, atau Topik, admin cukup memilih induknya, dan jenjang serta kelas mengikuti induk tersebut.
+
 ### 3.17 Image Library
 
 Image library menyimpan gambar untuk soal, materi, dan landing page.
@@ -1389,6 +1418,7 @@ Bagian ini berisi aturan bisnis yang wajib menjadi acuan seluruh implementasi.
 | BR-026 | Hanya Super Admin yang dapat membuat dan mengubah task; penerima task dapat menandai task selesai.               |
 | BR-027 | Soal hanya dapat dipilih untuk jenis quiz yang ditandai pada kolom "Dipakai untuk" soal tersebut.                |
 | BR-028 | Perubahan Landing Page baru tampil di situs publik setelah tombol Publish ditekan.                               |
+| BR-029 | Mapel berlaku untuk semua jenjang. Bidang Materi, Bab, Subbab, dan Topik terikat pada satu jenjang dan satu kelas yang sama dengan induknya. |
 
 ## 5. SYSTEM ARCHITECTURE
 
@@ -1812,7 +1842,7 @@ Berikut rancangan awal domain database.
 
 ### 8.12 Admin: Master Data, Media, dan Landing Page
 
-- master_data_items (tipe: mapel, bidang materi, kelas, sekolah; parent; status)
+- master_data_items (tipe: jenjang, kelas, mapel, bidang materi, bab, subbab, topik, sekolah; parent; status). Bidang materi s/d topik juga menyimpan mapel, jenjang, dan kelas (disalin dari induk) supaya filter cepat tanpa JOIN berlapis.
 
 - media_assets (Image library)
 
@@ -2523,7 +2553,7 @@ Hal-hal berikut perlu dikonfirmasi kepada pihak bisnis sebelum implementasi fina
 | BD-028 | Leaderboard: apakah papan RUMATH tampil di aplikasi siswa (kini hanya 3 tab)? Bagaimana hadiah (coin, sertifikat digital, konsultasi gratis) diberikan dan siapa yang memproses? Apa yang diedit pada tombol Edit tiap baris peringkat?                                                                                                                                                         | TBD                              |
 | BD-029 | Apakah soal RUMATH dibuat admin dan disimpan di Bank Soal (desain: 130 soal isian bertanda RUMATH), atau dihasilkan otomatis oleh sistem (FR-MATH-002)?                                                                                                                                                                                                                                         | TBD                              |
 | BD-030 | Dari mana video RUMATH berasal (unggah ke storage atau tautan platform video)? Apakah durasi diisi otomatis atau manual?                                                                                                                                                                                                                                                                        | TBD                              |
-| BD-031 | Apakah Subbab dan Topik masih dipakai? Form admin Materi dan Soal hanya memakai Jenjang, Kelas, Mapel, Bidang materi, dan Bab.                                                                                                                                                                                                                                                                  | TBD                              |
+| BD-031 | Apakah Subbab dan Topik masih dipakai? Form admin Materi dan Soal hanya memakai Jenjang, Kelas, Mapel, Bidang materi, dan Bab. **Jawaban v1.3:** Subbab dan Topik tetap dipakai; mapel sama untuk semua jenjang dan Bidang Materi ke bawah terhubung ke jenjang dan kelas (lihat 3.4.1). Form soal wajib sampai Bab, Subbab dan Topik opsional; untuk form materi masih perlu dikonfirmasi.                                  | Dijawab pemilik produk (v1.3)    |
 | BD-032 | Buat quiz: bagaimana langkah 2 (pilih soal manual atau acak) dan langkah 3 (jadwal, kode akses otomatis atau manual, masa berlaku)? Apa arti entri Daily Quiz di menu Quiz admin, padahal Daily Quiz dibuat otomatis oleh siswa?                                                                                                                                                                | TBD                              |
 | BD-033 | Skala nilai Tryout: BR-018 menyebut 0-100, sedangkan Leaderboard admin menyebut skor Tryout 0-1.000. Mana yang berlaku, dan bagaimana konversinya ke poin?                                                                                                                                                                                                                                      | TBD                              |
 

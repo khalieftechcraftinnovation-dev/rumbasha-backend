@@ -57,7 +57,9 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			student_subscriptions,
 			student_feature_overrides,
 			coin_packages,
-			coin_transactions
+			coin_transactions,
+			questions,
+			media_assets
 		RESTART IDENTITY`).Error
 	if err != nil {
 		t.Fatalf("gagal mengosongkan tabel: %v", err)

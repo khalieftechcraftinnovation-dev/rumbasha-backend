@@ -7,6 +7,7 @@
 // File SQL yang dijalankan (urut), bisa juga dibuka di DBeaver:
 //  1. dummy_data.sql  → cabang, akun utama tiap role, paket, coin (hanya sekali)
 //  2. dummy_users.sql → akun tambahan sampai total 55 user (aman diulang)
+//  3. dummy_subjects.sql → 5 mapel + hierarki Matematika SD Kelas 1-6: bidang materi → bab → sub bab → topik (aman diulang)
 package main
 
 import (
@@ -25,6 +26,9 @@ var (
 
 	//go:embed dummy_users.sql
 	dummyUsersSQL string
+
+	//go:embed dummy_subjects.sql
+	dummySubjectsSQL string
 )
 
 func main() {
@@ -62,6 +66,27 @@ func main() {
 	}
 	log.Println("dummy_users.sql berhasil diisi")
 
+	// 3. dummy_subjects.sql: aman diulang (data yang sudah ada dilewati).
+	if err := db.Exec(dummySubjectsSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_subjects.sql: %v (sudah menjalankan make migrate-up?)", err)
+	}
+	log.Println("dummy_subjects.sql berhasil diisi")
+
+	// Ringkasan jumlah data mapel per tingkat.
+	type typeCount struct {
+		Type  string
+		Total int
+	}
+	var subjectCounts []typeCount
+	db.Raw(`
+		SELECT type, COUNT(*) AS total
+		FROM master_data_items
+		WHERE type IN ('subject', 'subject_field', 'chapter', 'subchapter', 'topic')
+		GROUP BY type
+		ORDER BY MIN(CASE type WHEN 'subject' THEN 1 WHEN 'subject_field' THEN 2
+		                       WHEN 'chapter' THEN 3 WHEN 'subchapter' THEN 4 ELSE 5 END)`).
+		Scan(&subjectCounts)
+
 	// Ringkasan jumlah user per role.
 	type roleCount struct {
 		Role  string
@@ -73,6 +98,11 @@ func main() {
 	fmt.Printf("\nData dummy di database %s (password semua: password123)\n", cfg.DBName)
 	for _, c := range counts {
 		fmt.Printf("  %-12s %d user\n", c.Role, c.Total)
+	}
+
+	fmt.Println("\nMaster data mapel (contoh lengkap: Matematika SD Kelas 1-6)")
+	for _, c := range subjectCounts {
+		fmt.Printf("  %-14s %d data\n", c.Type, c.Total)
 	}
 	fmt.Println(`
 Akun utama untuk dicoba:

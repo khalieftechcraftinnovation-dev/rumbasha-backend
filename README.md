@@ -50,6 +50,7 @@ curl http://localhost:8080/health
 Setelah `make seed`, semua akun memakai password **`password123`**. Total 55 user, mengikuti contoh desain menu User: 47 siswa, 4 tutor, 3 admin, 1 super admin.
 
 - [cmd/seed/dummy_data.sql](cmd/seed/dummy_data.sql): cabang, akun utama di bawah, paket, dan coin (dijalankan sekali).
+- [cmd/seed/dummy_subjects.sql](cmd/seed/dummy_subjects.sql): 5 mapel (Matematika, IPA, B. Indonesia, B. Inggris, IPS) + hierarki lengkap **Matematika SD Kelas 1-6**: 15 bidang materi, 18 bab, 24 sub bab, 47 topik (aman dijalankan ulang).
 - [cmd/seed/dummy_users.sql](cmd/seed/dummy_users.sql): 2 admin, 3 tutor, dan 43 siswa tambahan yang tersebar di semua cabang dan jenjang (aman dijalankan ulang). Siswa tambahan memakai username `siswa.<nama depan>`, contoh `siswa.adit`. Siswa tambahan belum punya paket.
 
 Akun utama untuk dicoba:
@@ -191,13 +192,31 @@ Semua tabel ada di satu schema (`public`), jadi cukup ditulis `SELECT ... FROM u
 
 | Domain    | Tabel                                                                                               |
 |-----------|-----------------------------------------------------------------------------------------------------|
-| Master    | `branches` (cabang), `master_data_items` (data acuan generik: jenjang & kelas)                      |
+| Master    | `branches` (cabang), `master_data_items` (data acuan generik: jenjang, kelas, hierarki mapel)       |
 | Akun      | `users` (semua akun + role), `refresh_tokens` (sesi login)                                          |
 | Siswa     | `students` (kode siswa, tanggal lahir, target sekolah, saldo coin)                                  |
 | Paket     | `subscription_plans` (paket + harga + akses fitur), `student_subscriptions` (paket dibeli/riwayat), |
 |           | `student_feature_overrides` (akses khusus per siswa)                                                |
 | Coin      | `coin_packages` (paket isi coin), `coin_transactions` (riwayat coin, termasuk pembelian)            |
 | Lain-lain | `subjects` (contoh awal), `schema_migrations` (catatan versi migration, jangan diubah manual)       |
+
+`master_data_items` dibedakan lewat kolom `type` dan membentuk pohon lewat `parent_id`:
+
+```text
+education_level  Jenjang   SD                        (data awal migration)
+└─ grade         Kelas     Kelas 5                   (data awal migration)
+
+subject          Mapel     Matematika                ┐ sama untuk semua jenjang, tanpa induk
+└─ subject_field  Bidang Materi  Bilangan  [SD, Kelas 5] │ ← mulai di sini terhubung ke jenjang & kelas
+   └─ chapter       Bab        Pecahan                │ diisi admin lewat Master Data
+      └─ subchapter   Sub Bab    Operasi Pecahan      │ (contoh: make seed → dummy_subjects.sql)
+         └─ topic       Topik      Penjumlahan pecahan ┘
+```
+
+- Mapel hanya satu (Matematika dipakai SD, SMP, SMA). Jenjang dan mapel tidak punya induk; type lain wajib punya induk.
+- Bidang materi s/d topik wajib mengisi `subject_id`, `education_level_id`, `grade_id`. Kolom ini **disalin dari induk** saat data dibuat, supaya daftar bab/topik per mapel & kelas cukup query 1 tabel tanpa JOIN berlapis (index `master_data_items_curriculum_idx`).
+- Database menolak kelas yang bukan milik jenjangnya (Kelas 4 + SMP) lewat foreign key `(grade_id, education_level_id)`.
+- Nama bidang materi boleh sama di kelas berbeda ("Bilangan" Kelas 1 dan Kelas 4), tapi tidak boleh kembar di kelas yang sama.
 
 Tutor adalah user dengan `role = 'tutor'` dan boleh mengajar siswa mana pun. Jatah gratis Daily Quiz berlaku global untuk semua siswa dan diatur di `.env` (`DAILY_QUIZ_FREE_QUOTA`, `DAILY_QUIZ_COIN_COST`).
 
@@ -261,8 +280,51 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | PUT    | `/api/v1/subjects/:id` | Admin        | Ubah subject                                    |
 | DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
 | POST   | `/api/v1/log-reports`  | Admin        | Laporan bug: kirim log hari ini ke email dev    |
+| POST   | `/api/v1/questions`    | Admin        | Tambah soal (4 tipe, lihat di bawah)            |
 
 "Admin" = role `admin` atau `super_admin`.
+
+### Tambah soal (`POST /api/v1/questions`)
+
+Bagian umum sama untuk semua tipe; hanya isi `answer` yang berbeda. Contoh lengkap ada di Postman (folder **Bank soal**).
+
+```json
+{
+  "type": "single_choice",
+  "question": "Hasil dari $\\frac{1}{2} + \\frac{1}{4}$ adalah ...",
+  "formula": null,
+  "image_id": null,
+  "table": { "headers": ["Nama", "Nilai"], "rows": [["Andi", "80"]] },
+  "explanation": "Samakan penyebut ...",
+  "display_order": ["question", "table"],
+  "placement": {
+    "education_level_id": "...", "grade_id": "...", "subject_id": "...",
+    "subject_field_id": "...", "chapter_id": "...",
+    "subchapter_id": null, "topic_id": null
+  },
+  "difficulty": "easy",
+  "used_for": ["daily_quiz", "uji_kom"],
+  "status": "active",
+  "answer": { "options": [{ "key": "A", "content": "...", "image_id": null }], "correct_key": "A" }
+}
+```
+
+| `type`            | Isi `answer`                                                                                              |
+|-------------------|-----------------------------------------------------------------------------------------------------------|
+| `single_choice`   | `options` (2-5, key urut A, B, ...) + `correct_key`                                                       |
+| `multiple_choice` | `options` (2-5) + `correct_keys` (min 1) + `scoring` (`all_or_nothing` default / `partial`)               |
+| `true_false`      | `options` (1-10 pernyataan) + `correct_keys: [{"key": "A", "correct": true}, ...]` untuk SETIAP opsi       |
+| `free_text`       | `input_type` (`number` / `string`) + `accepted_answers` (1-20) + `tolerance` (number) / `case_sensitive` (string) |
+
+Aturan penting:
+
+- Placement wajib sampai `chapter_id`; `subchapter_id` & `topic_id` opsional (topik butuh sub bab). Jenjang, kelas, mapel, dan bidang materi harus cocok dengan bab.
+- `display_order` opsional. Kalau diisi, harus berisi `question` + PERSIS bagian yang diisi (`formula`, `image`, `table`).
+- Field yang tidak dikenal di `answer` ditolak (contoh `correct_key` di soal `multiple_choice`), supaya salah ketik langsung ketahuan.
+- Free text `string`: jawaban siswa benar jika **mengandung salah satu** kata kunci di `accepted_answers`.
+- `image_id` (soal & opsi) harus ada di tabel `media_assets`. API upload gambar belum dibuat.
+- Semua kesalahan dikembalikan sekaligus (422) dengan `field` lengkap, contoh `answer.options[1].content`, `placement.grade_id`.
+- `answer` disimpan dalam bentuk rapi di kolom JSONB `questions.answer` (spasi dibuang, default diisi, `correct_keys` true/false diurutkan sesuai opsi).
 
 ### Postman
 
