@@ -29,8 +29,9 @@ import (
 // Semua error yang ditambahkan lewat c.Error ikut tercatat di field "process".
 func APILog(writer *apilog.Writer) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// /health dipanggil berkali-kali oleh monitoring, tidak perlu dicatat.
-		if c.Request.URL.Path == "/health" {
+		// /health dipanggil berkali-kali oleh monitoring, dan file gambar (/storage/...) dibuka
+		// sangat sering oleh aplikasi siswa. Keduanya tidak perlu dicatat.
+		if c.Request.URL.Path == "/health" || strings.HasPrefix(c.Request.URL.Path, "/storage/") {
 			c.Next()
 			return
 		}

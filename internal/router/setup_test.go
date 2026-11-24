@@ -21,20 +21,27 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
+	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
+	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
+	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
 	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
+	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
+	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/question"
 	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
 	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/testutil"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/token"
 )
@@ -42,6 +49,7 @@ import (
 const (
 	testJWTSecret = "secret-khusus-test-minimal-32-karakter!!"
 	testPassword  = "password123"
+	testAppURL    = "http://api.test"
 )
 
 // testPasswordHash dihitung sekali saja, karena bcrypt sengaja dibuat lambat.
@@ -67,11 +75,12 @@ func (f *fakeMailSender) Send(msg mailer.Message) error {
 
 // testApp berisi semua yang mungkin dibutuhkan test endpoint.
 type testApp struct {
-	Router *gin.Engine
-	DB     *gorm.DB
-	APILog *apilog.Writer  // writer log API (panggil Close() sebelum membaca file log)
-	LogDir string          // folder log API sementara
-	Mail   *fakeMailSender // email yang "terkirim" selama test
+	Router     *gin.Engine
+	DB         *gorm.DB
+	APILog     *apilog.Writer  // writer log API (panggil Close() sebelum membaca file log)
+	LogDir     string          // folder log API sementara
+	Mail       *fakeMailSender // email yang "terkirim" selama test
+	StorageDir string          // folder file upload sementara (gambar)
 }
 
 // setupRouter menyusun semua layer persis seperti di main.go, tapi memakai database test.
@@ -107,14 +116,19 @@ func setupApp(t *testing.T) testApp {
 	mail := &fakeMailSender{}
 	logReportService := logreportservice.NewLogReportService(mail, logDir, "dev@example.com", "test")
 
+	storageDir := t.TempDir() // file upload test otomatis dihapus setelah test selesai
+	store := storage.NewLocal(storageDir, testAppURL)
+
 	r := New(Handlers{
 		Login:     loginhandler.NewLoginHandler(loginService, subscriptionService),
 		Subject:   subjecthandler.NewSubjectHandler(subjectService),
 		LogReport: logreporthandler.NewLogReportHandler(logReportService, loginService),
 		Question:  questionhandler.NewQuestionHandler(questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db))),
-	}, testJWTSecret, apiLog)
+		Image:     imagehandler.NewImageHandler(imageservice.NewImageService(imagerepo.NewImageRepository(db), store)),
+		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
+	}, testJWTSecret, apiLog, storageDir)
 
-	return testApp{Router: r, DB: db, APILog: apiLog, LogDir: logDir, Mail: mail}
+	return testApp{Router: r, DB: db, APILog: apiLog, LogDir: logDir, Mail: mail, StorageDir: storageDir}
 }
 
 // sendRequest mengirim request ke router tanpa perlu menjalankan server sungguhan.

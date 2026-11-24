@@ -211,9 +211,14 @@ subject          Mapel     Matematika                ┐ sama untuk semua jenjan
    └─ chapter       Bab        Pecahan                │ diisi admin lewat Master Data
       └─ subchapter   Sub Bab    Operasi Pecahan      │ (contoh: make seed → dummy_subjects.sql)
          └─ topic       Topik      Penjumlahan pecahan ┘
+
+question_type    Tipe soal  single_choice = Pilihan ganda    ┐ data awal migration 000015, tanpa induk.
+quiz_type        Tipe quiz  daily_quiz = Daily Quiz          │ code = nilai yang DISIMPAN di tabel lain
+difficulty       Level      easy = Mudah                     ┘ (questions.type / used_for / difficulty)
 ```
 
-- Mapel hanya satu (Matematika dipakai SD, SMP, SMA). Jenjang dan mapel tidak punya induk; type lain wajib punya induk.
+- Mapel hanya satu (Matematika dipakai SD, SMP, SMA). Yang wajib punya induk hanya kelas, bidang materi, bab, sub bab, dan topik.
+- Tipe soal, tipe quiz, dan level **tidak** direlasikan lewat id: tabel lain menyimpan `code`-nya sebagai teks (contoh `questions.difficulty = 'easy'`). Karena itu `code` ketiganya wajib diisi dan **tidak boleh diubah**; yang boleh diubah hanya `name` & `sort_order`.
 - Bidang materi s/d topik wajib mengisi `subject_id`, `education_level_id`, `grade_id`. Kolom ini **disalin dari induk** saat data dibuat, supaya daftar bab/topik per mapel & kelas cukup query 1 tabel tanpa JOIN berlapis (index `master_data_items_curriculum_idx`).
 - Database menolak kelas yang bukan milik jenjangnya (Kelas 4 + SMP) lewat foreign key `(grade_id, education_level_id)`.
 - Nama bidang materi boleh sama di kelas berbeda ("Bilangan" Kelas 1 dan Kelas 4), tapi tidak boleh kembar di kelas yang sama.
@@ -281,10 +286,16 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
 | POST   | `/api/v1/log-reports`  | Admin        | Laporan bug: kirim log hari ini ke email dev    |
 | POST   | `/api/v1/questions`    | Admin        | Tambah 1-100 soal sekaligus (1 tipe)            |
+| GET    | `/api/v1/questions`    | Admin        | List Bank Soal: filter, search, pagination      |
+| GET    | `/api/v1/questions/type-counts` | Admin | Jumlah soal per tipe (angka di tab)     |
+| GET    | `/api/v1/dropdowns/:type` | Login (semua role) | Pilihan dropdown dari master data  |
 | GET    | `/api/v1/questions/:id`| Admin        | Detail soal + kunci jawaban & pembahasan        |
 | PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
 | DELETE | `/api/v1/questions`    | Admin        | Hapus 1-100 soal sekaligus (soft delete)        |
 | POST   | `/api/v1/questions/import/check` | Admin | Cek file Excel soal (tidak menyimpan)  |
+| POST   | `/api/v1/images`       | Admin        | Upload 1-10 gambar (multipart)                  |
+| DELETE | `/api/v1/images`       | Admin        | Hapus permanen 1-100 gambar                     |
+| GET    | `/storage/images/...`  | Publik       | File gambar (link dari field `url`)             |
 
 "Admin" = role `admin` atau `super_admin`.
 
@@ -342,6 +353,73 @@ Aturan penting:
 - Gambar soal & opsi: `image_id` (harus ada di tabel `media_assets`, API upload gambar belum dibuat) **atau** `image_url` (link luar http/https, maks 2000 karakter). Tidak boleh dua-duanya. Opsi boleh tanpa teks kalau punya gambar.
 - Semua kesalahan dikembalikan sekaligus (422) dengan `field` lengkap, contoh `questions[0].answer.options[1].content`, `questions[1].placement.grade_id`.
 - `answer` disimpan dalam bentuk rapi di kolom JSONB `questions.answer` (spasi dibuang, default diisi, `correct_keys` true/false diurutkan sesuai opsi).
+
+### List soal / Bank Soal (`GET /api/v1/questions`)
+
+Tabel Bank Soal, **urut terbaru dulu** (`created_at DESC`). Semua query string opsional dan bisa digabung (AND):
+
+| Query | Isi |
+| ----- | ---- |
+| `page`, `per_page` | Default 1 & 20, `per_page` maks 100 |
+| `search` | Cari di **kode soal** dan **teks soal**, bagian mana saja, tidak peka huruf besar/kecil (maks 100 karakter). `%` dan `_` dicari apa adanya |
+| `type` | `single_choice` / `multiple_choice` / `true_false` / `free_text` |
+| `difficulty` | Kolom "Level": `easy` / `medium` / `hard` |
+| `education_level_id`, `grade_id`, `subject_id`, `subject_field_id`, `chapter_id`, `subchapter_id`, `topic_id` | Filter per tingkat hierarki (UUID) |
+
+```http
+GET /api/v1/questions?page=1&per_page=20&subject_id=...&difficulty=easy&search=garis
+```
+
+```json
+{
+  "status_code": 200, "message": "Data soal berhasil diambil",
+  "data": [{
+    "id": "...", "code": "Q-1264", "type": "free_text",
+    "question": "Perhatikan garis bilangan. Hasil dari $-3 + 5$ adalah ...",
+    "media": { "formula": false, "image": true, "table": false },
+    "placement": {
+      "education_level": { "id": "...", "name": "SD" },
+      "grade":           { "id": "...", "name": "Kelas 4" },
+      "subject":         { "id": "...", "name": "Matematika" },
+      "subject_field":   { "id": "...", "name": "Bilangan" },
+      "chapter":         { "id": "...", "name": "Bilangan Bulat" },
+      "subchapter": null, "topic": null
+    },
+    "difficulty": "easy", "used_for": ["uji_kom"], "status": "active",
+    "created_by": { "id": "...", "name": "Admin Surabaya Timur" }, "created_at": "...",
+    "updated_by": null, "updated_at": "..."
+  }],
+  "meta": { "page": 1, "per_page": 20, "total": 2 }
+}
+```
+
+- Kolom tabel: Kode = `code`, Pertanyaan = `question`, Tipe = `type` + `media` (label "+N media" = jumlah `true`), Hirarki = `placement`, Level = `difficulty`, Dipakai di = `used_for`, Create by/on = `created_by`/`created_at`, Last updated by/on = `updated_by`/`updated_at`.
+- `media` hanya untuk isi **soal** (rumus, gambar Image Library atau link luar, tabel), bukan gambar di opsi jawaban.
+- `updated_by: null` = soal belum pernah diubah (`updated_at` = waktu dibuat).
+- **Tanpa** kunci jawaban & pembahasan supaya response kecil; ambil lewat detail kalau perlu.
+- Soal yang dihapus (soft delete) tidak pernah tampil. Hasil kosong → `data: []`.
+- Performa: halaman dipotong dulu di tabel `questions` (CTE), baru JOIN nama untuk ≤ `per_page` soal itu saja. Pencarian memakai index trigram `pg_trgm` (migration 000013). Uji 20.000 soal: ~1 ms dengan index vs ~350 ms tanpa index. Total (`meta.total`) dihitung dengan `COUNT(*)` terpisah, kecuali sudah pasti dari halaman terakhir yang tidak penuh.
+- Soal dari 1 request bulk create punya `created_at` yang sama; urutannya tetap sesuai request (id soal memakai UUID v7 yang berurutan).
+- Tab tipe dipilih (`type=...`): index `questions_type_created_at_idx` (migration 000014) langsung memberi 20 soal terbaru tipe itu tanpa sorting (uji 100.000 soal: < 0,1 ms).
+
+### Jumlah soal per tipe / angka di tab (`GET /api/v1/questions/type-counts`)
+
+Untuk tab **Semua · Pilihan ganda · PG kompleks · Benar / Salah · Isian**. Query string **sama persis** dengan list (`search`, `difficulty`, hierarki), jadi angka di tab selalu cocok dengan isi tabel. `type`, `page`, `per_page` diabaikan (boleh ikut dikirim), karena semua tipe selalu dihitung.
+
+```http
+GET /api/v1/questions/type-counts?subject_id=...&search=garis
+```
+
+```json
+{
+  "status_code": 200, "message": "Jumlah soal per tipe",
+  "data": { "all": 264, "single_choice": 128, "multiple_choice": 2, "true_false": 2, "free_text": 132 }
+}
+```
+
+- Semua tipe selalu ada (0 kalau kosong). `all` = jumlah semuanya.
+- FE: panggil endpoint ini saat search/filter berubah; saat hanya pindah tab atau halaman, cukup panggil list (angka tab tidak berubah).
+- 1 query `GROUP BY type` (bukan 1 query per tipe). Uji 100.000 soal: ±55 ms tanpa filter, ±6 ms dengan search.
 
 ### Detail soal (`GET /api/v1/questions/:id`)
 
@@ -460,6 +538,83 @@ Setiap ada endpoint baru, tambahkan juga request-nya ke collection ini.
 `status_code` selalu sama dengan HTTP status code. `data` selalu ada (`null` kalau kosong). `meta` hanya muncul di endpoint list, `errors` hanya muncul saat validasi gagal.
 
 Status: 401 belum login / sesi habis, 403 tidak punya akses / akun nonaktif, 422 validasi gagal, 400 JSON rusak, 404 data tidak ada, 409 data kembar, 500 error server (detail hanya di log).
+
+## Dropdown (`GET /api/v1/dropdowns/:type`)
+
+Pilihan dropdown dari `master_data_items`. Semua role yang login boleh (siswa juga butuh, contoh memilih mapel & level Daily Quiz). Hanya item **aktif**, urut `sort_order` lalu nama.
+
+| `:type` | Isi | Filter (query string) |
+| ------- | --- | --------------------- |
+| `education_level` | Jenjang | - |
+| `grade` | Kelas | `education_level_id` (opsional) |
+| `subject` | Mapel | - |
+| `subject_field` | Bidang materi | `subject_id` **wajib**, `grade_id` (opsional) |
+| `chapter` | Bab | `subject_field_id` **wajib** |
+| `subchapter` | Sub bab | `chapter_id` **wajib** |
+| `topic` | Topik | `subchapter_id` **wajib** |
+| `question_type` | Tipe soal | - |
+| `quiz_type` | Tipe quiz (Dipakai untuk) | - |
+| `difficulty` | Level | - |
+
+```http
+GET /api/v1/dropdowns/difficulty
+GET /api/v1/dropdowns/subject_field?subject_id=...&grade_id=...
+```
+
+```json
+{
+  "status_code": 200, "message": "Data dropdown",
+  "data": [
+    { "value": "easy",   "id": "...", "code": "easy",   "name": "Mudah",  "parent_id": null },
+    { "value": "medium", "id": "...", "code": "medium", "name": "Sedang", "parent_id": null },
+    { "value": "hard",   "id": "...", "code": "hard",   "name": "Sulit",  "parent_id": null }
+  ]
+}
+```
+
+- **FE cukup memakai `value` (dikirim ke API lain) dan `name` (ditampilkan).** `value` = `code` untuk `question_type`, `quiz_type`, `difficulty` (contoh `"easy"`, `"daily_quiz"`), dan = `id` untuk jenjang s/d topik. Jadi `value` selalu bisa langsung dipakai di body create soal (`type`, `used_for`, `difficulty`, `placement.*_id`) dan di filter list soal.
+- Filter yang tidak berlaku untuk type tersebut diabaikan. Induk wajib belum diisi → 422 (contoh `subject_id: wajib diisi`); format bukan UUID → 422; type tidak dikenal → 404 berisi daftar type.
+- 1 query 1 tabel, memakai index `master_data_items_dropdown_idx (type, parent_id, sort_order)`.
+- Kelas tanpa filter → 14 kelas (urut Nol Kecil s/d Kelas 12), `parent_id` = id jenjangnya (bisa dipakai FE untuk mengelompokkan).
+
+## Image Library (gambar)
+
+Data gambar ada di tabel `media_assets`, filenya di disk:
+
+```text
+storage/                          ← STORAGE_DIR di .env (tidak di-commit, ada di .gitignore)
+└─ images/
+   ├─ question/2026/11/<uuid>.png  ← kategori / tahun / bulan / id gambar
+   ├─ banner/...
+   └─ landing/...
+```
+
+Link gambar (`url`) disimpan lengkap, dibentuk dari `APP_URL` di `.env`, contoh `http://localhost:8080/storage/images/question/2026/11/<uuid>.png`, dan bisa dibuka **tanpa login**. Di production isi `APP_URL` dengan domain asli **sebelum** upload gambar pertama. Request ke `/storage/...` tidak dicatat di log API.
+
+### Upload gambar (`POST /api/v1/images`)
+
+`multipart/form-data`:
+
+| Field | Keterangan |
+|---|---|
+| `files` | 1-10 file, masing-masing maks 5 MB. PNG, JPG, GIF, WebP (dicek dari **isi** file, bukan nama). SVG ditolak (bisa berisi script). |
+| `category` | Wajib: `question` / `banner` / `landing` |
+| `name` | Wajib, maks 150 karakter. Upload lebih dari 1 file → nama diberi nomor urut: `Segitiga 1`, `Segitiga 2`, ... |
+| `subject_id`, `subject_field_id`, `chapter_id`, `subchapter_id`, `topic_id` | Opsional, **hanya untuk `question`**, diisi berurutan dari atas (bab butuh bidang materi, dst.) dan harus saling cocok. |
+
+- Semua file dalam 1 upload memakai kategori & hierarki yang sama.
+- **Semua atau tidak sama sekali**: 1 file salah → tidak ada yang tersimpan, error di `files[i]`.
+- Response 201: daftar gambar (urut sesuai file) dengan `id`, `name`, `url`, `mime_type`, `size_bytes`, `width`, `height`, hierarki. `id` dipakai sebagai `image_id` di soal.
+
+### Hapus gambar (`DELETE /api/v1/images`)
+
+```json
+{ "ids": ["uuid-gambar-1", "uuid-gambar-2"] }
+```
+
+- **Hapus permanen** (data + file), 1-100 gambar.
+- **Semua atau tidak sama sekali**: ditolak (422, error di `ids[i]`) kalau ada ID yang tidak ada, atau gambar **masih dipakai soal aktif** (sebagai `image_id` soal atau gambar opsi jawaban), contoh `"masih dipakai soal Q-12, Q-15"`.
+- Soal yang sudah dihapus (soft delete) tidak menghalangi; `image_id`-nya otomatis jadi `NULL`.
 
 ## Log API
 

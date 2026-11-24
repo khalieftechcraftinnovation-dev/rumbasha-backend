@@ -108,7 +108,14 @@ func (r *QuestionRepository) CreateMany(ctx context.Context, questions []questio
 	indexByID := make(map[string]int, len(questions)) // ID → posisi soal di slice
 
 	for i := range questions {
-		questions[i].ID = uuid.NewString()
+		// UUID v7 berurutan sesuai waktu dibuat. Soal dari 1 request punya created_at yang sama,
+		// jadi list (ORDER BY created_at DESC, id DESC) memakai id ini sebagai pemecah seri:
+		// soal terakhir di request tampil paling atas, sama seperti kodenya (Q-5 di atas Q-4).
+		id, err := uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("gagal membuat id soal: %w", err)
+		}
+		questions[i].ID = id.String()
 		indexByID[questions[i].ID] = i
 
 		rowArgs, err := questionArgs(questions[i])
@@ -385,4 +392,199 @@ func (r *QuestionRepository) FindMasterDataByNames(ctx context.Context, names []
 			  AND deleted_at IS NULL`, names).
 		Scan(&items).Error
 	return items, err
+}
+
+// listWhere menyusun kondisi WHERE list soal dari filter. Hanya filter yang diisi yang dipakai.
+// Nilai selalu lewat placeholder ?, tidak pernah ditempel ke SQL.
+//
+// Contoh hasil (filter bab + cari "bilangan"):
+//
+//	q.deleted_at IS NULL AND q.chapter_id = ? AND (q.code ILIKE ? OR q.question_text ILIKE ?)
+func listWhere(f questionmodel.ListFilter) (string, []any) {
+	conds := []string{"q.deleted_at IS NULL"}
+	args := []any{}
+
+	// Filter "kolom = nilai". Urutan di sini = urutan di SQL (mudah dibaca saat debug).
+	equals := []struct {
+		column string
+		value  string
+	}{
+		{"q.type", f.Type},
+		{"q.difficulty", f.Difficulty},
+		{"q.education_level_id", f.EducationLevelID},
+		{"q.grade_id", f.GradeID},
+		{"q.subject_id", f.SubjectID},
+		{"q.subject_field_id", f.SubjectFieldID},
+		{"q.chapter_id", f.ChapterID},
+		{"q.subchapter_id", f.SubchapterID},
+		{"q.topic_id", f.TopicID},
+	}
+	for _, e := range equals {
+		if e.value != "" {
+			conds = append(conds, e.column+" = ?")
+			args = append(args, e.value)
+		}
+	}
+
+	// Pencarian: cocok di bagian mana saja dari kode / teks soal (pakai index trigram).
+	if f.Search != "" {
+		pattern := "%" + escapeLike(f.Search) + "%"
+		conds = append(conds, "(q.code ILIKE ? OR q.question_text ILIKE ?)")
+		args = append(args, pattern, pattern)
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
+// likeEscaper membuat %, _, dan \ yang diketik user dicari apa adanya (bukan wildcard LIKE).
+var likeEscaper = strings.NewReplacer(`\`, `\`, `%`, `\%`, `_`, `\_`)
+
+func escapeLike(s string) string {
+	return likeEscaper.Replace(s)
+}
+
+// questionListQuery mengambil 1 halaman list soal lengkap dengan nama hierarki & user. [Native SQL]
+//
+// Langkah 1 (CTE "page"): filter + urutkan + potong halaman HANYA di tabel questions,
+// hasilnya maksimal per_page ID. Langkah 2: baru JOIN nama ke ID-ID itu saja, jadi
+// JOIN ke master_data_items/users tidak pernah dikerjakan untuk soal di halaman lain.
+//
+// %s diganti kondisi dari listWhere. Untuk dicoba di DBeaver, ganti ? sesuai urutan args.
+const questionListQuery = `
+	WITH page AS (
+		SELECT q.id, q.created_at
+		FROM questions q
+		WHERE %s
+		ORDER BY q.created_at DESC, q.id DESC
+		LIMIT ? OFFSET ?
+	)
+	SELECT
+		q.id, q.code, q.type, q.question_text,
+		(q.formula IS NOT NULL)                             AS has_formula,
+		(q.image_id IS NOT NULL OR q.image_url IS NOT NULL) AS has_image,
+		(q.table_data IS NOT NULL)                          AS has_table,
+		q.education_level_id, level.name   AS education_level_name,
+		q.grade_id,           grade.name   AS grade_name,
+		q.subject_id,         subject.name AS subject_name,
+		q.subject_field_id,   field.name   AS subject_field_name,
+		q.chapter_id,         chapter.name AS chapter_name,
+		q.subchapter_id,      sub.name     AS subchapter_name,
+		q.topic_id,           topic.name   AS topic_name,
+		q.difficulty,
+		q.used_for::text      AS used_for,
+		q.status,
+		q.created_by,         u.real_name  AS created_by_name,
+		q.updated_by,         uu.real_name AS updated_by_name,
+		q.created_at, q.updated_at
+	FROM page p
+	JOIN      questions         AS q       ON q.id       = p.id
+	JOIN      master_data_items AS level   ON level.id   = q.education_level_id
+	JOIN      master_data_items AS grade   ON grade.id   = q.grade_id
+	JOIN      master_data_items AS subject ON subject.id = q.subject_id
+	JOIN      master_data_items AS field   ON field.id   = q.subject_field_id
+	JOIN      master_data_items AS chapter ON chapter.id = q.chapter_id
+	LEFT JOIN master_data_items AS sub     ON sub.id     = q.subchapter_id
+	LEFT JOIN master_data_items AS topic   ON topic.id   = q.topic_id
+	LEFT JOIN users             AS u       ON u.id       = q.created_by
+	LEFT JOIN users             AS uu      ON uu.id      = q.updated_by
+	ORDER BY p.created_at DESC, p.id DESC`
+
+// questionListRow menampung 1 baris questionListQuery apa adanya (used_for masih teks JSON).
+type questionListRow struct {
+	ID, Code, Type, QuestionText   string
+	HasFormula, HasImage, HasTable bool
+
+	EducationLevelID, EducationLevelName string
+	GradeID, GradeName                   string
+	SubjectID, SubjectName               string
+	SubjectFieldID, SubjectFieldName     string
+	ChapterID, ChapterName               string
+	SubchapterID, SubchapterName         *string
+	TopicID, TopicName                   *string
+
+	Difficulty, UsedFor, Status string
+	CreatedBy                   string
+	CreatedByName               *string
+	UpdatedBy, UpdatedByName    *string
+	CreatedAt, UpdatedAt        time.Time
+}
+
+// List mengambil 1 halaman soal sesuai filter, urut terbaru dulu, beserta total soal
+// yang cocok dengan filter (untuk pagination).
+func (r *QuestionRepository) List(ctx context.Context, f questionmodel.ListFilter) ([]questionmodel.QuestionListItem, int, error) {
+	where, whereArgs := listWhere(f)
+	offset := (f.Page - 1) * f.PerPage
+
+	args := append(append([]any{}, whereArgs...), f.PerPage, offset)
+	var rows []questionListRow
+	if err := r.db.WithContext(ctx).Raw(fmt.Sprintf(questionListQuery, where), args...).Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	items := make([]questionmodel.QuestionListItem, 0, len(rows))
+	for _, row := range rows {
+		item := questionmodel.QuestionListItem{
+			ID: row.ID, Code: row.Code, Type: row.Type, QuestionText: row.QuestionText,
+			HasFormula: row.HasFormula, HasImage: row.HasImage, HasTable: row.HasTable,
+			EducationLevelID: row.EducationLevelID, EducationLevelName: row.EducationLevelName,
+			GradeID: row.GradeID, GradeName: row.GradeName,
+			SubjectID: row.SubjectID, SubjectName: row.SubjectName,
+			SubjectFieldID: row.SubjectFieldID, SubjectFieldName: row.SubjectFieldName,
+			ChapterID: row.ChapterID, ChapterName: row.ChapterName,
+			SubchapterID: row.SubchapterID, SubchapterName: row.SubchapterName,
+			TopicID: row.TopicID, TopicName: row.TopicName,
+			Difficulty: row.Difficulty, Status: row.Status,
+			CreatedBy: row.CreatedBy, CreatedByName: row.CreatedByName,
+			UpdatedBy: row.UpdatedBy, UpdatedByName: row.UpdatedByName,
+			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		}
+		if err := json.Unmarshal([]byte(row.UsedFor), &item.UsedFor); err != nil {
+			return nil, 0, fmt.Errorf("soal %s: used_for rusak: %w", row.Code, err)
+		}
+		items = append(items, item)
+	}
+
+	// Total tanpa query COUNT kalau sudah pasti: halaman ini belum penuh berarti ini halaman
+	// terakhir, jadi total = soal di halaman sebelumnya + soal di halaman ini. (Kecuali halaman
+	// kosong di luar halaman 1: bisa jadi page-nya kelewat jauh, jadi tetap dihitung.)
+	if len(items) < f.PerPage && (len(items) > 0 || offset == 0) {
+		return items, offset + len(items), nil
+	}
+
+	var total int
+	err := r.db.WithContext(ctx).
+		Raw("SELECT COUNT(*) FROM questions q WHERE "+where, whereArgs...).
+		Scan(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// CountByType menghitung jumlah soal per tipe dengan filter yang sama seperti List. [Native SQL]
+// 1 query untuk semua tipe (bukan 1 query per tipe). Tanpa filter, PostgreSQL cukup membaca
+// index questions_type_created_at_idx (index-only scan), tidak perlu membaca tabel.
+//
+//	SELECT q.type, COUNT(*) AS total FROM questions q WHERE q.deleted_at IS NULL ... GROUP BY q.type
+//
+// Hasil: map type → jumlah. Tipe yang tidak punya soal tidak ada di map (anggap 0).
+func (r *QuestionRepository) CountByType(ctx context.Context, f questionmodel.ListFilter) (map[string]int, error) {
+	where, args := listWhere(f)
+
+	var rows []struct {
+		Type  string
+		Total int
+	}
+	err := r.db.WithContext(ctx).
+		Raw("SELECT q.type, COUNT(*) AS total FROM questions q WHERE "+where+" GROUP BY q.type", args...).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	counts := make(map[string]int, len(rows))
+	for _, row := range rows {
+		counts[row.Type] = row.Total
+	}
+	return counts, nil
 }

@@ -313,3 +313,106 @@ func ToImportCheckResponse(questionType string, items []questionmodel.ImportedQu
 	}
 	return ImportCheckResponse{Type: questionType, Total: len(questions), Questions: questions}
 }
+
+// ListQuestionsQuery adalah query string GET /api/v1/questions (list Bank Soal).
+// Semua filter opsional dan bisa digabung (AND). Contoh:
+//
+//	/api/v1/questions?page=1&per_page=20&type=free_text&difficulty=easy&subject_id=...&search=garis
+//
+// page & per_page sama dengan dto.PaginationQuery (ditulis ulang di sini supaya nama field
+// di error validasi tetap "per_page", bukan "PaginationQuery.per_page").
+type ListQuestionsQuery struct {
+	Page    int `form:"page" binding:"omitempty,min=1"`
+	PerPage int `form:"per_page" binding:"omitempty,min=1,max=100"`
+
+	Search     string `form:"search" binding:"omitempty,max=100"` // kode soal / teks soal
+	Type       string `form:"type" binding:"omitempty,oneof=single_choice multiple_choice true_false free_text"`
+	Difficulty string `form:"difficulty" binding:"omitempty,oneof=easy medium hard"` // kolom "Level"
+
+	EducationLevelID string `form:"education_level_id" binding:"omitempty,uuid"`
+	GradeID          string `form:"grade_id" binding:"omitempty,uuid"`
+	SubjectID        string `form:"subject_id" binding:"omitempty,uuid"`
+	SubjectFieldID   string `form:"subject_field_id" binding:"omitempty,uuid"`
+	ChapterID        string `form:"chapter_id" binding:"omitempty,uuid"`
+	SubchapterID     string `form:"subchapter_id" binding:"omitempty,uuid"`
+	TopicID          string `form:"topic_id" binding:"omitempty,uuid"`
+}
+
+// QuestionListItemResponse adalah 1 baris tabel Bank Soal. Tidak berisi kunci jawaban &
+// pembahasan; ambil lewat GET /api/v1/questions/:id kalau perlu.
+type QuestionListItemResponse struct {
+	ID         string                  `json:"id"`
+	Code       string                  `json:"code"`
+	Type       string                  `json:"type"`
+	Question   string                  `json:"question"`
+	Media      QuestionMediaResponse   `json:"media"`
+	Placement  PlacementDetailResponse `json:"placement"`
+	Difficulty string                  `json:"difficulty"`
+	UsedFor    []string                `json:"used_for"`
+	Status     string                  `json:"status"`
+	CreatedBy  RefResponse             `json:"created_by"`
+	CreatedAt  time.Time               `json:"created_at"`
+	UpdatedBy  *RefResponse            `json:"updated_by"` // null kalau belum pernah diubah
+	UpdatedAt  time.Time               `json:"updated_at"`
+}
+
+// QuestionMediaResponse menandai isi tambahan di soal (untuk label "+N media" di tabel).
+type QuestionMediaResponse struct {
+	Formula bool `json:"formula"`
+	Image   bool `json:"image"` // gambar dari Image Library atau link luar
+	Table   bool `json:"table"`
+}
+
+// ToQuestionListResponses mengubah hasil list menjadi response. Selalu slice (bukan nil),
+// supaya hasil kosong menjadi [] di JSON, bukan null.
+func ToQuestionListResponses(items []questionmodel.QuestionListItem) []QuestionListItemResponse {
+	result := make([]QuestionListItemResponse, 0, len(items))
+	for _, it := range items {
+		result = append(result, QuestionListItemResponse{
+			ID:       it.ID,
+			Code:     it.Code,
+			Type:     it.Type,
+			Question: it.QuestionText,
+			Media:    QuestionMediaResponse{Formula: it.HasFormula, Image: it.HasImage, Table: it.HasTable},
+			Placement: PlacementDetailResponse{
+				EducationLevel: ref(it.EducationLevelID, &it.EducationLevelName),
+				Grade:          ref(it.GradeID, &it.GradeName),
+				Subject:        ref(it.SubjectID, &it.SubjectName),
+				SubjectField:   ref(it.SubjectFieldID, &it.SubjectFieldName),
+				Chapter:        ref(it.ChapterID, &it.ChapterName),
+				Subchapter:     optionalRef(it.SubchapterID, it.SubchapterName),
+				Topic:          optionalRef(it.TopicID, it.TopicName),
+			},
+			Difficulty: it.Difficulty,
+			UsedFor:    it.UsedFor,
+			Status:     it.Status,
+			CreatedBy:  ref(it.CreatedBy, it.CreatedByName),
+			CreatedAt:  it.CreatedAt,
+			UpdatedBy:  optionalRef(it.UpdatedBy, it.UpdatedByName),
+			UpdatedAt:  it.UpdatedAt,
+		})
+	}
+	return result
+}
+
+// TypeCountsResponse adalah data GET /api/v1/questions/type-counts: angka di tab Bank Soal.
+// Semua tipe selalu ada (0 kalau tidak ada soalnya). all = jumlah semua tipe.
+type TypeCountsResponse struct {
+	All            int `json:"all"`             // tab "Semua"
+	SingleChoice   int `json:"single_choice"`   // tab "Pilihan ganda"
+	MultipleChoice int `json:"multiple_choice"` // tab "PG kompleks"
+	TrueFalse      int `json:"true_false"`      // tab "Benar / Salah"
+	FreeText       int `json:"free_text"`       // tab "Isian"
+}
+
+// ToTypeCountsResponse mengubah map type → jumlah menjadi response.
+func ToTypeCountsResponse(counts map[string]int) TypeCountsResponse {
+	res := TypeCountsResponse{
+		SingleChoice:   counts[questionmodel.TypeSingleChoice],
+		MultipleChoice: counts[questionmodel.TypeMultipleChoice],
+		TrueFalse:      counts[questionmodel.TypeTrueFalse],
+		FreeText:       counts[questionmodel.TypeFreeText],
+	}
+	res.All = res.SingleChoice + res.MultipleChoice + res.TrueFalse + res.FreeText
+	return res
+}

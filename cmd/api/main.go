@@ -29,6 +29,14 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 
+	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
+	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
+	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
+	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
+	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
+	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
+
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/question"
@@ -87,6 +95,11 @@ func main() {
 		questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db)),
 	)
 
+	// Fitur: Image Library (upload & hapus gambar). File disimpan di STORAGE_DIR/images/...
+	imageHandler := imagehandler.NewImageHandler(
+		imageservice.NewImageService(imagerepo.NewImageRepository(db), storage.NewLocal(cfg.StorageDir, cfg.AppURL)),
+	)
+
 	// Log API harian: logs/api-YYYY-MM-DD.txt, disimpan LOG_RETENTION_DAYS hari terakhir.
 	apiLog, err := apilog.NewWriter(cfg.LogDir, cfg.LogRetentionDays)
 	if err != nil {
@@ -99,7 +112,9 @@ func main() {
 		Subject:   subjectHandler,
 		LogReport: logReportHandler,
 		Question:  questionHandler,
-	}, cfg.JWTSecret, apiLog)
+		Image:     imageHandler,
+		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
+	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}
 

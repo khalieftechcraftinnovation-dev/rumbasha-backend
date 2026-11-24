@@ -11,6 +11,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/xuri/excelize/v2 v2.11.1
 	golang.org/x/crypto v0.59.0
+	golang.org/x/image v0.44.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )

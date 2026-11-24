@@ -236,3 +236,52 @@ type ImportedQuestion struct {
 }
 
 var ErrQuestionNotFound = errors.New("soal tidak ditemukan")
+
+// ----------------------------------------------------------------------------
+// List soal (endpoint GET /questions)
+// ----------------------------------------------------------------------------
+
+// ListFilter adalah filter list Bank Soal. Field kosong ("") = tidak difilter.
+type ListFilter struct {
+	Type       string
+	Difficulty string
+
+	EducationLevelID string
+	GradeID          string
+	SubjectID        string
+	SubjectFieldID   string
+	ChapterID        string
+	SubchapterID     string
+	TopicID          string
+
+	Search string // dicari di kode soal & teks soal (tidak peka huruf besar/kecil)
+
+	Page    int
+	PerPage int
+}
+
+// QuestionListItem adalah 1 baris tabel Bank Soal. Tanpa kunci jawaban & pembahasan
+// (lihat detail untuk itu), supaya response list tetap kecil.
+type QuestionListItem struct {
+	ID, Code, Type, QuestionText string
+
+	// Media di soal (bukan di opsi jawaban), untuk label "+N media" di tabel.
+	HasFormula, HasImage, HasTable bool
+
+	EducationLevelID, EducationLevelName string
+	GradeID, GradeName                   string
+	SubjectID, SubjectName               string
+	SubjectFieldID, SubjectFieldName     string
+	ChapterID, ChapterName               string
+	SubchapterID, SubchapterName         *string
+	TopicID, TopicName                   *string
+
+	Difficulty string
+	UsedFor    []string
+	Status     string
+
+	CreatedBy                string
+	CreatedByName            *string
+	UpdatedBy, UpdatedByName *string // NULL kalau belum pernah diubah
+	CreatedAt, UpdatedAt     time.Time
+}

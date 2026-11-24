@@ -377,6 +377,48 @@ func (s *QuestionService) GetDetail(ctx context.Context, id string) (questionmod
 	return s.repo.FindDetailByID(ctx, id)
 }
 
+// List mengambil 1 halaman list Bank Soal (urut terbaru dulu) beserta total soal yang cocok.
+// Query sudah divalidasi binding di handler; di sini hanya default pagination & rapikan search.
+func (s *QuestionService) List(ctx context.Context, q questiondto.ListQuestionsQuery) ([]questionmodel.QuestionListItem, questionmodel.ListFilter, int, error) {
+	filter := toListFilter(q)
+	if filter.Page == 0 {
+		filter.Page = 1
+	}
+	if filter.PerPage == 0 {
+		filter.PerPage = 20
+	}
+
+	items, total, err := s.repo.List(ctx, filter)
+	return items, filter, total, err
+}
+
+// CountByType menghitung jumlah soal per tipe untuk tab Bank Soal (Semua, Pilihan ganda, ...).
+// Memakai filter yang sama dengan List (search, level, hierarki), supaya angka di tab cocok
+// dengan isi tabel. Filter type & pagination diabaikan: semua tipe selalu dihitung.
+func (s *QuestionService) CountByType(ctx context.Context, q questiondto.ListQuestionsQuery) (map[string]int, error) {
+	filter := toListFilter(q)
+	filter.Type = ""
+	return s.repo.CountByType(ctx, filter)
+}
+
+// toListFilter mengubah query string list menjadi filter repository.
+func toListFilter(q questiondto.ListQuestionsQuery) questionmodel.ListFilter {
+	return questionmodel.ListFilter{
+		Type:             q.Type,
+		Difficulty:       q.Difficulty,
+		EducationLevelID: q.EducationLevelID,
+		GradeID:          q.GradeID,
+		SubjectID:        q.SubjectID,
+		SubjectFieldID:   q.SubjectFieldID,
+		ChapterID:        q.ChapterID,
+		SubchapterID:     q.SubchapterID,
+		TopicID:          q.TopicID,
+		Search:           strings.TrimSpace(q.Search),
+		Page:             q.Page,
+		PerPage:          q.PerPage,
+	}
+}
+
 // validTypes adalah tipe soal yang dikenal (dipakai update, karena create mengecek lewat binding).
 var validTypes = map[string]bool{
 	questionmodel.TypeSingleChoice:   true,

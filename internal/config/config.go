@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,6 +18,10 @@ import (
 type Config struct {
 	AppEnv string // development, staging, atau production
 	Port   string
+	AppURL string // alamat publik server, contoh https://api.rumbasha.com (dipakai untuk link gambar)
+
+	// Folder penyimpanan file upload (gambar disimpan di StorageDir/images/...).
+	StorageDir string
 
 	DBHost     string
 	DBPort     string
@@ -60,6 +65,9 @@ func Load() Config {
 	return Config{
 		AppEnv: getEnv("APP_ENV", "development"),
 		Port:   getEnv("APP_PORT", "8080"),
+		AppURL: strings.TrimRight(getEnv("APP_URL", "http://localhost:"+getEnv("APP_PORT", "8080")), "/"),
+
+		StorageDir: getEnv("STORAGE_DIR", "storage"),
 
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),

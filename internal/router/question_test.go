@@ -52,7 +52,9 @@ func seedPlacement(t *testing.T, db *gorm.DB) testPlacement {
 	insertChild(&p.TopicID, "topic", "Menentukan KPK", p.SubchapterID)
 
 	t.Cleanup(func() {
+		// Urutan penting: soal & gambar menunjuk ke master data, jadi dihapus lebih dulu.
 		db.Exec(`DELETE FROM questions`)
+		db.Exec(`DELETE FROM media_assets`)
 		db.Exec(`DELETE FROM master_data_items WHERE id IN ?`, []string{p.TopicID, p.SubchapterID, p.ChapterID})
 		db.Exec(`DELETE FROM master_data_items WHERE id = ?`, p.FieldID)
 		db.Exec(`DELETE FROM master_data_items WHERE id = ?`, p.SubjectID)
@@ -207,7 +209,7 @@ func TestCreateQuestion_DenganTabelFormulaDanGambar(t *testing.T) {
 	accessToken := adminToken(t, db)
 
 	var imageID string
-	db.Raw(`INSERT INTO media_assets (file_name, storage_path, mime_type, size_bytes) VALUES ('a.png', 'img/a.png', 'image/png', 100) RETURNING id`).Scan(&imageID)
+	db.Raw(`INSERT INTO media_assets (category, name, url, file_name, storage_path, mime_type, size_bytes) VALUES ('question', 'Gambar', 'http://api.test/storage/images/a.png', 'a.png', 'images/a.png', 'image/png', 100) RETURNING id`).Scan(&imageID)
 
 	// Gambar, tabel, dan rumus ada di level soal (bukan di answer), jadi berlaku untuk SEMUA tipe:
 	// boleh salah satu, beberapa, atau ketiganya sekaligus.

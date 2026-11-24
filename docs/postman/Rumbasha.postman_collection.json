@@ -24,7 +24,9 @@
     { "key": "q_chapter_id", "value": "" },
     { "key": "q_subchapter_id", "value": "" },
     { "key": "q_topic_id", "value": "" },
-    { "key": "question_id", "value": "" }
+    { "key": "question_id", "value": "" },
+    { "key": "image_ids_json", "value": "[]" },
+    { "key": "image_url", "value": "" }
   ],
   "item": [
     {
@@ -641,6 +643,92 @@
           ]
         },
         {
+          "name": "List soal (Bank Soal: filter, search, pagination)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/questions?page=1&per_page=20&chapter_id={{q_chapter_id}}&search=KPK",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "questions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "20", "description": "Default 20, maks 100" },
+                { "key": "search", "value": "KPK", "description": "Cari di kode soal & teks soal (tidak peka huruf besar/kecil)" },
+                { "key": "type", "value": "single_choice", "disabled": true, "description": "single_choice / multiple_choice / true_false / free_text" },
+                { "key": "difficulty", "value": "easy", "disabled": true, "description": "Kolom Level: easy / medium / hard" },
+                { "key": "education_level_id", "value": "{{q_education_level_id}}", "disabled": true },
+                { "key": "grade_id", "value": "{{q_grade_id}}", "disabled": true },
+                { "key": "subject_id", "value": "{{q_subject_id}}", "disabled": true },
+                { "key": "subject_field_id", "value": "{{q_subject_field_id}}", "disabled": true },
+                { "key": "chapter_id", "value": "{{q_chapter_id}}" },
+                { "key": "subchapter_id", "value": "{{q_subchapter_id}}", "disabled": true },
+                { "key": "topic_id", "value": "{{q_topic_id}}", "disabled": true }
+              ]
+            },
+            "description": "Tabel Bank Soal, urut terbaru dulu. Semua query opsional dan bisa digabung (centang/hilangkan centang di tab Params).\n\nTiap baris: `code`, `question`, `type`, `media` (formula/image/table), `placement` (id + nama 7 tingkat), `difficulty`, `used_for`, `status`, `created_by`/`created_at`, `updated_by` (null = belum pernah diubah)/`updated_at`. Tanpa kunci jawaban.\n\n`meta` = `{page, per_page, total}`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('data array + meta pagination', () => {",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body.meta).to.include.keys('page', 'per_page', 'total');",
+                  "});",
+                  "pm.test('baris berisi kolom tabel, tanpa kunci jawaban', () => {",
+                  "  pm.expect(body.data.length).to.be.above(0);",
+                  "  const row = body.data[0];",
+                  "  pm.expect(row).to.include.keys('code', 'question', 'type', 'media', 'placement', 'difficulty', 'used_for', 'created_by', 'created_at', 'updated_by', 'updated_at');",
+                  "  pm.expect(row.placement.chapter.name).to.eql('KPK dan FPB');",
+                  "  pm.expect(row).to.not.have.property('answer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jumlah soal per tipe (angka di tab)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/questions/type-counts?chapter_id={{q_chapter_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "questions", "type-counts"],
+              "query": [
+                { "key": "search", "value": "KPK", "disabled": true, "description": "Sama dengan list" },
+                { "key": "difficulty", "value": "easy", "disabled": true },
+                { "key": "subject_id", "value": "{{q_subject_id}}", "disabled": true },
+                { "key": "chapter_id", "value": "{{q_chapter_id}}" }
+              ]
+            },
+            "description": "Angka di tab Bank Soal: Semua (`all`), Pilihan ganda (`single_choice`), PG kompleks (`multiple_choice`), Benar / Salah (`true_false`), Isian (`free_text`).\n\nQuery string sama dengan **List soal** (search, difficulty, hierarki); `type` & pagination diabaikan. Semua tipe selalu ada (0 kalau kosong)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('semua tipe ada & all = jumlahnya', () => {",
+                  "  pm.expect(d).to.have.all.keys('all', 'single_choice', 'multiple_choice', 'true_false', 'free_text');",
+                  "  pm.expect(d.all).to.eql(d.single_choice + d.multiple_choice + d.true_false + d.free_text);",
+                  "  pm.expect(d.single_choice).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Ubah soal (ganti penuh)",
           "request": {
             "method": "PUT",
@@ -870,6 +958,397 @@
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "pm.test('ID terhapus dikembalikan', () => {",
                   "  pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('question_id')]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dropdown (master data)",
+      "description": "Pilihan dropdown dari master data. Semua role yang login boleh. FE cukup memakai `value` (dikirim ke API lain) dan `name` (ditampilkan).\n\n`value` = code untuk question_type, quiz_type, difficulty; = id untuk jenjang s/d topik.\n\nRequest hierarki memakai variabel `q_*` (isi dari seed, sama dengan folder Bank soal).",
+      "item": [
+        {
+          "name": "Level (difficulty)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/dropdowns/difficulty" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('value = code soal', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.map(d => d.value)).to.eql(['easy', 'medium', 'hard']);",
+                  "  pm.expect(data.map(d => d.name)).to.eql(['Mudah', 'Sedang', 'Sulit']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tipe soal (question_type)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/dropdowns/question_type" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('4 tipe soal', () => pm.expect(pm.response.json().data.map(d => d.value)).to.eql(['single_choice', 'multiple_choice', 'true_false', 'free_text']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tipe quiz (quiz_type)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/dropdowns/quiz_type" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('4 tipe quiz', () => pm.expect(pm.response.json().data.map(d => d.value)).to.eql(['daily_quiz', 'uji_kom', 'tryout', 'rumath']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jenjang (education_level)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/dropdowns/education_level" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('4 jenjang', () => pm.expect(pm.response.json().data.map(d => d.name)).to.eql(['PraSD', 'SD', 'SMP', 'SMA']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kelas per jenjang (grade)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dropdowns/grade?education_level_id={{q_education_level_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dropdowns", "grade"],
+              "query": [{ "key": "education_level_id", "value": "{{q_education_level_id}}", "description": "Opsional; tanpa filter = semua 14 kelas" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('kelas milik jenjang yang dipilih', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.length).to.be.above(0);",
+                  "  data.forEach(d => pm.expect(d.parent_id).to.eql(pm.variables.get('q_education_level_id')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mapel (subject)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/dropdowns/subject" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bidang materi (subject_field)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dropdowns/subject_field?subject_id={{q_subject_id}}&grade_id={{q_grade_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dropdowns", "subject_field"],
+              "query": [
+                { "key": "subject_id", "value": "{{q_subject_id}}", "description": "Wajib" },
+                { "key": "grade_id", "value": "{{q_grade_id}}", "description": "Opsional" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('value = id', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.map(d => d.value)).to.include(pm.variables.get('q_subject_field_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bab (chapter)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dropdowns/chapter?subject_field_id={{q_subject_field_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dropdowns", "chapter"],
+              "query": [{ "key": "subject_field_id", "value": "{{q_subject_field_id}}", "description": "Wajib" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ada bab KPK dan FPB', () => pm.expect(pm.response.json().data.map(d => d.name)).to.include('KPK dan FPB'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sub bab (subchapter)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dropdowns/subchapter?chapter_id={{q_chapter_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dropdowns", "subchapter"],
+              "query": [{ "key": "chapter_id", "value": "{{q_chapter_id}}", "description": "Wajib" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Topik (topic)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dropdowns/topic?subchapter_id={{q_subchapter_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dropdowns", "topic"],
+              "query": [{ "key": "subchapter_id", "value": "{{q_subchapter_id}}", "description": "Wajib" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bab tanpa induk (harus 422)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/dropdowns/chapter" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('subject_field_id wajib', () => pm.expect(pm.response.json().errors[0].field).to.eql('subject_field_id'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Image Library (gambar)",
+      "description": "Upload & hapus gambar (admin & super admin). Login dulu sebagai admin.\n\nFile contoh ada di `docs/postman/assets/`. Kalau dijalankan dari Postman app, pilih ulang file di tab Body.\n\nGambar disimpan di `STORAGE_DIR/images/<kategori>/<tahun>/<bulan>/`, link-nya di field `url` (bisa dibuka tanpa login).",
+      "item": [
+        {
+          "name": "Upload 2 gambar soal (dengan hierarki mapel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": "docs/postman/assets/contoh-gambar-1.png" },
+                { "key": "files", "type": "file", "src": "docs/postman/assets/contoh-gambar-2.png" },
+                { "key": "category", "value": "question", "type": "text" },
+                { "key": "name", "value": "Diagram KPK", "type": "text" },
+                { "key": "subject_id", "value": "{{q_subject_id}}", "type": "text" },
+                { "key": "subject_field_id", "value": "{{q_subject_field_id}}", "type": "text" },
+                { "key": "chapter_id", "value": "{{q_chapter_id}}", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/images",
+            "description": "Upload 1-10 gambar (masing-masing maks 5 MB; PNG/JPG/GIF/WebP). Semua file memakai kategori & hierarki yang sama; nama diberi nomor urut: \"Diagram KPK 1\", \"Diagram KPK 2\".\n\nHierarki (subject_id s/d topic_id) opsional, hanya untuk kategori `question`, diisi berurutan dari atas. Variable `q_...` sama dengan folder Bank soal.\n\nID gambar disimpan ke `image_ids_json` untuk request Hapus gambar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('nama diberi nomor urut', () => {",
+                  "  pm.expect(data.map(d => d.name)).to.eql(['Diagram KPK 1', 'Diagram KPK 2']);",
+                  "});",
+                  "pm.collectionVariables.set('image_ids_json', JSON.stringify(data.map(d => d.id)));",
+                  "pm.collectionVariables.set('image_url', data[0].url);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buka gambar (publik, tanpa login)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{image_url}}",
+            "description": "Membuka file gambar lewat link `url` hasil upload. Tidak perlu login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 & berupa gambar', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.eql('image/png');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload banner (tanpa hierarki)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": "docs/postman/assets/contoh-gambar-1.png" },
+                { "key": "category", "value": "banner", "type": "text" },
+                { "key": "name", "value": "Promo Diskon 30%", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/images",
+            "description": "1 file → nama dipakai apa adanya (tanpa nomor). Kategori banner/landing tidak boleh mengisi hierarki mapel."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('nama tanpa nomor', () => pm.expect(data[0].name).to.eql('Promo Diskon 30%'));",
+                  "const ids = JSON.parse(pm.collectionVariables.get('image_ids_json'));",
+                  "pm.collectionVariables.set('image_ids_json', JSON.stringify(ids.concat(data.map(d => d.id))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload ditolak (bukan gambar, harus 422)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": "docs/postman/assets/contoh-gambar-1.png" },
+                { "key": "files", "type": "file", "src": "docs/postman/Rumbasha.postman_collection.json" },
+                { "key": "category", "value": "question", "type": "text" },
+                { "key": "name", "value": "Campur", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/images",
+            "description": "File ke-2 bukan gambar → 422 di `files[1]`, dan file ke-1 yang valid juga tidak disimpan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error di files[1]', () => {",
+                  "  pm.expect(pm.response.json().errors.map(e => e.field)).to.include('files[1]');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus gambar (permanen, bisa banyak)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": {{image_ids_json}}\n}"
+            },
+            "url": "{{base_url}}/api/v1/images",
+            "description": "Hapus permanen 1-100 gambar (data + file). Contoh ini menghapus semua gambar hasil upload di folder ini.\n\nDitolak semuanya (422, error di `ids[i]`) kalau ada ID yang tidak ada atau gambar masih dipakai soal aktif."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('semua ID terhapus', () => {",
+                  "  pm.expect(pm.response.json().data.deleted_ids).to.eql(JSON.parse(pm.collectionVariables.get('image_ids_json')));",
                   "});"
                 ]
               }

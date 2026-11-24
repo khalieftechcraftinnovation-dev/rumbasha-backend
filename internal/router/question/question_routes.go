@@ -19,6 +19,8 @@ func Register(private *gin.RouterGroup, h *questionhandler.QuestionHandler) {
 	adminOnly := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin)
 
 	private.POST("/questions", adminOnly, h.Create)
+	private.GET("/questions", adminOnly, h.List)                    // list Bank Soal: filter, search, pagination
+	private.GET("/questions/type-counts", adminOnly, h.CountByType) // jumlah soal per tipe (tab Bank Soal)
 	private.GET("/questions/:id", adminOnly, h.GetDetail)
 	private.PUT("/questions/:id", adminOnly, h.Update)               // ubah 1 soal (ganti penuh)
 	private.DELETE("/questions", adminOnly, h.Delete)                // hapus banyak soal (soft delete), body {"ids": [...]}

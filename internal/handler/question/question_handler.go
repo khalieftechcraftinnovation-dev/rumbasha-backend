@@ -54,6 +54,47 @@ func (h *QuestionHandler) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, fmt.Sprintf("%d soal berhasil dibuat", len(questions)), data)
 }
 
+// List menangani GET /api/v1/questions: list Bank Soal dengan filter, pencarian & pagination.
+// Urut terbaru dulu. Query string lihat questiondto.ListQuestionsQuery.
+func (h *QuestionHandler) List(c *gin.Context) {
+	var query questiondto.ListQuestionsQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+
+	items, filter, total, err := h.questionService.List(c.Request.Context(), query)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	response.SuccessWithMeta(c, "Data soal berhasil diambil", questiondto.ToQuestionListResponses(items), response.Meta{
+		Page:    filter.Page,
+		PerPage: filter.PerPage,
+		Total:   total,
+	})
+}
+
+// CountByType menangani GET /api/v1/questions/type-counts: jumlah soal per tipe untuk tab Bank Soal.
+// Query string sama dengan List (search, difficulty, hierarki); type & page/per_page diabaikan,
+// jadi FE bisa mengirim query string yang sama persis dengan request list.
+func (h *QuestionHandler) CountByType(c *gin.Context) {
+	var query questiondto.ListQuestionsQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+
+	counts, err := h.questionService.CountByType(c.Request.Context(), query)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Jumlah soal per tipe", questiondto.ToTypeCountsResponse(counts))
+}
+
 // GetDetail menangani GET /api/v1/questions/:id: detail 1 soal termasuk kunci jawaban & pembahasan.
 // Hanya admin & super admin (diatur di router), karena berisi kunci jawaban.
 func (h *QuestionHandler) GetDetail(c *gin.Context) {

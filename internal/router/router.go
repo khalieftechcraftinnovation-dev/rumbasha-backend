@@ -6,24 +6,31 @@
 //	router/login/login_routes.go      → /auth/...
 //	router/subject/subject_routes.go  → /subjects/...
 //	router/question/question_routes.go → /questions/...
+//	router/image/image_routes.go       → /images/...
 package router
 
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
+	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
+	dropdownrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dropdown"
+	imagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/image"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
 	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/logreport"
 	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/question"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 	// subjectrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subject"
 )
 
@@ -34,12 +41,15 @@ type Handlers struct {
 	Subject   *subjecthandler.SubjectHandler
 	LogReport *logreporthandler.LogReportHandler
 	Question  *questionhandler.QuestionHandler
+	Image     *imagehandler.ImageHandler
+	Dropdown  *dropdownhandler.DropdownHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
 // jwtSecret dipakai middleware untuk memeriksa access token.
 // apiLog dipakai untuk mencatat setiap request ke file log harian.
-func New(h Handlers, jwtSecret string, apiLog *apilog.Writer) *gin.Engine {
+// storageDir adalah folder file upload; gambar di storageDir/images disajikan publik di /storage/images.
+func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string) *gin.Engine {
 	// Supaya pesan error validasi memakai nama field JSON ("per_page"),
 	// bukan nama field struct Go ("PerPage").
 	response.UseJSONFieldNames()
@@ -69,6 +79,10 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer) *gin.Engine {
 	// Atur ulang nanti kalau server sudah di belakang reverse proxy (nginx).
 	_ = r.SetTrustedProxies(nil)
 
+	// File gambar (Image Library) bisa dibuka publik tanpa login, contoh:
+	// GET /storage/images/question/2026/11/<uuid>.png. Daftar isi folder tidak ditampilkan.
+	r.Static(storage.PublicPrefix+"/images", filepath.Join(storageDir, "images"))
+
 	r.GET("/health", func(c *gin.Context) {
 		response.Success(c, http.StatusOK, "OK", nil)
 	})
@@ -82,6 +96,8 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer) *gin.Engine {
 	loginrouter.Register(public, private, h.Login)
 	logreportrouter.Register(private, h.LogReport)
 	questionrouter.Register(private, h.Question)
+	imagerouter.Register(private, h.Image)
+	dropdownrouter.Register(private, h.Dropdown)
 	// subjectrouter.Register(private, h.Subject)
 
 	return r

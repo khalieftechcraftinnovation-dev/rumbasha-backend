@@ -19,7 +19,7 @@
 | 1.0       | 1 November 2026 | Draf awal BRD.                                                                                                                                                                                                                                                        |
 | 1.1       | 9 November 2026 | Penyesuaian dengan desain UI: login, beranda siswa, modul, Daily Quiz, isi quiz, Uji Kom & Tryout, RUMATH, peringkat, paket & coin, notifikasi, profil, dan beranda admin. Fitur admin lainnya menyusul.                                                              |
 | 1.2       | 9 November 2026 | Penyesuaian dengan desain panel admin: Materi, Bank Soal, Image, Master Data, Quiz, RUMATH, Leaderboard, Report Quiz, Report RUMATH, User, Coin & Akses, Paket, Landing Page, dan Task. Ditambahkan Bagian 3.16-3.20, BR-024 sampai BR-028, dan BD-025 sampai BD-033. |
-| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text". Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. |
+| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text"; Image Library: upload banyak gambar dengan kategori & hierarki mapel, hapus permanen banyak gambar (FR-IMG-005 sampai FR-IMG-008). Daftar Bank Soal: cari kode/teks soal, filter tipe, level, dan setiap tingkat hierarki, kolom pembuat & pengubah terakhir. Master Data: Tipe soal, Tipe quiz, dan Level (disimpan sebagai kode) serta data dropdown (FR-MST-009, FR-MST-010). Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-022, FR-QUIZ-023, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. |
 
 Catatan v1.2: perubahan v1.2 ditandai sebagai tracked changes (perubahan v1.1 sudah diterima). Hal yang diambil dari desain tetapi belum pasti dicatat di Bagian 15 (Business Decisions Pending).
 
@@ -609,9 +609,9 @@ Functional requirements:
 
 - FR-QUIZ-021: Daily Quiz memiliki kuota gratis 2 kali per hari. Setelah kuota habis, setiap quiz memakai 10 coin (lihat 3.9).
 
-- FR-QUIZ-022: Menu Bank Soal pada panel admin menampilkan daftar soal dengan kolom Kode (contoh Q-1256), Pertanyaan, Tipe, Mapel · Bab, Level, Dipakai di, dan Aksi (Edit, hapus). Tab: Semua, Pilihan ganda, dan Isian beserta jumlahnya (contoh desain: 256, 126, 130).
+- FR-QUIZ-022 (diubah v1.3): Menu Bank Soal pada panel admin (Admin dan Super Admin) menampilkan daftar soal, urut dari yang terbaru dibuat, dengan kolom Kode (contoh Q-1256), Pertanyaan, Tipe beserta penanda isi tambahan soal (gambar, tabel, rumus; contoh "+1 media"), Hirarki mapel (jenjang, kelas, mapel, bidang materi, bab, subbab, topik), Level, Dipakai di, Dibuat oleh, Dibuat pada, Terakhir diubah oleh, Terakhir diubah pada, dan Aksi (Edit, hapus). Daftar memakai halaman (maksimal 100 soal per halaman) dan tidak menampilkan kunci jawaban maupun soal yang sudah dihapus. Tab per tipe soal beserta jumlahnya: Semua, Pilihan ganda (single choice), PG kompleks (multiple choice), Benar / Salah (true/false), dan Isian (free text), contoh desain: 264, 128, 2, 2, 132. Jumlah di tab mengikuti pencarian dan filter yang sedang dipakai (kecuali filter tipe).
 
-- FR-QUIZ-023: Daftar soal dapat dicari berdasarkan teks soal dan difilter berdasarkan Mapel, Jenjang, dan Level.
+- FR-QUIZ-023 (diubah v1.3): Daftar soal dapat dicari berdasarkan kode soal dan teks soal (sebagian kata, tidak membedakan huruf besar/kecil), serta difilter berdasarkan Tipe soal, Level, dan setiap tingkat hierarki mapel (Jenjang, Kelas, Mapel, Bidang materi, Bab, Subbab, Topik). Pencarian dan filter dapat digabung.
 
 - FR-QUIZ-024: Admin menambah soal satu per satu lewat halaman "Tambah soal" (tombol Simpan soal, Simpan & tambah lagi, dan Batal), dan banyak soal sekaligus lewat Import Excel.
 
@@ -1320,6 +1320,10 @@ Functional requirements:
 
 - FR-MST-008: Master Data menyimpan hierarki Mapel → Bidang Materi → Bab → Subbab → Topik sesuai aturan 3.4.1. Saat menambah Bidang Materi, admin memilih Mapel, Jenjang, dan Kelas. Saat menambah Bab, Subbab, atau Topik, admin cukup memilih induknya, dan jenjang serta kelas mengikuti induk tersebut.
 
+- FR-MST-009 (baru v1.3): Master Data juga menyimpan pilihan Tipe soal (Pilihan ganda, PG kompleks, Benar / Salah, Isian), Tipe quiz (Daily Quiz, Uji Kom, Tryout, RUMATH), dan Level (Mudah, Sedang, Sulit). Data lain (soal, quiz) menyimpan KODE pilihan tersebut sebagai teks (contoh level "easy"), bukan relasi ke Master Data, sehingga kode tidak boleh diubah; yang boleh diubah hanya nama tampilan dan urutannya.
+
+- FR-MST-010 (baru v1.3): Sistem menyediakan data dropdown dari Master Data untuk semua pengguna yang login (admin maupun siswa): Jenjang, Kelas (dapat disaring per jenjang), Mapel, Bidang materi (wajib memilih Mapel, dapat disaring per Kelas), Bab (wajib memilih Bidang materi), Subbab (wajib memilih Bab), Topik (wajib memilih Subbab), Tipe soal, Tipe quiz, dan Level. Hanya data aktif yang tampil, urut sesuai urutan yang diatur admin.
+
 ### 3.17 Image Library
 
 Image library menyimpan gambar untuk soal, materi, dan landing page.
@@ -1334,7 +1338,15 @@ Functional requirements:
 
 - FR-IMG-004: Gambar dapat dipilih lebih dari satu (indikator "0 dari 6 baris dipilih"). Aksi massal yang tersedia tidak terlihat pada desain.
 
-File gambar disimpan di object/file storage; database hanya menyimpan metadata dan lokasi file (lihat 3.4.3).
+- FR-IMG-005 (baru v1.3): Setiap gambar memiliki kategori: question (gambar soal), banner, atau landing (landing page), serta nama gambar. Gambar kategori question boleh dihubungkan ke hierarki mapel (Mapel, Bidang Materi, Bab, Subbab, Topik) yang diisi berurutan dari atas; kategori lain tidak memakai hierarki.
+
+- FR-IMG-006 (baru v1.3): Admin dapat mengunggah banyak gambar sekaligus (maksimal 10 file, masing-masing maksimal 5 MB; format PNG, JPG, GIF, atau WebP yang dicek dari isi file). Semua gambar dalam satu unggahan memakai kategori dan hierarki yang sama; nama gambar diberi nomor urut di belakangnya (contoh "Segitiga 1", "Segitiga 2"). Jika ada satu file yang tidak valid, tidak ada gambar yang tersimpan. SVG tidak diterima karena dapat berisi script (keputusan v1.3, menggantikan contoh SVG pada desain).
+
+- FR-IMG-007 (baru v1.3): Link gambar disimpan dan dikirim ke aplikasi untuk ditampilkan; gambar dapat dibuka tanpa login.
+
+- FR-IMG-008 (baru v1.3): Admin dapat menghapus satu atau banyak gambar sekaligus (maksimal 100) secara permanen (data dan file). Penghapusan ditolak seluruhnya jika ada gambar yang tidak ditemukan atau masih dipakai soal aktif (sebagai gambar soal atau gambar opsi jawaban); soal yang sudah dihapus otomatis dilepas dari gambarnya.
+
+File gambar disimpan di file storage server (folder STORAGE_DIR/images/<kategori>/<tahun>/<bulan>/); database (tabel media_assets) hanya menyimpan metadata, lokasi file, dan link gambar (lihat 3.4.3).
 
 ### 3.18 Laporan Quiz dan RUMATH
 

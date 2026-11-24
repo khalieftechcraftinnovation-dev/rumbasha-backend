@@ -78,6 +78,21 @@ func TestMasterDataItemsHierarchyRules(t *testing.T) {
 			sql:     `UPDATE master_data_items SET subject_id = (SELECT id FROM master_data_items WHERE code = 'TEST_MTK') WHERE code = 'GRADE_1'`,
 			wantErr: true,
 		},
+		{
+			name:    "level tidak boleh punya induk",
+			sql:     `INSERT INTO master_data_items (type, code, name, parent_id) SELECT 'difficulty', 'very_hard', 'Sangat sulit', id FROM master_data_items WHERE code = 'SD'`,
+			wantErr: true,
+		},
+		{
+			name:    "tipe quiz wajib punya code (code itulah yang disimpan di soal)",
+			sql:     `INSERT INTO master_data_items (type, name) VALUES ('quiz_type', 'Olimpiade')`,
+			wantErr: true,
+		},
+		{
+			name:    "code tipe soal tidak boleh kembar",
+			sql:     `INSERT INTO master_data_items (type, code, name) VALUES ('question_type', 'free_text', 'Isian lain')`,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
