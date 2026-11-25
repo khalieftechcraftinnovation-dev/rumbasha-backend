@@ -53,3 +53,17 @@ func TestTodayInJakarta(t *testing.T) {
 		t.Errorf("TodayInJakarta = %q, seharusnya 2026-11-23", got)
 	}
 }
+
+func TestStartOfDayInJakarta(t *testing.T) {
+	cases := []struct{ now, want time.Time }{
+		// 25 Nov 23:30 WIB → 25 Nov 00:00 WIB
+		{time.Date(2026, 11, 25, 23, 30, 0, 0, Jakarta), time.Date(2026, 11, 25, 0, 0, 0, 0, Jakarta)},
+		// 24 Nov 18:00 UTC = 25 Nov 01:00 WIB → hari WIB, bukan hari UTC
+		{time.Date(2026, 11, 24, 18, 0, 0, 0, time.UTC), time.Date(2026, 11, 25, 0, 0, 0, 0, Jakarta)},
+	}
+	for _, c := range cases {
+		if got := StartOfDayInJakarta(c.now); !got.Equal(c.want) {
+			t.Errorf("StartOfDayInJakarta(%s) = %s, seharusnya %s", c.now, got, c.want)
+		}
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,17 +18,28 @@ import (
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
 	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
 )
 
 var accessCodeFormat = regexp.MustCompile(`^[A-Z0-9]{6}$`)
 
-// tomorrowWIB = besok jam 08:00 WIB, format input "2006-01-02T15:04" (dianggap WIB).
-func tomorrowWIB() (string, time.Time) {
-	d := time.Now().In(clock.Jakarta).AddDate(0, 0, 1)
+// daysFromNowWIB = N hari lagi jam 08:00 WIB, format input "2006-01-02T15:04" (dianggap WIB).
+func daysFromNowWIB(days int) (string, time.Time) {
+	d := time.Now().In(clock.Jakarta).AddDate(0, 0, days)
 	start := time.Date(d.Year(), d.Month(), d.Day(), 8, 0, 0, 0, clock.Jakarta)
 	return start.Format("2006-01-02T15:04"), start
+}
+
+// quizDay = hari jadwal quiz berikutnya untuk quizBody. Setiap quiz mendapat hari berbeda
+// (mulai 10 hari lagi), supaya quiz dengan mapel & kelas sama di 1 test tidak bentrok jadwal.
+var quizDay atomic.Int64
+
+// nextSchedule mengembalikan start_at & end_at (JSON) untuk quiz berikutnya: 08:00 - 10:00 WIB.
+func nextSchedule() (startAt, endAt string) {
+	start, _ := daysFromNowWIB(10 + int(quizDay.Add(1)))
+	return fmt.Sprintf("%q", start), fmt.Sprintf("%q", start[:11]+"10:00")
 }
 
 // quizBody membuat body POST /quizzes. placement berisi JSON mentah; extra menimpa field lain
@@ -37,12 +49,14 @@ func quizBody(placement string, questionIDs []string, extra map[string]string) s
 	for _, id := range questionIDs {
 		ids = append(ids, fmt.Sprintf("%q", id))
 	}
-	startAt, _ := tomorrowWIB()
+	startAt, endAt := nextSchedule()
 	fields := map[string]string{
 		"name":             `"Uji Kompetensi Matematika - KPK"`,
 		"type":             `"uji_kom"`,
+		"status":           `"draft"`,
 		"placement":        placement,
-		"start_at":         fmt.Sprintf("%q", startAt),
+		"start_at":         startAt,
+		"end_at":           endAt,
 		"duration_minutes": "60",
 		"total_questions":  fmt.Sprint(len(questionIDs)),
 		"question_ids":     "[" + strings.Join(ids, ",") + "]",
@@ -79,6 +93,7 @@ type quizDetail struct {
 	Type            string    `json:"type"`
 	StartAt         time.Time `json:"start_at"`
 	EndAt           time.Time `json:"end_at"`
+	ScheduleStatus  string    `json:"schedule_status"`
 	DurationMinutes int       `json:"duration_minutes"`
 	AccessCode      string    `json:"access_code"`
 	CoinCost        int       `json:"coin_cost"`
@@ -141,7 +156,14 @@ func TestCreateQuiz_BerhasilDenganUrutanSoalJadwalDanKodeAkses(t *testing.T) {
 	q3 := createQuestionID(t, r, accessToken, questionBody(p, "true_false", trueFalseAnswer, nil))
 
 	// Urutan di request (q3, q1, q2) = nomor soal di quiz. coin_cost tidak dikirim → 0.
-	quiz := createQuiz(t, r, accessToken, quizBody(basePlacement(p), []string{q3, q1, q2}, nil))
+	// Event 3 hari: besok 08:00 s/d lusa+1 17:00 WIB (input tanpa zona = WIB).
+	startInput, wantStart := daysFromNowWIB(1)
+	endInput, wantEnd := daysFromNowWIB(3)
+	endInput = endInput[:11] + "17:00"
+	wantEnd = wantEnd.Add(9 * time.Hour)
+	quiz := createQuiz(t, r, accessToken, quizBody(basePlacement(p), []string{q3, q1, q2}, map[string]string{
+		"start_at": fmt.Sprintf("%q", startInput), "end_at": fmt.Sprintf("%q", endInput),
+	}))
 
 	if quiz.Name != "Uji Kompetensi Matematika - KPK" || quiz.Type != "uji_kom" || quiz.Status != "draft" ||
 		quiz.DurationMinutes != 60 || quiz.CoinCost != 0 || quiz.TotalQuestions != 3 {
@@ -163,13 +185,14 @@ func TestCreateQuiz_BerhasilDenganUrutanSoalJadwalDanKodeAkses(t *testing.T) {
 		}
 	}
 
-	// Waktu mulai: input "YYYY-MM-DDTHH:mm" dianggap WIB, ditampilkan dengan +07:00. Selesai = mulai + durasi.
-	_, wantStart := tomorrowWIB()
-	if !quiz.StartAt.Equal(wantStart) || !quiz.EndAt.Equal(wantStart.Add(time.Hour)) {
-		t.Errorf("start_at %s / end_at %s, seharusnya %s / +1 jam", quiz.StartAt, quiz.EndAt, wantStart)
+	// Jadwal: input "YYYY-MM-DDTHH:mm" dianggap WIB, ditampilkan dengan +07:00, event boleh beberapa hari.
+	if !quiz.StartAt.Equal(wantStart) || !quiz.EndAt.Equal(wantEnd) || quiz.ScheduleStatus != "upcoming" {
+		t.Errorf("start_at %s / end_at %s / %s, seharusnya %s / %s / upcoming", quiz.StartAt, quiz.EndAt, quiz.ScheduleStatus, wantStart, wantEnd)
 	}
-	res := sendRequest(r, http.MethodPost, "/api/v1/quizzes", quizBody(basePlacement(p), []string{q1}, nil), accessToken)
-	if !strings.Contains(res.Body.String(), `"start_at":"`+wantStart.Format("2006-01-02")+`T08:00:00+07:00"`) {
+	res := sendRequest(r, http.MethodPost, "/api/v1/quizzes", quizBody(basePlacement(p), []string{q1}, map[string]string{
+		"start_at": fmt.Sprintf("%q", endInput), "end_at": fmt.Sprintf("%q", endInput[:11]+"23:00"), // tepat setelah quiz pertama selesai: boleh
+	}), accessToken)
+	if !strings.Contains(res.Body.String(), `"start_at":"`+wantEnd.Format("2006-01-02")+`T17:00:00+07:00"`) {
 		t.Errorf("start_at seharusnya ditampilkan dalam WIB. body: %s", res.Body)
 	}
 
@@ -202,6 +225,7 @@ func TestCreateQuiz_TryoutKelasBebasDanLetakLebihDalam(t *testing.T) {
 	quiz := createQuiz(t, r, accessToken, quizBody(placement, []string{q}, map[string]string{
 		"type": `"tryout"`, "name": `"  Tryout Bersama  "`, "coin_cost": "25", "duration_minutes": "120",
 		"start_at": `"2099-01-01T01:00:00Z"`, // RFC3339 dengan zona waktu juga diterima
+		"end_at":   `"2099-01-02T10:00:00Z"`,
 	}))
 
 	if quiz.Type != "tryout" || quiz.Name != "Tryout Bersama" || quiz.CoinCost != 25 || quiz.DurationMinutes != 120 ||
@@ -494,7 +518,7 @@ func TestRefreshAccessCodes_HanyaQuizYangBelumSelesai(t *testing.T) {
 	r, db := setupRouter(t)
 	p := seedPlacementInGrade(t, db, "GRADE_6")
 	accessToken := adminToken(t, db)
-	service := quizservice.NewQuizService(quizrepo.NewQuizRepository(db))
+	service := quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))
 
 	q := createQuestionID(t, r, accessToken, questionBody(p, "single_choice", singleChoiceAnswer, nil))
 	upcoming := createQuiz(t, r, accessToken, quizBody(basePlacement(p), []string{q}, nil))
@@ -504,8 +528,8 @@ func TestRefreshAccessCodes_HanyaQuizYangBelumSelesai(t *testing.T) {
 
 	// Atur waktu langsung di database: sedang berjalan (mulai 30 menit lalu, durasi 60),
 	// sudah selesai (mulai 2 jam lalu, durasi 60), dan quiz yang dihapus.
-	db.Exec(`UPDATE quizzes SET start_at = NOW() - INTERVAL '30 minutes' WHERE id = ?`, running.ID)
-	db.Exec(`UPDATE quizzes SET start_at = NOW() - INTERVAL '2 hours' WHERE id = ?`, ended.ID)
+	db.Exec(`UPDATE quizzes SET start_at = NOW() - INTERVAL '30 minutes', end_at = NOW() + INTERVAL '30 minutes' WHERE id = ?`, running.ID)
+	db.Exec(`UPDATE quizzes SET start_at = NOW() - INTERVAL '2 hours', end_at = NOW() - INTERVAL '1 hour' WHERE id = ?`, ended.ID)
 	db.Exec(`UPDATE quizzes SET deleted_at = NOW() WHERE id = ?`, deleted.ID)
 	db.Exec(`UPDATE quizzes SET access_code_updated_at = NOW() - INTERVAL '1 hour'`)
 

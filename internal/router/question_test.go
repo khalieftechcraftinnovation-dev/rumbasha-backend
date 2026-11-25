@@ -60,6 +60,8 @@ func seedPlacementInGrade(t *testing.T, db *gorm.DB, gradeCode string) testPlace
 
 	t.Cleanup(func() {
 		// Urutan penting: soal & gambar menunjuk ke master data, jadi dihapus lebih dulu.
+		db.Exec(`DELETE FROM daily_quizzes`) // daily_quiz_questions ikut terhapus (ON DELETE CASCADE)
+		db.Exec(`DELETE FROM quiz_attempts`)
 		db.Exec(`DELETE FROM quizzes`) // quiz_questions ikut terhapus (ON DELETE CASCADE)
 		db.Exec(`DELETE FROM questions`)
 		db.Exec(`DELETE FROM media_assets`)

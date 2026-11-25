@@ -30,12 +30,15 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 
+	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
+	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
 	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
+	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquiz"
 	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
@@ -105,7 +108,7 @@ func main() {
 	)
 
 	// Fitur: Quiz (Uji Kom & Tryout). Service juga dipakai scheduler (ganti kode akses tiap jam).
-	quizService := quizservice.NewQuizService(quizrepo.NewQuizRepository(db))
+	quizService := quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))
 
 	// Scheduler (cron di dalam proses API): ganti kode akses quiz yang belum selesai.
 	// Jadwal dari ACCESS_CODE_REFRESH_CRON (default setiap jam tepat, WIB).
@@ -131,6 +134,7 @@ func main() {
 		Image:     imageHandler,
 		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
 		Quiz:      quizhandler.NewQuizHandler(quizService),
+		DailyQuiz: dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db), cfg.DailyQuizFreeQuota, cfg.DailyQuizCoinCost)),
 	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

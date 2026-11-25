@@ -21,6 +21,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
@@ -29,6 +30,7 @@ import (
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
 	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
+	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
 	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
@@ -36,6 +38,7 @@ import (
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
 	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
 	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
+	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquiz"
 	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
@@ -129,7 +132,8 @@ func setupApp(t *testing.T) testApp {
 		Question:  questionhandler.NewQuestionHandler(questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db))),
 		Image:     imagehandler.NewImageHandler(imageservice.NewImageService(imagerepo.NewImageRepository(db), store)),
 		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
-		Quiz:      quizhandler.NewQuizHandler(quizservice.NewQuizService(quizrepo.NewQuizRepository(db))),
+		Quiz:      quizhandler.NewQuizHandler(quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))),
+		DailyQuiz: dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db), 2, 10)),
 	}, testJWTSecret, apiLog, storageDir)
 
 	return testApp{Router: r, DB: db, APILog: apiLog, LogDir: logDir, Mail: mail, StorageDir: storageDir}

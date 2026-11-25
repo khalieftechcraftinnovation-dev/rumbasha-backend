@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
@@ -26,6 +27,7 @@ import (
 	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
+	dailyquizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dailyquiz"
 	dropdownrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dropdown"
 	imagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/image"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
@@ -46,6 +48,7 @@ type Handlers struct {
 	Image     *imagehandler.ImageHandler
 	Dropdown  *dropdownhandler.DropdownHandler
 	Quiz      *quizhandler.QuizHandler
+	DailyQuiz *dailyquizhandler.DailyQuizHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
@@ -102,6 +105,7 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	imagerouter.Register(private, h.Image)
 	dropdownrouter.Register(private, h.Dropdown)
 	quizrouter.Register(private, h.Quiz)
+	dailyquizrouter.Register(private, h.DailyQuiz)
 	// subjectrouter.Register(private, h.Subject)
 
 	return r

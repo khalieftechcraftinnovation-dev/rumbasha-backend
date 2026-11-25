@@ -9,6 +9,9 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	questionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/question"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scoring"
 )
 
 // Tipe quiz. Nilainya sama dengan code quiz_type di master data & isi questions.used_for.
@@ -39,6 +42,25 @@ const (
 	StatusPublished = "published"
 )
 
+// Status jadwal event, dihitung dari start_at & end_at terhadap waktu sekarang (tidak disimpan).
+const (
+	ScheduleUpcoming = "upcoming" // akan dimulai: sekarang < start_at
+	ScheduleOngoing  = "ongoing"  // sedang berjalan: start_at <= sekarang < end_at
+	ScheduleFinished = "finished" // sudah lewat: sekarang >= end_at
+)
+
+// ScheduleStatus menghitung status jadwal event pada waktu now.
+func ScheduleStatus(startAt, endAt, now time.Time) string {
+	switch {
+	case now.Before(startAt):
+		return ScheduleUpcoming
+	case now.Before(endAt):
+		return ScheduleOngoing
+	default:
+		return ScheduleFinished
+	}
+}
+
 // Quiz adalah 1 baris tabel quizzes + ID soal yang dipilih (urut = nomor soal).
 type Quiz struct {
 	ID   string
@@ -53,10 +75,11 @@ type Quiz struct {
 	SubchapterID     *string // opsional, butuh ChapterID
 	TopicID          *string // opsional, butuh SubchapterID
 
-	StartAt         time.Time // waktu mulai; selesai = StartAt + DurationMinutes
-	DurationMinutes int
-	CoinCost        int // 0 = gratis
-	TotalQuestions  int // selalu = len(QuestionIDs)
+	StartAt         time.Time // mulai event
+	EndAt           time.Time // selesai event (boleh beda hari)
+	DurationMinutes int       // lama mengerjakan 1 kali, di dalam jendela StartAt..EndAt
+	CoinCost        int       // 0 = gratis
+	TotalQuestions  int       // selalu = len(QuestionIDs)
 	Status          string
 
 	AccessCode          *string    // 6 karakter A-Z/0-9, wajib untuk Uji Kom & Tryout
@@ -165,3 +188,72 @@ var ErrQuizNotFound = errors.New("quiz tidak ditemukan")
 // ErrAccessCodeTaken dikembalikan repository kalau kode akses sudah dipakai quiz lain;
 // service membuat kode baru lalu mencoba lagi.
 var ErrAccessCodeTaken = errors.New("kode akses sudah dipakai quiz lain")
+
+// ErrScheduleConflict dikembalikan repository kalau database menolak jadwal karena beririsan
+// dengan quiz lain bermapel & berkelas sama (exclusion constraint quizzes_no_overlap).
+// Biasanya sudah dicegah service; ini terjadi kalau 2 request masuk bersamaan.
+var ErrScheduleConflict = errors.New("jadwal quiz beririsan dengan quiz lain")
+
+// ErrQuizStarted dikembalikan saat mengubah quiz yang event-nya sudah dimulai.
+var ErrQuizStarted = errors.New("quiz sudah dimulai, tidak bisa diubah")
+
+// ScheduleConflict adalah quiz lain yang jadwalnya beririsan (untuk pesan error).
+type ScheduleConflict struct {
+	ID, Name       string
+	StartAt, EndAt time.Time
+}
+
+// ListFilter adalah filter list quiz. Field kosong ("") = tidak difilter.
+type ListFilter struct {
+	Search                               string // nama quiz
+	Type                                 string
+	Status                               string // draft / published
+	Schedule                             string // upcoming / ongoing / finished
+	EducationLevelID, GradeID, SubjectID string
+	Page, PerPage                        int
+}
+
+// ScheduleCounts adalah jumlah quiz per status jadwal (angka di tab).
+type ScheduleCounts struct {
+	Upcoming, Ongoing, Finished int
+}
+
+// Attempt adalah catatan siswa membuka quiz Uji Kom / Tryout (tabel quiz_attempts).
+type Attempt struct {
+	ID        string
+	StartedAt time.Time
+
+	// Terisi setelah siswa submit jawaban (nil = belum submit).
+	SubmittedAt     *time.Time
+	Score           float64
+	CorrectCount    int
+	Answers         []scoring.Answer
+	DurationSeconds int // lama mengerjakan total (submit - mulai)
+}
+
+// QuizReview adalah hasil & review 1 quiz setelah siswa submit: nilai + setiap soal (urutan
+// sama dengan saat dikerjakan) dengan kunci jawaban, pembahasan, dan jawaban siswa.
+type QuizReview struct {
+	QuizDetail
+	Attempt
+	Items []scoring.ReviewItem
+}
+
+// OpenedQuiz adalah quiz yang dibuka siswa: info quiz, waktu mulai mengerjakan & batasnya,
+// dan soal lengkap dengan kunci jawaban (tanpa pembahasan).
+type OpenedQuiz struct {
+	QuizDetail
+	StartedAt  time.Time // pertama kali siswa membuka quiz
+	DeadlineAt time.Time // batas mengerjakan = min(StartedAt + durasi, EndAt)
+	Content    []questionmodel.AttemptQuestion
+}
+
+// ClosedError dikembalikan saat quiz dibuka di luar jadwal event (belum mulai / sudah selesai).
+// Message berisi kalimat untuk siswa, contoh "Quiz belum dimulai. Mulai 01-12-2026 08:00 WIB".
+type ClosedError struct {
+	Message string
+}
+
+func (e *ClosedError) Error() string {
+	return e.Message
+}

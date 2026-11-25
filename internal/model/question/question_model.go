@@ -298,3 +298,20 @@ type QuizRef struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
+
+// ----------------------------------------------------------------------------
+// Soal untuk dikerjakan (buka quiz): isi soal + kunci jawaban, TANPA pembahasan.
+// ----------------------------------------------------------------------------
+
+// AttemptQuestion adalah 1 soal saat quiz dibuka siswa. Gambar Image Library sudah diubah
+// menjadi link (ImageURL soal & image_url di setiap opsi jawaban).
+type AttemptQuestion struct {
+	ID, Code, Type, QuestionText string
+	Formula                      *string
+	ImageURL                     *string
+	Table                        *Table
+	DisplayOrder                 []string
+	Difficulty                   string
+	Answer                       json.RawMessage // opsi + kunci jawaban (bentuk sama dengan create soal)
+	Explanation                  string          // pembahasan; hanya diisi untuk review setelah submit
+}

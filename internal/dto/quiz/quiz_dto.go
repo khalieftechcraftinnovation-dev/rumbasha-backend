@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
+	questiondto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/question"
 	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
 )
 
@@ -17,7 +18,7 @@ import (
 //	{
 //	  "name": "Uji Kompetensi Matematika - Pecahan", "type": "uji_kom",
 //	  "placement": {"education_level_id": "...", "grade_id": "...", "subject_id": "..."},
-//	  "start_at": "2026-12-01T08:00",
+//	  "start_at": "2026-12-01T08:00", "end_at": "2026-12-03T17:00",
 //	  "duration_minutes": 60, "coin_cost": 0, "total_questions": 12,
 //	  "bundle_quiz_ids": ["..."],
 //	  "question_ids": ["...", "..."]
@@ -28,15 +29,21 @@ import (
 // Minimal salah satu dari bundle_quiz_ids / question_ids diisi.
 //
 // Aturan yang bergantung pada field lain (total_questions = jumlah soal, kecocokan letak,
-// syarat soal, kelas Uji Kom, waktu mulai) dicek di service.
+// syarat soal, kelas Uji Kom, jadwal & bentrok jadwal) dicek di service.
+//
+// Body PUT /api/v1/quizzes/:id (ubah quiz) memakai struct yang sama (ganti penuh).
 type CreateQuizRequest struct {
-	Name      string               `json:"name" binding:"required,max=200"`
+	Name string `json:"name" binding:"required,max=200"`
+	// Tombol simpan: "draft" (Simpan draf) atau "published" (Publish: tampil di pengumuman siswa).
+	Status    string               `json:"status" binding:"required,oneof=draft published"`
 	Type      string               `json:"type" binding:"required,oneof=uji_kom tryout"`
 	Placement QuizPlacementRequest `json:"placement" binding:"required"`
-	// Waktu mulai dalam WIB. Format "2026-12-01T08:00" / "2026-12-01 08:00" (dianggap WIB),
-	// atau RFC3339 dengan zona waktu ("2026-12-01T08:00:00+07:00"). Harus setelah waktu sekarang.
+	// Jendela event dalam WIB, boleh lebih dari 1 hari. Format "2026-12-01T08:00" /
+	// "2026-12-01 08:00" (dianggap WIB), atau RFC3339 dengan zona ("2026-12-01T08:00:00+07:00").
+	// start_at harus setelah sekarang; end_at - start_at minimal sepanjang duration_minutes.
 	StartAt         string `json:"start_at" binding:"required"`
-	DurationMinutes int    `json:"duration_minutes" binding:"required,min=1,max=600"` // menit
+	EndAt           string `json:"end_at" binding:"required"`
+	DurationMinutes int    `json:"duration_minutes" binding:"required,min=1,max=600"` // lama mengerjakan 1 kali (menit)
 	CoinCost        *int   `json:"coin_cost" binding:"omitempty,min=0,max=1000000"`   // opsional, default 0 (gratis)
 	TotalQuestions  int    `json:"total_questions" binding:"required,min=1,max=200"`
 	// Quiz lain yang soalnya diambil semua (bundle). Maksimal 20 bundle.
@@ -58,24 +65,31 @@ type QuizPlacementRequest struct {
 	TopicID          *string `json:"topic_id" binding:"omitempty,uuid"`
 }
 
-// QuizDetailResponse adalah data quiz lengkap (response create).
+// QuizResponse adalah data 1 quiz (baris list quiz), tanpa daftar soal.
+type QuizResponse struct {
+	ID              string                `json:"id"`
+	Name            string                `json:"name"`
+	Type            string                `json:"type"`
+	Placement       QuizPlacementResponse `json:"placement"`
+	StartAt         time.Time             `json:"start_at"` // mulai event, WIB, contoh "2026-12-01T08:00:00+07:00"
+	EndAt           time.Time             `json:"end_at"`   // selesai event, WIB (boleh beda hari)
+	ScheduleStatus  string                `json:"schedule_status"`
+	DurationMinutes int                   `json:"duration_minutes"` // lama mengerjakan 1 kali
+	AccessCode      *string               `json:"access_code"`      // berganti setiap jam selama event belum selesai
+	CoinCost        int                   `json:"coin_cost"`
+	TotalQuestions  int                   `json:"total_questions"`
+	Status          string                `json:"status"`
+	CreatedBy       RefResponse           `json:"created_by"`
+	UpdatedBy       *RefResponse          `json:"updated_by"` // null kalau belum pernah diubah
+	CreatedAt       time.Time             `json:"created_at"`
+	UpdatedAt       time.Time             `json:"updated_at"`
+}
+
+// QuizDetailResponse adalah data quiz lengkap + daftar soal (response create & update).
+// Field QuizResponse ikut di level atas JSON (embedded), "questions" di akhir.
 type QuizDetailResponse struct {
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name"`
-	Type            string                 `json:"type"`
-	Placement       QuizPlacementResponse  `json:"placement"`
-	StartAt         time.Time              `json:"start_at"` // WIB, contoh "2026-12-01T08:00:00+07:00"
-	EndAt           time.Time              `json:"end_at"`   // start_at + durasi, WIB
-	DurationMinutes int                    `json:"duration_minutes"`
-	AccessCode      *string                `json:"access_code"` // berganti setiap jam selama quiz belum selesai
-	CoinCost        int                    `json:"coin_cost"`
-	TotalQuestions  int                    `json:"total_questions"`
-	Status          string                 `json:"status"`
-	Questions       []QuizQuestionResponse `json:"questions"`
-	CreatedBy       RefResponse            `json:"created_by"`
-	UpdatedBy       *RefResponse           `json:"updated_by"` // null kalau belum pernah diubah
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
+	QuizResponse
+	Questions []QuizQuestionResponse `json:"questions"`
 }
 
 // QuizPlacementResponse adalah letak quiz dengan nama. Tingkat yang tidak diisi = null.
@@ -105,16 +119,30 @@ type RefResponse struct {
 	Name *string `json:"name"`
 }
 
-// ToQuizDetailResponse mengubah quizmodel.QuizDetail menjadi response.
-func ToQuizDetailResponse(d quizmodel.QuizDetail) QuizDetailResponse {
+// ToQuizDetailResponse mengubah quizmodel.QuizDetail (dengan soal) menjadi response.
+// now dipakai untuk menghitung schedule_status.
+func ToQuizDetailResponse(d quizmodel.QuizDetail, now time.Time) QuizDetailResponse {
 	questions := make([]QuizQuestionResponse, 0, len(d.Questions))
 	for _, q := range d.Questions {
 		questions = append(questions, QuizQuestionResponse{
 			No: q.SortOrder, ID: q.ID, Code: q.Code, Type: q.Type, Question: q.QuestionText, Difficulty: q.Difficulty,
 		})
 	}
+	return QuizDetailResponse{QuizResponse: ToQuizResponse(d, now), Questions: questions}
+}
 
-	return QuizDetailResponse{
+// ToQuizResponses mengubah hasil list quiz menjadi response. Hasil kosong menjadi [] (bukan null).
+func ToQuizResponses(items []quizmodel.QuizDetail, now time.Time) []QuizResponse {
+	result := make([]QuizResponse, 0, len(items))
+	for _, d := range items {
+		result = append(result, ToQuizResponse(d, now))
+	}
+	return result
+}
+
+// ToQuizResponse mengubah 1 quiz (tanpa soal) menjadi response. Waktu event ditampilkan dalam WIB.
+func ToQuizResponse(d quizmodel.QuizDetail, now time.Time) QuizResponse {
+	return QuizResponse{
 		ID:   d.ID,
 		Name: d.Name,
 		Type: d.Type,
@@ -128,13 +156,13 @@ func ToQuizDetailResponse(d quizmodel.QuizDetail) QuizDetailResponse {
 			Topic:          optionalRef(d.TopicID, d.TopicName),
 		},
 		StartAt:         d.StartAt.In(clock.Jakarta),
-		EndAt:           d.StartAt.Add(time.Duration(d.DurationMinutes) * time.Minute).In(clock.Jakarta),
+		EndAt:           d.EndAt.In(clock.Jakarta),
+		ScheduleStatus:  quizmodel.ScheduleStatus(d.StartAt, d.EndAt, now),
 		DurationMinutes: d.DurationMinutes,
 		AccessCode:      d.AccessCode,
 		CoinCost:        d.CoinCost,
 		TotalQuestions:  d.TotalQuestions,
 		Status:          d.Status,
-		Questions:       questions,
 		CreatedBy:       RefResponse{ID: d.CreatedBy, Name: d.CreatedByName},
 		UpdatedBy:       optionalRef(d.UpdatedBy, d.UpdatedByName),
 		CreatedAt:       d.CreatedAt,
@@ -192,4 +220,185 @@ func ToBundleResponses(bundles []quizmodel.Bundle) []BundleResponse {
 		})
 	}
 	return result
+}
+
+// ListQuizzesQuery adalah query string GET /api/v1/quizzes (list quiz admin). Semua opsional.
+// Contoh: ?schedule_status=upcoming&type=uji_kom&subject_id=...&search=pecahan
+type ListQuizzesQuery struct {
+	Page    int `form:"page" binding:"omitempty,min=1"`
+	PerPage int `form:"per_page" binding:"omitempty,min=1,max=100"`
+
+	Search string `form:"search" binding:"omitempty,max=100"` // nama quiz
+	Type   string `form:"type" binding:"omitempty,oneof=daily_quiz uji_kom tryout rumath"`
+	Status string `form:"status" binding:"omitempty,oneof=draft published"`
+	// Jadwal event: upcoming (akan dimulai), ongoing (sedang berjalan), finished (sudah lewat).
+	ScheduleStatus   string `form:"schedule_status" binding:"omitempty,oneof=upcoming ongoing finished"`
+	EducationLevelID string `form:"education_level_id" binding:"omitempty,uuid"`
+	GradeID          string `form:"grade_id" binding:"omitempty,uuid"`
+	SubjectID        string `form:"subject_id" binding:"omitempty,uuid"`
+}
+
+// ScheduleCountsResponse adalah data GET /api/v1/quizzes/schedule-counts: angka di tab jadwal.
+// Semua status selalu ada (0 kalau kosong). all = jumlah semuanya.
+type ScheduleCountsResponse struct {
+	All      int `json:"all"`
+	Upcoming int `json:"upcoming"` // akan dimulai
+	Ongoing  int `json:"ongoing"`  // sedang berjalan
+	Finished int `json:"finished"` // sudah lewat
+}
+
+// ToScheduleCountsResponse mengubah jumlah per status jadwal menjadi response.
+func ToScheduleCountsResponse(c quizmodel.ScheduleCounts) ScheduleCountsResponse {
+	return ScheduleCountsResponse{
+		All:      c.Upcoming + c.Ongoing + c.Finished,
+		Upcoming: c.Upcoming,
+		Ongoing:  c.Ongoing,
+		Finished: c.Finished,
+	}
+}
+
+// DeleteQuizzesRequest adalah body DELETE /api/v1/quizzes: hapus 1 sampai 100 quiz (soft delete).
+type DeleteQuizzesRequest struct {
+	IDs []string `json:"ids" binding:"required,min=1,max=100,unique,dive,uuid"`
+}
+
+// DeleteQuizzesResponse berisi ID quiz yang berhasil dihapus.
+type DeleteQuizzesResponse struct {
+	DeletedIDs []string `json:"deleted_ids"`
+}
+
+// AnnouncementsQuery adalah query string GET /api/v1/student/quiz-announcements.
+type AnnouncementsQuery struct {
+	Page    int `form:"page" binding:"omitempty,min=1"`
+	PerPage int `form:"per_page" binding:"omitempty,min=1,max=100"`
+}
+
+// AnnouncementResponse adalah 1 pengumuman quiz untuk siswa. TANPA kode akses (dibagikan
+// tutor saat quiz dimulai) dan tanpa daftar soal.
+type AnnouncementResponse struct {
+	ID              string                `json:"id"`
+	Name            string                `json:"name"`
+	Type            string                `json:"type"`
+	Placement       QuizPlacementResponse `json:"placement"`
+	StartAt         time.Time             `json:"start_at"` // WIB
+	EndAt           time.Time             `json:"end_at"`   // WIB
+	ScheduleStatus  string                `json:"schedule_status"`
+	DurationMinutes int                   `json:"duration_minutes"`
+	TotalQuestions  int                   `json:"total_questions"`
+	CoinCost        int                   `json:"coin_cost"`
+}
+
+// ToAnnouncementResponses mengubah daftar quiz menjadi pengumuman siswa. Hasil kosong = [].
+func ToAnnouncementResponses(items []quizmodel.QuizDetail, now time.Time) []AnnouncementResponse {
+	result := make([]AnnouncementResponse, 0, len(items))
+	for _, d := range items {
+		q := ToQuizResponse(d, now)
+		result = append(result, AnnouncementResponse{
+			ID: q.ID, Name: q.Name, Type: q.Type, Placement: q.Placement,
+			StartAt: q.StartAt, EndAt: q.EndAt, ScheduleStatus: q.ScheduleStatus,
+			DurationMinutes: q.DurationMinutes, TotalQuestions: q.TotalQuestions, CoinCost: q.CoinCost,
+		})
+	}
+	return result
+}
+
+// OpenQuizRequest adalah body POST /api/v1/quizzes/:id/open (siswa membuka Uji Kom / Tryout).
+// access_code wajib saat pertama kali membuka; membuka ulang boleh tanpa body.
+type OpenQuizRequest struct {
+	AccessCode string `json:"access_code" binding:"omitempty,max=20"`
+}
+
+// OpenedQuizResponse adalah quiz yang dibuka siswa: info quiz (tanpa kode akses), waktu
+// mengerjakan, dan soal lengkap dengan kunci jawaban (tanpa pembahasan).
+// StateInProgress / StateSubmitted = nilai field "state" di response buka quiz & review:
+// in_progress = soal untuk dikerjakan; submitted = siswa sudah submit, data berisi review
+// (FE langsung menampilkan halaman review).
+const (
+	StateInProgress = "in_progress"
+	StateSubmitted  = "submitted"
+)
+
+type OpenedQuizResponse struct {
+	State           string                                `json:"state"` // "in_progress"
+	ID              string                                `json:"id"`
+	Name            string                                `json:"name"`
+	Type            string                                `json:"type"`
+	Placement       QuizPlacementResponse                 `json:"placement"`
+	StartAt         time.Time                             `json:"start_at"` // event, WIB
+	EndAt           time.Time                             `json:"end_at"`
+	DurationMinutes int                                   `json:"duration_minutes"`
+	StartedAt       time.Time                             `json:"started_at"`  // siswa mulai mengerjakan, WIB
+	DeadlineAt      time.Time                             `json:"deadline_at"` // = min(started_at + durasi, end_at), WIB
+	TotalQuestions  int                                   `json:"total_questions"`
+	CoinCost        int                                   `json:"coin_cost"`
+	Questions       []questiondto.AttemptQuestionResponse `json:"questions"`
+}
+
+// ToOpenedQuizResponse mengubah quiz yang dibuka menjadi response.
+func ToOpenedQuizResponse(o quizmodel.OpenedQuiz, now time.Time) OpenedQuizResponse {
+	q := ToQuizResponse(o.QuizDetail, now)
+	return OpenedQuizResponse{
+		State: StateInProgress,
+		ID:    q.ID, Name: q.Name, Type: q.Type, Placement: q.Placement,
+		StartAt: q.StartAt, EndAt: q.EndAt, DurationMinutes: q.DurationMinutes,
+		StartedAt:      o.StartedAt.In(clock.Jakarta),
+		DeadlineAt:     o.DeadlineAt.In(clock.Jakarta),
+		TotalQuestions: q.TotalQuestions, CoinCost: q.CoinCost,
+		Questions: questiondto.ToAttemptQuestionResponses(o.Content),
+	}
+}
+
+// AccessCodeResponse adalah data GET /api/v1/quizzes/:id/access-code (tutor/admin/super admin).
+type AccessCodeResponse struct {
+	QuizID              string     `json:"quiz_id"`
+	Name                string     `json:"name"`
+	Type                string     `json:"type"`
+	Status              string     `json:"status"`
+	StartAt             time.Time  `json:"start_at"`
+	EndAt               time.Time  `json:"end_at"`
+	ScheduleStatus      string     `json:"schedule_status"`
+	AccessCode          *string    `json:"access_code"`
+	AccessCodeUpdatedAt *time.Time `json:"access_code_updated_at"` // diganti tiap jam selama event belum selesai
+}
+
+// ToAccessCodeResponse mengubah quiz menjadi response kode akses.
+func ToAccessCodeResponse(d quizmodel.QuizDetail, now time.Time) AccessCodeResponse {
+	var updatedAt *time.Time
+	if d.AccessCodeUpdatedAt != nil {
+		t := d.AccessCodeUpdatedAt.In(clock.Jakarta)
+		updatedAt = &t
+	}
+	return AccessCodeResponse{
+		QuizID: d.ID, Name: d.Name, Type: d.Type, Status: d.Status,
+		StartAt: d.StartAt.In(clock.Jakarta), EndAt: d.EndAt.In(clock.Jakarta),
+		ScheduleStatus:      quizmodel.ScheduleStatus(d.StartAt, d.EndAt, now),
+		AccessCode:          d.AccessCode,
+		AccessCodeUpdatedAt: updatedAt,
+	}
+}
+
+// QuizReviewResponse adalah hasil & review Uji Kom / Tryout setelah submit (juga GET review):
+// nilai (total 100) dan setiap soal dengan urutan yang sama seperti saat dikerjakan, lengkap dengan
+// kunci jawaban, pembahasan, jawaban siswa, dan benar/salahnya.
+type QuizReviewResponse struct {
+	State     string                               `json:"state"` // selalu "submitted"
+	ID        string                               `json:"id"`
+	Name      string                               `json:"name"`
+	Type      string                               `json:"type"`
+	Placement QuizPlacementResponse                `json:"placement"`
+	StartedAt time.Time                            `json:"started_at"` // WIB
+	Result    questiondto.ResultResponse           `json:"result"`
+	Questions []questiondto.ReviewQuestionResponse `json:"questions"`
+}
+
+// ToQuizReviewResponse mengubah review quiz menjadi response.
+func ToQuizReviewResponse(r quizmodel.QuizReview, now time.Time) QuizReviewResponse {
+	q := ToQuizResponse(r.QuizDetail, now)
+	return QuizReviewResponse{
+		State: StateSubmitted,
+		ID:    q.ID, Name: q.Name, Type: q.Type, Placement: q.Placement,
+		StartedAt: r.StartedAt.In(clock.Jakarta),
+		Result:    questiondto.ToResultResponse(r.Score, r.CorrectCount, len(r.Items), *r.SubmittedAt, r.DurationSeconds),
+		Questions: questiondto.ToReviewResponses(r.Items),
+	}
 }

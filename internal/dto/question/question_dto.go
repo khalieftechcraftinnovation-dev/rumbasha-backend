@@ -7,9 +7,12 @@ package question
 
 import (
 	"encoding/json"
+	"math"
 	"time"
 
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
 	questionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/question"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scoring"
 )
 
 // CreateQuestionsRequest adalah body JSON untuk POST /api/v1/questions.
@@ -435,4 +438,133 @@ func ToTypeCountsResponse(counts map[string]int) TypeCountsResponse {
 	}
 	res.All = res.SingleChoice + res.MultipleChoice + res.TrueFalse + res.FreeText
 	return res
+}
+
+// AttemptQuestionResponse adalah 1 soal saat quiz dibuka siswa (Daily Quiz / Uji Kom / Tryout):
+// isi soal + answer (opsi & KUNCI JAWABAN, bentuk sama dengan create soal), TANPA pembahasan.
+// Gambar Image Library sudah berupa link (image_url soal & image_url tiap opsi).
+type AttemptQuestionResponse struct {
+	No           int                  `json:"no"`
+	ID           string               `json:"id"`
+	Code         string               `json:"code"`
+	Type         string               `json:"type"`
+	Question     string               `json:"question"`
+	Formula      *string              `json:"formula"`
+	ImageURL     *string              `json:"image_url"`
+	Table        *questionmodel.Table `json:"table"`
+	DisplayOrder []string             `json:"display_order"`
+	Difficulty   string               `json:"difficulty"`
+	Answer       json.RawMessage      `json:"answer"`
+}
+
+// ToAttemptQuestionResponses mengubah soal quiz yang dibuka menjadi response (no = urutan, mulai 1).
+func ToAttemptQuestionResponses(questions []questionmodel.AttemptQuestion) []AttemptQuestionResponse {
+	result := make([]AttemptQuestionResponse, 0, len(questions))
+	for i, q := range questions {
+		result = append(result, AttemptQuestionResponse{
+			No: i + 1, ID: q.ID, Code: q.Code, Type: q.Type, Question: q.QuestionText,
+			Formula: q.Formula, ImageURL: q.ImageURL, Table: q.Table, DisplayOrder: q.DisplayOrder,
+			Difficulty: q.Difficulty, Answer: q.Answer,
+		})
+	}
+	return result
+}
+
+// SubmitAnswersRequest adalah body submit jawaban quiz (Daily Quiz / Uji Kom / Tryout):
+//
+//	{"answers": [{"question_id": "...", "answer": "B", "is_correct": true}, ...]}
+//
+// Benar/salah dinilai di FE. answer = jawaban siswa apa adanya (contoh "B", ["A","C"],
+// [{"key":"A","correct":true}], "0.75"); null / tidak dikirim = tidak dijawab (dianggap salah).
+type SubmitAnswersRequest struct {
+	Answers []SubmitAnswerItem `json:"answers" binding:"max=200,dive"`
+}
+
+// SubmitAnswerItem adalah jawaban 1 soal.
+type SubmitAnswerItem struct {
+	QuestionID string          `json:"question_id" binding:"required,uuid"`
+	Answer     json.RawMessage `json:"answer"`
+	IsCorrect  *bool           `json:"is_correct" binding:"required"`
+	// Waktu per soal dari FE (opsional): jam soal terakhir dijawab (RFC3339, contoh
+	// "2026-12-01T08:05:30+07:00") dan lama mengerjakan soal itu dalam detik.
+	AnsweredAt       *time.Time `json:"answered_at"`
+	TimeSpentSeconds *int       `json:"time_spent_seconds" binding:"omitempty,min=0,max=86400"`
+}
+
+// ReviewQuestionResponse adalah 1 soal di review setelah submit (urutan sama dengan saat
+// dikerjakan): isi soal, kunci jawaban (answer), pembahasan, jawaban siswa, dan hasilnya.
+type ReviewQuestionResponse struct {
+	AttemptQuestionResponse
+	Explanation      string          `json:"explanation"`
+	StudentAnswer    json.RawMessage `json:"student_answer"` // null = tidak dijawab
+	IsCorrect        bool            `json:"is_correct"`
+	Points           float64         `json:"points"`             // nilai yang didapat dari soal ini
+	AnsweredAt       *time.Time      `json:"answered_at"`        // jam soal terakhir dijawab (WIB); null = tidak dikirim FE
+	TimeSpentSeconds *int            `json:"time_spent_seconds"` // lama mengerjakan soal ini (detik); null = tidak dikirim FE
+}
+
+// ResultResponse adalah ringkasan nilai 1 pengerjaan quiz (total nilai 100).
+type ResultResponse struct {
+	Score             float64   `json:"score"`               // 0-100
+	CorrectCount      int       `json:"correct_count"`       // jumlah benar
+	TotalQuestions    int       `json:"total_questions"`     // jumlah soal
+	PointsPerQuestion float64   `json:"points_per_question"` // = 100 / total soal (2 angka di belakang koma)
+	SubmittedAt       time.Time `json:"submitted_at"`
+	DurationSeconds   int       `json:"duration_seconds"` // lama mengerjakan total = submit - mulai
+}
+
+// ToSubmittedAnswers mengubah body submit menjadi input penilaian.
+func ToSubmittedAnswers(req SubmitAnswersRequest) []scoring.SubmittedAnswer {
+	result := make([]scoring.SubmittedAnswer, 0, len(req.Answers))
+	for _, a := range req.Answers {
+		result = append(result, scoring.SubmittedAnswer{
+			QuestionID: a.QuestionID, Answer: a.Answer, IsCorrect: *a.IsCorrect,
+			AnsweredAt: a.AnsweredAt, TimeSpentSeconds: a.TimeSpentSeconds,
+		})
+	}
+	return result
+}
+
+// ToReviewResponses mengubah review menjadi response (no = urutan soal, mulai 1).
+func ToReviewResponses(items []scoring.ReviewItem) []ReviewQuestionResponse {
+	content := make([]questionmodel.AttemptQuestion, 0, len(items))
+	for _, it := range items {
+		content = append(content, it.AttemptQuestion)
+	}
+	base := ToAttemptQuestionResponses(content)
+
+	result := make([]ReviewQuestionResponse, 0, len(items))
+	for i, it := range items {
+		result = append(result, ReviewQuestionResponse{
+			AttemptQuestionResponse: base[i],
+			Explanation:             it.Explanation,
+			StudentAnswer:           it.StudentAnswer,
+			IsCorrect:               it.IsCorrect,
+			Points:                  it.Points,
+			AnsweredAt:              inJakarta(it.AnsweredAt),
+			TimeSpentSeconds:        it.TimeSpentSeconds,
+		})
+	}
+	return result
+}
+
+// ToResultResponse menyusun ringkasan nilai. submittedAt ditampilkan dalam WIB.
+func ToResultResponse(score float64, correct, total int, submittedAt time.Time, durationSeconds int) ResultResponse {
+	return ResultResponse{
+		Score:             score,
+		CorrectCount:      correct,
+		TotalQuestions:    total,
+		PointsPerQuestion: math.Round(scoring.PointsPerQuestion(total)*100) / 100,
+		SubmittedAt:       submittedAt.In(clock.Jakarta),
+		DurationSeconds:   durationSeconds,
+	}
+}
+
+// inJakarta mengubah waktu ke WIB untuk ditampilkan (nil tetap nil).
+func inJakarta(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	local := t.In(clock.Jakarta)
+	return &local
 }

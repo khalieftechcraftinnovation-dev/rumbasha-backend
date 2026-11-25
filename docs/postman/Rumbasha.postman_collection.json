@@ -29,7 +29,14 @@
     { "key": "image_url", "value": "" },
     { "key": "quiz_question_ids_json", "value": "[]" },
     { "key": "quiz_id", "value": "" },
-    { "key": "quiz_start_at", "value": "" }
+    { "key": "quiz_start_at", "value": "" },
+    { "key": "quiz_end_at", "value": "" },
+    { "key": "quiz2_start_at", "value": "" },
+    { "key": "quiz2_end_at", "value": "" },
+    { "key": "quiz_access_code", "value": "" },
+    { "key": "quiz2_id", "value": "" },
+    { "key": "daily_quiz_id", "value": "" },
+    { "key": "daily_answers_json", "value": "{\"answers\":[]}" }
   ],
   "item": [
     {
@@ -1005,10 +1012,10 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Tryout Matematika - KPK dan FPB\",\n  \"type\": \"tryout\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"duration_minutes\": 60,\n  \"coin_cost\": 0,\n  \"total_questions\": 2,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
+              "raw": "{\n  \"name\": \"Tryout Matematika - KPK dan FPB\",\n  \"type\": \"tryout\",\n  \"status\": \"published\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"end_at\": \"{{quiz_end_at}}\",\n  \"duration_minutes\": 60,\n  \"coin_cost\": 0,\n  \"total_questions\": 2,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
             },
             "url": "{{base_url}}/api/v1/quizzes",
-            "description": "Body:\n- `name`, `type` (`uji_kom` / `tryout`), `start_at`, `duration_minutes` (1-600) wajib.\n- `start_at`: waktu mulai WIB, contoh `2026-12-01T08:00` (tanpa zona = WIB) atau RFC3339 `2026-12-01T01:00:00Z`. Harus setelah sekarang.\n- `placement`: jenjang, kelas, mapel wajib; bidang materi, bab, sub bab, topik opsional (berurutan). Uji Kom hanya Kelas 6/9/12.\n- `coin_cost` opsional (default 0 = gratis).\n- `bundle_quiz_ids` (opsional, maks 20): semua soal dari quiz lain ikut.\n- `question_ids` (opsional): soal satuan, urutan = nomor soal (setelah soal bundle).\n- `total_questions` wajib = jumlah soal akhir (bundle + satuan, soal kembar dihitung sekali).\n\nQuiz baru berstatus `draft` dan langsung punya `access_code` acak 6 karakter (diganti tiap jam selama quiz belum selesai)."
+            "description": "Body:\n- `name`, `type` (`uji_kom` / `tryout`), `status`, `start_at`, `end_at`, `duration_minutes` (1-600) wajib.\n- `status`: tombol simpan, `draft` (Simpan draf) atau `published` (Publish: tampil di pengumuman siswa kelas tersebut).\n- `start_at` / `end_at`: jendela event WIB (boleh beberapa hari), contoh `2026-12-01T08:00` (tanpa zona = WIB) atau RFC3339 `2026-12-01T01:00:00Z`. start_at harus setelah sekarang; end_at minimal start_at + durasi.\n- Mapel & kelas sama tidak boleh punya jadwal beririsan dengan quiz lain.\n- `placement`: jenjang, kelas, mapel wajib; bidang materi, bab, sub bab, topik opsional (berurutan). Uji Kom hanya Kelas 6/9/12.\n- `coin_cost` opsional (default 0 = gratis).\n- `bundle_quiz_ids` (opsional, maks 20): semua soal dari quiz lain ikut.\n- `question_ids` (opsional): soal satuan, urutan = nomor soal (setelah soal bundle).\n- `total_questions` wajib = jumlah soal akhir (bundle + satuan, soal kembar dihitung sekali).\n\nQuiz baru berstatus `draft` dan langsung punya `access_code` acak 6 karakter (diganti tiap jam selama quiz belum selesai)."
           },
           "event": [
             {
@@ -1016,9 +1023,16 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Besok jam 08:00 WIB, format 'YYYY-MM-DDTHH:mm' (dianggap WIB oleh API).",
-                  "const wib = new Date(Date.now() + 7 * 3600 * 1000 + 24 * 3600 * 1000);",
-                  "pm.collectionVariables.set('quiz_start_at', wib.toISOString().slice(0, 10) + 'T08:00');"
+                  "// Hari acak 30-3000 hari lagi (supaya collection bisa dijalankan berulang tanpa bentrok jadwal",
+                  "// dengan quiz dari run sebelumnya). Format 'YYYY-MM-DDTHH:mm' dianggap WIB oleh API.",
+                  "const dayMs = 24 * 3600 * 1000;",
+                  "const offsetDays = 30 + Math.floor(Math.random() * 2970);",
+                  "const day = (n) => new Date(Date.now() + 7 * 3600 * 1000 + n * dayMs).toISOString().slice(0, 10);",
+                  "pm.collectionVariables.set('quiz_start_at', day(offsetDays) + 'T08:00');",
+                  "pm.collectionVariables.set('quiz_end_at', day(offsetDays) + 'T17:00');",
+                  "// Quiz kedua (dari bundle): mulai tepat saat quiz pertama selesai, event 2 hari.",
+                  "pm.collectionVariables.set('quiz2_start_at', day(offsetDays) + 'T17:00');",
+                  "pm.collectionVariables.set('quiz2_end_at', day(offsetDays + 1) + 'T17:00');"
                 ]
               }
             },
@@ -1030,17 +1044,19 @@
                   "pm.test('status 201', () => pm.response.to.have.status(201));",
                   "const data = pm.response.json().data;",
                   "pm.collectionVariables.set('quiz_id', data.id);",
-                  "pm.test('draft dengan 2 soal berurutan', () => {",
-                  "  pm.expect(data.status).to.eql('draft');",
+                  "pm.test('publish dengan 2 soal berurutan', () => {",
+                  "  pm.expect(data.status).to.eql('published');",
                   "  pm.expect(data.total_questions).to.eql(2);",
                   "  pm.expect(data.questions.map(q => q.no)).to.eql([1, 2]);",
                   "  pm.expect(data.questions.map(q => q.id)).to.eql(JSON.parse(pm.collectionVariables.get('quiz_question_ids_json')));",
                   "});",
                   "pm.test('jadwal WIB & kode akses', () => {",
                   "  pm.expect(data.start_at).to.eql(pm.collectionVariables.get('quiz_start_at') + ':00+07:00');",
-                  "  pm.expect(data.end_at).to.match(/T09:00:00\\+07:00$/);",
+                  "  pm.expect(data.end_at).to.eql(pm.collectionVariables.get('quiz_end_at') + ':00+07:00');",
+                  "  pm.expect(data.schedule_status).to.eql('upcoming');",
                   "  pm.expect(data.access_code).to.match(/^[A-Z0-9]{6}$/);",
                   "});",
+                  "pm.collectionVariables.set('quiz_access_code', data.access_code);",
                   "pm.test('letak berisi nama', () => pm.expect(data.placement.chapter.name).to.eql('KPK dan FPB'));"
                 ]
               }
@@ -1125,7 +1141,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Tryout Ulang - KPK dan FPB\",\n  \"type\": \"tryout\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"duration_minutes\": 90,\n  \"total_questions\": 2,\n  \"bundle_quiz_ids\": [\"{{quiz_id}}\"],\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
+              "raw": "{\n  \"name\": \"Tryout Ulang - KPK dan FPB\",\n  \"type\": \"tryout\",\n  \"status\": \"draft\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\"\n  },\n  \"start_at\": \"{{quiz2_start_at}}\",\n  \"end_at\": \"{{quiz2_end_at}}\",\n  \"duration_minutes\": 90,\n  \"total_questions\": 2,\n  \"bundle_quiz_ids\": [\"{{quiz_id}}\"],\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
             },
             "url": "{{base_url}}/api/v1/quizzes",
             "description": "Semua soal dari bundle ikut masuk. `question_ids` berisi soal yang sama dengan bundle, jadi diabaikan (soal kembar diambil sekali) dan total tetap 2."
@@ -1138,6 +1154,7 @@
                 "exec": [
                   "pm.test('status 201', () => pm.response.to.have.status(201));",
                   "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('quiz2_id', data.id);",
                   "pm.test('soal dari bundle, tanpa kembar', () => {",
                   "  pm.expect(data.total_questions).to.eql(2);",
                   "  pm.expect(data.questions.map(q => q.id)).to.eql(JSON.parse(pm.collectionVariables.get('quiz_question_ids_json')));",
@@ -1192,7 +1209,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Uji Kom salah\",\n  \"type\": \"uji_kom\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\"\n  },\n  \"start_at\": \"2020-01-01T08:00\",\n  \"duration_minutes\": 120,\n  \"total_questions\": 5,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
+              "raw": "{\n  \"name\": \"Uji Kom salah\",\n  \"type\": \"uji_kom\",\n  \"status\": \"draft\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\"\n  },\n  \"start_at\": \"2020-01-01T08:00\",\n  \"end_at\": \"2020-01-01T12:00\",\n  \"duration_minutes\": 120,\n  \"total_questions\": 5,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
             },
             "url": "{{base_url}}/api/v1/quizzes",
             "description": "Uji Kom di Kelas 4 (hanya boleh Kelas 6/9/12), waktu mulai sudah lewat, total_questions tidak sama dengan jumlah soal, dan soal pertama hanya bertanda Tryout."
@@ -1207,6 +1224,534 @@
                   "pm.test('semua error sekaligus', () => {",
                   "  const fields = pm.response.json().errors.map(e => e.field);",
                   "  pm.expect(fields).to.include.members(['placement.grade_id', 'start_at', 'total_questions', 'question_ids[0]']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jadwal bentrok (harus 422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tryout Bentrok\",\n  \"type\": \"tryout\",\n  \"status\": \"draft\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"end_at\": \"{{quiz_end_at}}\",\n  \"duration_minutes\": 60,\n  \"total_questions\": 2,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
+            },
+            "url": "{{base_url}}/api/v1/quizzes",
+            "description": "Mapel & kelas sama dengan **Buat quiz Tryout**, jadwal beririsan → ditolak (apa pun tipenya). Quiz yang mulai tepat saat quiz lain selesai boleh (lihat **Buat quiz dari bundle utuh**)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('pesan bentrok menyebut quiz lain', () => {",
+                  "  const err = pm.response.json().errors.find(e => e.field === 'start_at');",
+                  "  pm.expect(err.message).to.include('jadwal beririsan dengan quiz \"Tryout Matematika - KPK dan FPB\"');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah quiz (ganti penuh)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tryout Matematika - KPK dan FPB (revisi)\",\n  \"type\": \"tryout\",\n  \"status\": \"published\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"end_at\": \"{{quiz_end_at}}\",\n  \"duration_minutes\": 45,\n  \"coin_cost\": 10,\n  \"total_questions\": 2,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
+            },
+            "url": "{{base_url}}/api/v1/quizzes/{{quiz_id}}",
+            "description": "Body sama dengan buat quiz (ganti penuh). Hanya quiz yang belum dimulai; yang sudah dimulai → 409. Kode akses & status tidak berubah. Jadwal lama quiz ini sendiri tidak dianggap bentrok."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('isi berubah, kode akses tetap', () => {",
+                  "  pm.expect(data.name).to.eql('Tryout Matematika - KPK dan FPB (revisi)');",
+                  "  pm.expect(data.duration_minutes).to.eql(45);",
+                  "  pm.expect(data.coin_cost).to.eql(10);",
+                  "  pm.expect(data.access_code).to.eql(pm.collectionVariables.get('quiz_access_code'));",
+                  "  pm.expect(data.updated_by).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List quiz (status jadwal)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/quizzes?schedule_status=upcoming&subject_id={{q_subject_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "quizzes"],
+              "query": [
+                { "key": "page", "value": "1", "disabled": true },
+                { "key": "per_page", "value": "20", "disabled": true },
+                { "key": "search", "value": "KPK", "disabled": true, "description": "Nama quiz" },
+                { "key": "schedule_status", "value": "upcoming", "description": "upcoming (akan dimulai) / ongoing (sedang berjalan) / finished (sudah lewat)" },
+                { "key": "type", "value": "tryout", "disabled": true, "description": "daily_quiz / uji_kom / tryout / rumath" },
+                { "key": "status", "value": "draft", "disabled": true, "description": "draft / published" },
+                { "key": "education_level_id", "value": "{{q_education_level_id}}", "disabled": true },
+                { "key": "grade_id", "value": "{{q_grade_id}}", "disabled": true },
+                { "key": "subject_id", "value": "{{q_subject_id}}" }
+              ]
+            },
+            "description": "List quiz admin, terbaru dibuat dulu. Setiap baris punya `schedule_status` (dihitung dari waktu sekarang) dan tidak berisi daftar soal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('quiz tadi tampil sebagai upcoming', () => {",
+                  "  const q = pm.response.json().data.find(x => x.id === pm.collectionVariables.get('quiz_id'));",
+                  "  pm.expect(q).to.not.be.undefined;",
+                  "  pm.expect(q.schedule_status).to.eql('upcoming');",
+                  "  pm.expect(q).to.not.have.property('questions');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jumlah quiz per status jadwal (angka tab)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/quizzes/schedule-counts?subject_id={{q_subject_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "quizzes", "schedule-counts"],
+              "query": [{ "key": "subject_id", "value": "{{q_subject_id}}", "description": "Filter sama dengan List quiz" }]
+            },
+            "description": "Angka tab: semua, akan dimulai, sedang berjalan, sudah lewat. Query sama dengan List quiz; schedule_status & pagination diabaikan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('all = jumlah semua status', () => {",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d).to.have.all.keys('all', 'upcoming', 'ongoing', 'finished');",
+                  "  pm.expect(d.all).to.eql(d.upcoming + d.ongoing + d.finished);",
+                  "  pm.expect(d.upcoming).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kode akses quiz (tutor/admin/super admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quizzes/{{quiz_id}}/access-code",
+            "description": "Kode akses yang berlaku sekarang, untuk dibagikan tutor ke siswa saat quiz dimulai. Kode diganti setiap jam selama event belum selesai (`access_code_updated_at`). Role: tutor, admin, super admin."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('kode akses 6 karakter', () => pm.expect(pm.response.json().data.access_code).to.match(/^[A-Z0-9]{6}$/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail quiz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quizzes/{{quiz_id}}",
+            "description": "Detail 1 quiz: letak dengan nama, jadwal (WIB), schedule_status, kode akses, daftar soal urut nomor (tanpa kunci jawaban). Tidak ada / sudah dihapus → 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('isi detail', () => {",
+                  "  pm.expect(data.id).to.eql(pm.collectionVariables.get('quiz_id'));",
+                  "  pm.expect(data.name).to.eql('Tryout Matematika - KPK dan FPB (revisi)');",
+                  "  pm.expect(data.access_code).to.eql(pm.collectionVariables.get('quiz_access_code'));",
+                  "  pm.expect(data.questions.map(q => q.no)).to.eql([1, 2]);",
+                  "  pm.expect(data.questions[0]).to.not.have.property('answer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus quiz (soft delete, bisa banyak)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"{{quiz_id}}\", \"{{quiz2_id}}\"]\n}"
+            },
+            "url": "{{base_url}}/api/v1/quizzes",
+            "description": "Hapus 1-100 quiz sekaligus (soft delete). Semua atau tidak sama sekali: ID tidak ada / sudah dihapus atau quiz yang sedang berjalan → 422 per `ids[i]`, tidak ada yang terhapus.\n\nDi sini menghapus 2 quiz yang dibuat folder ini, jadi folder bisa dijalankan berulang."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('2 quiz terhapus', () => {",
+                  "  pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('quiz_id'), pm.collectionVariables.get('quiz2_id')]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail quiz terhapus (harus 404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quizzes/{{quiz_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Daily Quiz & Pengumuman (siswa)",
+      "description": "Jalankan setelah login admin (request pertama membuat soal Daily Quiz), lalu folder ini login sebagai siswa.citra (SD Kelas 5).\n\nDaily Quiz: siswa memilih kelas (dropdown sesuai jenjang; SD dibagi Kelas 1-3 & 4-6), mapel & bidang materi (wajib), bab/sub bab/topik (opsional), level (easy/medium/hard = difficulty soal, tipe soal campur), dan total soal 5/10/15. Soal diambil acak. Tidak ada kode akses & timer.",
+      "item": [
+        {
+          "name": "Siapkan 5 soal Daily Quiz (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"single_choice\",\n  \"questions\": [\n    { \"question\": \"KPK dari 2 dan 3 adalah ...\", \"explanation\": \"Kelipatan persekutuan terkecil 2 dan 3 = 6\", \"placement\": { \"education_level_id\": \"{{q_education_level_id}}\", \"grade_id\": \"{{q_grade_id}}\", \"subject_id\": \"{{q_subject_id}}\", \"subject_field_id\": \"{{q_subject_field_id}}\", \"chapter_id\": \"{{q_chapter_id}}\" }, \"difficulty\": \"easy\", \"used_for\": [\"daily_quiz\"], \"answer\": { \"options\": [{\"key\": \"A\", \"content\": \"6\"}, {\"key\": \"B\", \"content\": \"5\"}], \"correct_key\": \"A\" } },\n    { \"question\": \"KPK dari 3 dan 4 adalah ...\", \"explanation\": \"KPK 3 dan 4 = 12\", \"placement\": { \"education_level_id\": \"{{q_education_level_id}}\", \"grade_id\": \"{{q_grade_id}}\", \"subject_id\": \"{{q_subject_id}}\", \"subject_field_id\": \"{{q_subject_field_id}}\", \"chapter_id\": \"{{q_chapter_id}}\" }, \"difficulty\": \"easy\", \"used_for\": [\"daily_quiz\"], \"answer\": { \"options\": [{\"key\": \"A\", \"content\": \"7\"}, {\"key\": \"B\", \"content\": \"12\"}], \"correct_key\": \"B\" } },\n    { \"question\": \"FPB dari 6 dan 9 adalah ...\", \"explanation\": \"FPB 6 dan 9 = 3\", \"placement\": { \"education_level_id\": \"{{q_education_level_id}}\", \"grade_id\": \"{{q_grade_id}}\", \"subject_id\": \"{{q_subject_id}}\", \"subject_field_id\": \"{{q_subject_field_id}}\", \"chapter_id\": \"{{q_chapter_id}}\" }, \"difficulty\": \"easy\", \"used_for\": [\"daily_quiz\"], \"answer\": { \"options\": [{\"key\": \"A\", \"content\": \"3\"}, {\"key\": \"B\", \"content\": \"6\"}], \"correct_key\": \"A\" } },\n    { \"question\": \"FPB dari 8 dan 12 adalah ...\", \"explanation\": \"FPB 8 dan 12 = 4\", \"placement\": { \"education_level_id\": \"{{q_education_level_id}}\", \"grade_id\": \"{{q_grade_id}}\", \"subject_id\": \"{{q_subject_id}}\", \"subject_field_id\": \"{{q_subject_field_id}}\", \"chapter_id\": \"{{q_chapter_id}}\" }, \"difficulty\": \"easy\", \"used_for\": [\"daily_quiz\"], \"answer\": { \"options\": [{\"key\": \"A\", \"content\": \"2\"}, {\"key\": \"B\", \"content\": \"4\"}], \"correct_key\": \"B\" } },\n    { \"question\": \"KPK dari 4 dan 6 adalah ...\", \"explanation\": \"KPK 4 dan 6 = 12\", \"placement\": { \"education_level_id\": \"{{q_education_level_id}}\", \"grade_id\": \"{{q_grade_id}}\", \"subject_id\": \"{{q_subject_id}}\", \"subject_field_id\": \"{{q_subject_field_id}}\", \"chapter_id\": \"{{q_chapter_id}}\" }, \"difficulty\": \"easy\", \"used_for\": [\"daily_quiz\"], \"answer\": { \"options\": [{\"key\": \"A\", \"content\": \"12\"}, {\"key\": \"B\", \"content\": \"24\"}], \"correct_key\": \"A\" } }\n  ]\n}"
+            },
+            "url": "{{base_url}}/api/v1/questions",
+            "description": "Admin membuat 5 soal easy bertanda Daily Quiz (Kelas 4, bab KPK dan FPB), supaya generate di bawah pasti cukup soal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login siswa.citra (SD Kelas 5)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.citra\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', data.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pilihan kelas Daily Quiz (dropdown)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/daily-quizzes/grade-options" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('SD Kelas 5 → Kelas 4, 5, 6 (default Kelas 5)', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.map(d => d.name)).to.eql(['Kelas 4', 'Kelas 5', 'Kelas 6']);",
+                  "  pm.expect(data.find(d => d.is_default).name).to.eql('Kelas 5');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Daily Quiz",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placement\": {\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"difficulty\": \"easy\",\n  \"total_questions\": 5\n}"
+            },
+            "url": "{{base_url}}/api/v1/daily-quizzes",
+            "description": "Body:\n- `placement.grade_id` opsional (kosong = kelas siswa), harus dari **Pilihan kelas Daily Quiz**.\n- `placement.subject_id`, `placement.subject_field_id` wajib; `chapter_id`, `subchapter_id`, `topic_id` opsional (berurutan).\n- `difficulty` (level): `easy` / `medium` / `hard`.\n- `total_questions`: 5, 10, atau 15.\n\nSoal diambil acak (aktif, bertanda Daily Quiz, level sama, tipe campur). Soal kurang → 422 dengan jumlah yang tersedia. Response = soal untuk dikerjakan, TANPA kunci jawaban, kode akses, dan timer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('daily_quiz_id', data.id);",
+                  "pm.test('5 soal acak tanpa kunci jawaban', () => {",
+                  "  pm.expect(data.questions).to.have.lengthOf(5);",
+                  "  pm.expect(data.questions.map(q => q.no)).to.eql([1, 2, 3, 4, 5]);",
+                  "  pm.expect(pm.response.text()).to.not.include('correct_key');",
+                  "  pm.expect(data).to.not.have.property('access_code');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buka Daily Quiz (jatah gratis / coin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/daily-quizzes/{{daily_quiz_id}}/open",
+            "description": "Buka Daily Quiz milik siswa. Jatah gratis 2x per hari (WIB, DAILY_QUIZ_FREE_QUOTA); berikutnya memotong 10 coin (DAILY_QUIZ_COIN_COST) dan dicatat di coin_transactions. Coin kurang → 402. Membuka ulang tidak dihitung lagi.\n\ndata = soal lengkap dengan `answer` (opsi + kunci jawaban), tanpa pembahasan; `usage` = jatah & coin. Tidak ada kode akses & timer.\n\nKalau collection dijalankan berkali-kali di hari yang sama, jatah gratis siswa.citra bisa habis → 402 (normal)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 (dibuka) atau 402 (jatah habis & coin kurang)', () => pm.expect(pm.response.code).to.be.oneOf([200, 402]));",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.test('soal berisi kunci jawaban, tanpa pembahasan', () => {",
+                  "    pm.expect(data.questions[0].answer).to.have.property('correct_key');",
+                  "    pm.expect(pm.response.text()).to.not.include('explanation');",
+                  "    pm.expect(data.usage).to.include.keys('free_per_day', 'opened_today', 'coin_charged', 'coin_balance');",
+                  "  });",
+                  "  // Simulasi FE: jawab semua soal dengan pilihan A, nilai benar/salah pakai kunci jawaban.",
+                  "  // answered_at = jam soal terakhir dijawab, time_spent_seconds = lama mengerjakan soal itu (dicatat FE).",
+                  "  const answers = data.questions.map((q, i) => ({",
+                  "    question_id: q.id, answer: 'A', is_correct: q.answer.correct_key === 'A',",
+                  "    answered_at: new Date().toISOString(), time_spent_seconds: 20 + i * 5",
+                  "  }));",
+                  "  pm.collectionVariables.set('daily_answers_json', JSON.stringify({ answers }));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit jawaban Daily Quiz",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{daily_answers_json}}" },
+            "url": "{{base_url}}/api/v1/daily-quizzes/{{daily_quiz_id}}/submit",
+            "description": "Body: `{\"answers\": [{\"question_id\": \"...\", \"answer\": \"A\", \"is_correct\": false}, ...]}`. Benar/salah dinilai FE (pakai kunci jawaban dari Buka Daily Quiz). Soal yang tidak dikirim = tidak dijawab (salah).\n\nNilai total 100: per soal = 100 / total soal; nilai = jumlah benar x per soal. Hanya sekali (submit ke-2 → 409). Harus sudah dibuka (belum → 409).\n\ndata = `result` (score, correct_count, total_questions, points_per_question, submitted_at) + `questions` urut sama dengan saat dikerjakan: soal, `answer` (kunci), `explanation`, `student_answer`, `is_correct`, `points`.\n\nKalau Buka Daily Quiz tadi 402 (jatah & coin habis), request ini 409 (belum dibuka) — normal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 (dikumpulkan) atau 409 (belum dibuka)', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.test('nilai total 100 & review lengkap', () => {",
+                  "    const r = data.result;",
+                  "    pm.expect(r.points_per_question).to.eql(Math.round(100 / r.total_questions * 100) / 100);",
+                  "    pm.expect(r.score).to.eql(Math.round(r.correct_count * 100 / r.total_questions * 100) / 100);",
+                  "    pm.expect(data.questions[0]).to.include.keys('explanation', 'answer', 'student_answer', 'is_correct', 'points', 'answered_at', 'time_spent_seconds');",
+                  "    pm.expect(data.state).to.eql('submitted');",
+                  "    pm.expect(r.duration_seconds).to.be.a('number');",
+                  "    pm.expect(data.questions[0].time_spent_seconds).to.eql(20);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buka lagi setelah submit → langsung review",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/daily-quizzes/{{daily_quiz_id}}/open",
+            "description": "Quiz yang sudah di-submit (Daily Quiz maupun Uji Kom/Tryout): buka quiz mengembalikan data **review** dengan `state: \"submitted\"` (tanpa kode akses, tidak memotong jatah/coin, Uji Kom/Tryout walaupun event sudah selesai). FE cek `data.state`: `in_progress` → halaman soal, `submitted` → halaman review."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 atau 409', () => pm.expect(pm.response.code).to.be.oneOf([200, 409, 402]));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('state submitted (review)', () => {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.state).to.eql('submitted');",
+                  "    pm.expect(data.result).to.include.keys('score', 'duration_seconds');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Review Daily Quiz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/daily-quizzes/{{daily_quiz_id}}/review",
+            "description": "Hasil & review Daily Quiz yang sudah di-submit (bentuk sama dengan response submit). Belum submit → 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 atau 409 (belum submit)', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit jawaban Uji Kom / Tryout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"answers\": [\n    { \"question_id\": \"<id soal>\", \"answer\": \"B\", \"is_correct\": true }\n  ]\n}" },
+            "url": "{{base_url}}/api/v1/quizzes/{{quiz_id}}/submit",
+            "description": "Sama seperti submit Daily Quiz, untuk Uji Kom / Tryout yang sudah dibuka dengan kode akses. Ditolak (409) kalau belum dibuka, sudah submit, atau lewat batas waktu (`deadline_at` + toleransi 2 menit). Review: GET /api/v1/quizzes/:id/review.\n\nDi collection ini quiz_id adalah quiz Kelas 4 (siswa.citra Kelas 5) → 404; ganti `quiz_id` untuk mencoba quiz yang sedang berjalan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('respons terdefinisi', () => pm.expect(pm.response.code).to.be.oneOf([200, 404, 409, 422]));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buka Uji Kom / Tryout (kode akses)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"access_code\": \"K7Q2ZD\"\n}" },
+            "url": "{{base_url}}/api/v1/quizzes/{{quiz_id}}/open",
+            "description": "Siswa membuka Uji Kom / Tryout: quiz harus publish, untuk kelas siswa, dan sedang berjalan.\n- Pertama kali: `access_code` wajib (kode terbaru dari tutor: GET /quizzes/:id/access-code). Salah → 422.\n- Membuka ulang (contoh refresh, kode sudah berganti): boleh tanpa body.\n- Belum mulai / sudah selesai → 409. Draf / kelas lain → 404.\n\ndata = info quiz, `started_at`, `deadline_at` (= min(mulai + durasi, akhir event)), soal + kunci jawaban (tanpa pembahasan).\n\nDi collection ini quiz_id adalah quiz Kelas 4 yang belum mulai, jadi hasilnya 404 (siswa.citra Kelas 5) — ganti `quiz_id` & kode untuk mencoba quiz yang sedang berjalan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('respons terdefinisi', () => pm.expect(pm.response.code).to.be.oneOf([200, 404, 409, 422]));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Total soal tidak valid (harus 422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placement\": {\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\"\n  },\n  \"difficulty\": \"easy\",\n  \"total_questions\": 7\n}"
+            },
+            "url": "{{base_url}}/api/v1/daily-quizzes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('total_questions hanya 5/10/15', () => pm.expect(pm.response.json().errors[0].field).to.eql('total_questions'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pengumuman quiz (dashboard siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/quiz-announcements",
+            "description": "Quiz Uji Kom & Tryout yang sudah **publish**, belum selesai, dan untuk kelas siswa; urut yang paling dekat dimulai. Tanpa kode akses. `meta` = pagination (`page`, `per_page`)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('data array tanpa kode akses', () => {",
+                  "  pm.expect(pm.response.json().data).to.be.an('array');",
+                  "  pm.expect(pm.response.text()).to.not.include('access_code');",
                   "});"
                 ]
               }

@@ -28,6 +28,15 @@ func TodayInJakarta(now time.Time) string {
 	return now.In(Jakarta).Format(time.DateOnly)
 }
 
+// StartOfDayInJakarta mengembalikan jam 00:00 WIB di hari yang sama dengan now.
+// Dipakai untuk menghitung jatah harian (contoh: Daily Quiz gratis 2x per hari).
+//
+// Contoh: 25 Nov 2026 23:30 WIB → 25 Nov 2026 00:00 WIB
+func StartOfDayInJakarta(now time.Time) time.Time {
+	local := now.In(Jakarta)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Jakarta)
+}
+
 // Earliest mengembalikan waktu yang paling awal di antara a dan b.
 func Earliest(a, b time.Time) time.Time {
 	if a.Before(b) {

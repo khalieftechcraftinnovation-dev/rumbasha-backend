@@ -290,6 +290,21 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | GET    | `/api/v1/questions/type-counts` | Admin | Jumlah soal per tipe (angka di tab)     |
 | GET    | `/api/v1/dropdowns/:type` | Login (semua role) | Pilihan dropdown dari master data  |
 | POST   | `/api/v1/quizzes`      | Admin        | Buat quiz Uji Kom / Tryout + soal yang dipilih  |
+| GET    | `/api/v1/quizzes`      | Admin        | List quiz + status jadwal (akan/berjalan/lewat) |
+| GET    | `/api/v1/quizzes/schedule-counts` | Admin | Jumlah quiz per status jadwal (angka tab) |
+| GET    | `/api/v1/quizzes/:id`  | Admin        | Detail quiz + jadwal, kode akses, daftar soal   |
+| PUT    | `/api/v1/quizzes/:id`  | Admin        | Ubah 1 quiz (ganti penuh), hanya yang belum mulai |
+| DELETE | `/api/v1/quizzes`      | Admin        | Hapus 1-100 quiz (soft delete), kecuali yang berjalan |
+| GET    | `/api/v1/student/quiz-announcements` | Siswa | Pengumuman quiz publish untuk kelas siswa |
+| GET    | `/api/v1/daily-quizzes/grade-options` | Siswa | Dropdown kelas Daily Quiz (sesuai jenjang/kelompok) |
+| POST   | `/api/v1/daily-quizzes` | Siswa       | Generate Daily Quiz dari soal acak              |
+| POST   | `/api/v1/daily-quizzes/:id/open` | Siswa | Buka Daily Quiz (jatah gratis / potong coin) + kunci jawaban |
+| POST   | `/api/v1/quizzes/:id/open` | Siswa    | Buka Uji Kom / Tryout dengan kode akses + kunci jawaban |
+| GET    | `/api/v1/quizzes/:id/access-code` | Tutor, Admin | Kode akses quiz yang berlaku sekarang |
+| POST   | `/api/v1/daily-quizzes/:id/submit` | Siswa | Kumpulkan jawaban Daily Quiz → nilai + review |
+| GET    | `/api/v1/daily-quizzes/:id/review` | Siswa | Hasil & review Daily Quiz |
+| POST   | `/api/v1/quizzes/:id/submit` | Siswa  | Kumpulkan jawaban Uji Kom / Tryout → nilai + review |
+| GET    | `/api/v1/quizzes/:id/review` | Siswa  | Hasil & review Uji Kom / Tryout |
 | GET    | `/api/v1/quiz-bundles` | Admin        | Daftar bundle (quiz lama) untuk dipakai ulang   |
 | GET    | `/api/v1/questions/:id`| Admin        | Detail soal + kunci jawaban & pembahasan        |
 | PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
@@ -549,11 +564,11 @@ Status: 401 belum login / sesi habis, 403 tidak punya akses / akun nonaktif, 422
 
 ## Quiz (Uji Kom & Tryout)
 
-Tabel (migration 000016 & 000017):
+Tabel (migration 000016 - 000018):
 
 | Tabel | Isi |
 | ----- | --- |
-| `quizzes` | Info quiz: nama, tipe, letak (jenjang, kelas, mapel wajib; bidang materi s/d topik opsional), `start_at` (waktu mulai), durasi, biaya coin, `total_questions`, status (`draft`/`published`), `access_code` (kode akses) |
+| `quizzes` | Info quiz: nama, tipe, letak (jenjang, kelas, mapel wajib; bidang materi s/d topik opsional), jendela event `start_at`..`end_at` (boleh beberapa hari), `duration_minutes` (lama mengerjakan 1 kali), biaya coin, `total_questions`, status (`draft`/`published`), `access_code` (kode akses) |
 | `quiz_questions` | Soal yang dipilih: `(quiz_id, question_id, sort_order)`. 1 soal tidak bisa dipilih 2x di quiz yang sama; boleh dipakai di banyak quiz |
 
 `total_questions` disimpan di `quizzes` (selalu = jumlah baris `quiz_questions`) supaya list quiz tidak perlu `COUNT`. Penanda "soal sudah dipakai quiz" di list Bank Soal juga dibaca dari `quiz_questions` (index `quiz_questions_question_idx`), jadi tidak ada kolom tambahan di `questions` yang harus selalu disinkronkan.
@@ -569,6 +584,7 @@ Tabel (migration 000016 & 000017):
     "subject_field_id": "...", "chapter_id": "..."
   },
   "start_at": "2026-12-01T08:00",
+  "end_at": "2026-12-03T17:00",
   "duration_minutes": 60,
   "coin_cost": 0,
   "total_questions": 12,
@@ -580,10 +596,12 @@ Tabel (migration 000016 & 000017):
 | Field | Aturan |
 | ----- | ------ |
 | `name` | Wajib, maks 200 karakter (spasi di awal/akhir dibuang) |
+| `status` | **Wajib**, tombol simpan: `draft` (Simpan draf) atau `published` (Publish: quiz tampil di pengumuman dashboard siswa kelas tersebut) |
 | `type` | `uji_kom` / `tryout` (Daily Quiz & RUMATH dibuat otomatis, bukan lewat API ini) |
 | `placement` | Jenjang, kelas, mapel **wajib**. Bidang materi, bab, sub bab, topik opsional tapi berurutan (bab butuh bidang materi, dst). Kelas harus milik jenjang; bidang materi harus milik mapel & kelas; semua harus aktif. **Uji Kom hanya untuk Kelas 6, 9, dan 12** (Tryout bebas) |
-| `start_at` | **Wajib**, waktu mulai dalam **WIB**, harus setelah sekarang. `"2026-12-01T08:00"` / `"2026-12-01 08:00"` (tanpa zona = WIB, sama dengan nilai input HTML `datetime-local`), atau RFC3339 dengan zona (`"2026-12-01T01:00:00Z"` = 08:00 WIB) |
-| `duration_minutes` | Wajib, 1-600 menit |
+| `start_at` | **Wajib**, mulai event dalam **WIB**, harus setelah sekarang. `"2026-12-01T08:00"` / `"2026-12-01 08:00"` (tanpa zona = WIB, sama dengan nilai input HTML `datetime-local`), atau RFC3339 dengan zona (`"2026-12-01T01:00:00Z"` = 08:00 WIB) |
+| `end_at` | **Wajib**, selesai event (WIB, format sama), **boleh beda hari**. Harus setelah `start_at` dan minimal `start_at + duration_minutes` |
+| `duration_minutes` | Wajib, 1-600 menit: lama mengerjakan 1 kali, di dalam jendela event |
 | `coin_cost` | Opsional, default 0 (gratis) |
 | `bundle_quiz_ids` | Opsional, maks 20. **Semua** soal dari quiz-quiz ini (bundle) ikut masuk |
 | `question_ids` | Opsional, soal satuan. Minimal salah satu dari `bundle_quiz_ids` / `question_ids` diisi |
@@ -597,9 +615,48 @@ Syarat setiap soal (error di field asalnya, `bundle_quiz_ids[i]` atau `question_
 - `used_for` berisi tipe quiz (quiz Uji Kom hanya boleh memakai soal bertanda Uji Kom);
 - mapel & kelas sama dengan quiz; kalau quiz mengisi bidang materi/bab/sub bab/topik, soal juga harus di tingkat yang sama.
 
-Respons 201 = detail quiz (`status: "draft"`), letak dengan nama, `start_at` & `end_at` (= mulai + durasi) dalam WIB (`"2026-12-01T08:00:00+07:00"`), `access_code`, dan `questions: [{no, id, code, type, question, difficulty}]` urut nomor soal. Semua kesalahan dikembalikan sekaligus (422); kalau letak quiz salah, soal tidak dibandingkan ke letak itu (supaya error tidak berlipat).
+**Jadwal tidak boleh beririsan:** quiz (belum dihapus, tipe & status apa pun) dengan **mapel & kelas yang sama** tidak boleh punya jendela event yang beririsan. Quiz yang mulai tepat saat quiz lain selesai (10:00 → 10:00) boleh. Error di `start_at`, contoh `jadwal beririsan dengan quiz "Uji Kom A" (01-12-2026 08:00 WIB - 03-12-2026 17:00 WIB) untuk mapel & kelas yang sama`. Aturan ini juga dijaga database (exclusion constraint `quizzes_no_overlap`, extension `btree_gist`), jadi 2 request bersamaan pun tidak bisa lolos.
 
-Performa: soal bundle 1 query, cek letak 1 query, cek semua soal 1 query, simpan 1 transaksi (1 INSERT quiz + 1 INSERT banyak baris untuk soal), ambil detail 2 query.
+Respons 201 = detail quiz (`status` sesuai tombol), letak dengan nama, `start_at` & `end_at` dalam WIB (`"2026-12-01T08:00:00+07:00"`), `schedule_status`, `access_code`, dan `questions: [{no, id, code, type, question, difficulty}]` urut nomor soal. Semua kesalahan dikembalikan sekaligus (422); kalau letak quiz salah, soal tidak dibandingkan ke letak itu (supaya error tidak berlipat).
+
+Performa: soal bundle 1 query, cek letak 1 query, cek bentrok jadwal 1 query (index GiST), cek semua soal 1 query, simpan 1 transaksi (1 INSERT quiz + 1 INSERT banyak baris untuk soal), ambil detail 2 query.
+
+### Ubah quiz (`PUT /api/v1/quizzes/:id`)
+
+Body **sama persis** dengan buat quiz (ganti penuh: nama, tipe, letak, jadwal, durasi, biaya, soal). Aturan validasi sama, dan quiz itu sendiri tidak dianggap bentrok dengan jadwal lamanya. Respons 200 = detail terbaru (`updated_by` terisi).
+
+- **Hanya quiz yang belum dimulai** (`start_at` > sekarang). Yang sudah dimulai / selesai → **409** `Quiz sudah dimulai, tidak bisa diubah`.
+- `access_code` dan `status` tidak berubah. Soal lama diganti seluruhnya dengan daftar soal baru.
+- ID tidak ada / bukan UUID / sudah dihapus → 404.
+
+### Detail quiz (`GET /api/v1/quizzes/:id`)
+
+Bentuk sama dengan respons buat/ubah quiz: letak dengan nama, `start_at`/`end_at` (WIB), `schedule_status`, `duration_minutes`, `access_code`, `coin_cost`, `total_questions`, `status`, `created_by`/`updated_by`, dan `questions: [{no, id, code, type, question, difficulty}]` urut nomor soal (tanpa kunci jawaban; kunci ada di detail soal). ID tidak ada / bukan UUID / sudah dihapus → 404. 3 query: quiz + nama (JOIN lewat primary key), daftar soal.
+
+### Hapus quiz (`DELETE /api/v1/quizzes`)
+
+Body `{"ids": ["...", "..."]}`, 1-100 quiz, **soft delete** (`deleted_at` & `deleted_by` diisi, baris tetap ada).
+
+- **Semua atau tidak sama sekali**: ID tidak ada / sudah dihapus, atau quiz yang **sedang berjalan** → 422 dengan error per `ids[i]` (contoh `quiz "Tryout A" sedang berjalan (sampai 03-12-2026 17:00 WIB), tidak bisa dihapus`) dan tidak ada yang terhapus. Quiz yang belum mulai maupun yang sudah lewat boleh dihapus.
+- Quiz yang dihapus tidak tampil di list quiz, list bundle, dan penanda "dipakai quiz" di Bank Soal; jadwal & kode aksesnya tidak lagi menghalangi quiz lain.
+- 1 transaksi: quiz dikunci (`FOR UPDATE`) saat dicek, lalu 1 UPDATE.
+
+### List quiz (`GET /api/v1/quizzes`)
+
+Terbaru dibuat dulu. Semua query opsional dan bisa digabung:
+
+| Query | Isi |
+| ----- | --- |
+| `page`, `per_page` | Default 1 & 20, `per_page` maks 100 |
+| `search` | Nama quiz (sebagian kata, tidak peka huruf besar/kecil) |
+| `schedule_status` | `upcoming` (akan dimulai), `ongoing` (sedang berjalan), `finished` (sudah lewat) |
+| `type` | `daily_quiz` / `uji_kom` / `tryout` / `rumath` |
+| `status` | `draft` / `published` |
+| `education_level_id`, `grade_id`, `subject_id` | Filter letak |
+
+Setiap baris = data quiz seperti detail (letak dengan nama, `start_at`, `end_at`, `duration_minutes`, `access_code`, `coin_cost`, `total_questions`, `status`, `created_by`/`updated_by`) + **`schedule_status`**, **tanpa** daftar soal. `schedule_status` dihitung dari waktu sekarang: sekarang < `start_at` → `upcoming`; `start_at` ≤ sekarang < `end_at` → `ongoing`; sesudahnya → `finished`.
+
+**Angka tab jadwal:** `GET /api/v1/quizzes/schedule-counts` → `{"all": 12, "upcoming": 4, "ongoing": 1, "finished": 7}`. Query string sama dengan list (filter lain ikut berlaku; `schedule_status` & pagination diabaikan). 1 query `COUNT(*) FILTER (...)`.
 
 ### Bundle soal (pakai ulang soal quiz lama)
 
@@ -631,11 +688,161 @@ Daftar bundle: `GET /api/v1/quiz-bundles` (admin), terbaru dulu.
 ### Kode akses & pergantian per jam
 
 - Setiap quiz Uji Kom & Tryout mendapat `access_code` acak saat dibuat: **6 karakter A-Z dan 0-9** (contoh `K7Q2ZD`), dibuat dengan `crypto/rand` (tidak bisa ditebak). Kode **unik** di antara quiz yang belum dihapus (index unik `quizzes_access_code_unique`); kalau kebetulan bentrok, kode dibuat ulang otomatis.
-- **Scheduler** di dalam proses API ([internal/scheduler](internal/scheduler/scheduler.go), library `robfig/cron`) mengganti kode akses **setiap jam tepat (WIB)** untuk quiz yang **belum selesai** (`start_at + durasi > sekarang`, termasuk yang belum mulai & yang sedang berjalan). Quiz yang sudah selesai atau dihapus tidak diubah.
+- **Scheduler** di dalam proses API ([internal/scheduler](internal/scheduler/scheduler.go), library `robfig/cron`) mengganti kode akses **setiap jam tepat (WIB)** untuk quiz yang **belum selesai** (`end_at > sekarang`, termasuk yang belum mulai & yang sedang berjalan). Quiz yang sudah selesai atau dihapus tidak diubah.
 - Jadwal diatur `ACCESS_CODE_REFRESH_CRON` di `.env` (format cron 5 kolom, default `0 * * * *`; `off` = mati).
 - **Aman untuk beberapa server**: setiap jalan memakai advisory lock PostgreSQL (`pg_try_advisory_xact_lock`), jadi hanya 1 server yang mengganti kode; server lain mencatat "dilewati".
-- Performa: 1 transaksi, quiz dicari lewat index `start_at` (durasi maks 600 menit → quiz yang belum selesai pasti mulai < 10 jam lalu), kode baru dicek sekaligus ke database, lalu UPDATE banyak baris per 1.000 quiz.
+- Performa: 1 transaksi, quiz dicari lewat index `end_at` (`quizzes_access_code_end_at_idx`), kode baru dicek sekaligus ke database, lalu UPDATE banyak baris per 1.000 quiz.
 - Hasil setiap jalan dicetak di terminal server, contoh `scheduler: kode akses 12 quiz diganti (35ms)`.
+
+### Kode akses untuk tutor (`GET /api/v1/quizzes/:id/access-code`)
+
+Role **tutor, admin, super admin**. Data: `quiz_id`, `name`, `type`, `status`, `start_at`/`end_at`, `schedule_status`, `access_code` (yang berlaku sekarang), `access_code_updated_at`. Tutor membagikan kode ini ke siswa saat quiz dimulai; kode berganti setiap jam selama event belum selesai. Quiz tidak ada / dihapus → 404.
+
+### Buka Uji Kom / Tryout (`POST /api/v1/quizzes/:id/open`)
+
+Khusus siswa. Body `{"access_code": "K7Q2ZD"}`.
+
+- Quiz harus **publish**, untuk **kelas siswa**, dan **sedang berjalan**. Draf / kelas lain / tidak ada → 404 (siswa tidak boleh tahu quiz itu ada). Belum mulai → 409 `Quiz belum dimulai. Mulai 01-12-2026 08:00 WIB`; sudah selesai → 409 `Quiz sudah selesai pada ...`.
+- **Pertama kali dibuka wajib kode akses** yang berlaku sekarang (huruf besar/kecil sama saja). Kosong → 422 `access_code: wajib diisi`; salah / sudah berganti → 422 `kode akses salah atau sudah berganti, minta kode terbaru ke tutor`.
+- Saat berhasil, dicatat di tabel `quiz_attempts` (1 baris per siswa per quiz, `started_at`). **Membuka ulang** (contoh refresh halaman setelah kode berganti) **tidak perlu kode lagi** (boleh tanpa body) dan `started_at` tetap.
+- Respons 200: info quiz (tanpa kode akses), `started_at`, `deadline_at` = **min(`started_at` + durasi, `end_at`)**, `total_questions`, `coin_cost`, dan `questions` lengkap dengan kunci jawaban (bentuk soal di bagian Daily Quiz).
+- Biaya coin quiz (`coin_cost`) belum dipotong saat dibuka.
+
+### Submit jawaban & review (Uji Kom, Tryout, Daily Quiz)
+
+| Endpoint | Untuk |
+| -------- | ----- |
+| `POST /api/v1/quizzes/:id/submit`, `GET /api/v1/quizzes/:id/review` | Uji Kom / Tryout |
+| `POST /api/v1/daily-quizzes/:id/submit`, `GET /api/v1/daily-quizzes/:id/review` | Daily Quiz |
+
+Body submit (khusus siswa):
+
+```json
+{
+  "answers": [
+    { "question_id": "...", "answer": "B", "is_correct": true },
+    { "question_id": "...", "answer": ["A", "C"], "is_correct": false },
+    { "question_id": "...", "answer": "0.75", "is_correct": true }
+  ]
+}
+```
+
+- **Penilaian di FE**: FE menilai benar/salah tiap soal memakai kunci jawaban dari response buka quiz, lalu mengirim `is_correct` (wajib per item). `answer` = jawaban siswa apa adanya (bebas bentuknya, disimpan untuk review). Soal yang tidak dikirim = tidak dijawab (salah, `student_answer: null`).
+- Waktu per soal (opsional): `answered_at` & `time_spent_seconds` (lihat Waktu pengerjaan di bawah).
+- **Nilai total 100**: nilai per soal = 100 / total soal; nilai = jumlah benar x nilai per soal (dihitung server, 2 angka di belakang koma; semua benar selalu tepat 100). Contoh 3 soal, 2 benar → 66.67.
+- **Hanya sekali.** Submit ke-2 → 409 `Jawaban sudah dikumpulkan pada ...`. Harus sudah dibuka (belum → 409). Uji Kom/Tryout: lewat `deadline_at` + toleransi 2 menit → 409 `Waktu mengerjakan sudah habis pada ...`. Daily Quiz tanpa batas waktu.
+- Soal yang bukan bagian quiz / dikirim 2x → 422 di `answers[i].question_id`.
+- Disimpan: `submitted_at`, `score`, `correct_count`, dan `answers` (JSONB, urut nomor soal: `{question_id, answer, is_correct, points}`) di `quiz_attempts` (Uji Kom/Tryout) atau `daily_quizzes` (Daily Quiz). Submit = 1 UPDATE (`... AND submitted_at IS NULL`, aman dari submit dobel); review = baca 1 baris + isi soal.
+
+Response submit = response review (200):
+
+```json
+{
+  "id": "...", "name": "Uji Kom Matematika", "type": "uji_kom", "placement": { ... }, "started_at": "...",
+  "state": "submitted",
+  "result": { "score": 66.67, "correct_count": 2, "total_questions": 3, "points_per_question": 33.33, "submitted_at": "2026-12-01T09:05:00+07:00", "duration_seconds": 1520 },
+  "questions": [
+    {
+      "no": 1, "id": "...", "code": "Q-12", "type": "single_choice", "question": "...", "formula": null,
+      "image_url": null, "table": null, "display_order": ["question"], "difficulty": "easy",
+      "answer": { "options": [ ... ], "correct_key": "B" },
+      "explanation": "Pembahasan ...",
+      "student_answer": "B", "is_correct": true, "points": 33.33,
+      "answered_at": "2026-12-01T08:05:30+07:00", "time_spent_seconds": 42
+    }
+  ]
+}
+```
+
+Urutan `questions` sama dengan saat dikerjakan, lengkap dengan **jawaban yang benar** (`answer`) dan **pembahasan** (`explanation`). Daily Quiz: tanpa `name`/`type`/`started_at`, ada `difficulty` & `opened_at`.
+
+**Waktu pengerjaan:**
+
+- Per soal (opsional, dari FE) di setiap item `answers`: `answered_at` (RFC3339, jam soal terakhir dijawab, contoh `"2026-12-01T08:05:30+07:00"`) dan `time_spent_seconds` (lama mengerjakan soal itu, 0-86400). Disimpan di JSONB `answers` dan tampil lagi di review (`answered_at` dalam WIB; `null` kalau tidak dikirim).
+- Total: `result.duration_seconds` = submit - mulai (Uji Kom/Tryout: `started_at` saat pertama dibuka; Daily Quiz: `opened_at`), dihitung server dan disimpan di kolom `duration_seconds` (migration 000022).
+
+**Sudah pernah dikerjakan → langsung review:** buka quiz (`POST /quizzes/:id/open` atau `POST /daily-quizzes/:id/open`) untuk quiz yang sudah di-submit mengembalikan **data review** (bentuk sama dengan response submit) dengan `"state": "submitted"` — tanpa kode akses, tidak memotong jatah/coin, dan untuk Uji Kom/Tryout tetap bisa walaupun event sudah selesai. Response buka quiz biasa berisi `"state": "in_progress"`. FE cukup cek `data.state`: `in_progress` → halaman soal, `submitted` → halaman review.
+
+### Pengumuman quiz di dashboard siswa (`GET /api/v1/student/quiz-announcements`)
+
+Khusus siswa. Berisi quiz Uji Kom & Tryout yang **sudah publish**, **belum selesai** (`end_at` > sekarang), dan untuk **kelas siswa** (kelas akun siswa); urut yang paling dekat dimulai. Pagination `page`/`per_page` (default 20).
+
+Setiap item: `id`, `name`, `type`, `placement` (nama letak), `start_at`/`end_at` (WIB), `schedule_status` (`upcoming`/`ongoing`), `duration_minutes`, `total_questions`, `coin_cost`. **Tanpa kode akses** (dibagikan tutor saat quiz dimulai) dan tanpa soal. Siswa yang kelasnya belum diisi → `data: []`. Index `quizzes_announcement_idx (grade_id, start_at)` khusus quiz publish.
+
+## Daily Quiz (siswa)
+
+Quiz latihan yang **di-generate siswa** dari soal acak sesuai pilihannya. **Tanpa kode akses dan tanpa timer.** Disimpan di tabel terpisah `daily_quizzes` + `daily_quiz_questions` (migration 000019), bukan di `quizzes`, karena milik 1 siswa dan tidak ikut jadwal event / aturan bentrok / list quiz admin.
+
+### Pilihan kelas (`GET /api/v1/daily-quizzes/grade-options`)
+
+Dropdown kelas untuk siswa yang login (format sama dengan dropdown lain + `is_default`):
+
+- Hanya kelas di **jenjang siswa**. Khusus SD dibagi 2 kelompok: **Kelas 1-3** dan **Kelas 4-6** (siswa Kelas 5 → Kelas 4, 5, 6).
+- `is_default: true` = kelas siswa sendiri (dipakai kalau `grade_id` tidak dikirim).
+- Kelas/jenjang siswa belum diisi → 422 `Kelas kamu belum diisi, hubungi admin`.
+
+Bidang materi untuk kelas yang dipilih: `GET /api/v1/dropdowns/subject_field?subject_id=...&grade_id=...`.
+
+### Generate (`POST /api/v1/daily-quizzes`)
+
+```json
+{
+  "placement": {
+    "grade_id": "...", "subject_id": "...", "subject_field_id": "...",
+    "chapter_id": "...", "subchapter_id": null, "topic_id": null
+  },
+  "difficulty": "easy",
+  "total_questions": 10
+}
+```
+
+| Field | Aturan |
+| ----- | ------ |
+| `placement.grade_id` | Opsional (kosong = kelas siswa); harus dari pilihan kelas di atas |
+| `placement.subject_id`, `placement.subject_field_id` | **Wajib**. Bidang materi harus milik mapel & kelas yang dipilih |
+| `placement.chapter_id`, `subchapter_id`, `topic_id` | Opsional, berurutan (sub bab butuh bab, topik butuh sub bab) |
+| `difficulty` | Level: `easy` / `medium` / `hard` = parameter `difficulty` soal. **Tipe soal boleh campur** (pilihan ganda, PG kompleks, benar/salah, isian) |
+| `total_questions` | `5`, `10`, atau `15` |
+
+- Soal diambil **acak** (`ORDER BY random()`) dari soal yang **aktif**, bertanda **Daily Quiz** (`used_for`), level sama, dan di letak yang dipilih. Kandidat sudah dipersempit index bidang materi, jadi tetap cepat.
+- Soal kurang → 422 di `total_questions`: `soal yang tersedia hanya 8, pilih total soal yang lebih kecil atau ubah pilihan` (0 soal: `belum ada soal untuk pilihan ini, ...`).
+- Respons 201: `id`, `placement` (nama), `difficulty`, `total_questions`, `created_at`, dan `questions: [{no, id, type, question, formula, image_url, table, display_order, options, input_type}]`. **Tanpa kunci jawaban & pembahasan.** `options` (`key`, `content`, `image_url`) untuk pilihan ganda / PG kompleks / benar-salah; `input_type` (`number`/`text`) untuk isian. Gambar Image Library sudah diubah menjadi link.
+- Generate gratis; jatah & coin dihitung saat Daily Quiz **dibuka** (di bawah).
+
+### Buka Daily Quiz (`POST /api/v1/daily-quizzes/:id/open`)
+
+Siswa membuka Daily Quiz miliknya untuk dikerjakan. Tanpa body, tanpa kode akses, tanpa timer.
+
+- **Jatah gratis per hari (WIB)**: `DAILY_QUIZ_FREE_QUOTA` (default 2) Daily Quiz pertama yang dibuka hari itu gratis. Berikutnya memotong `DAILY_QUIZ_COIN_COST` coin (default 10) — sementara di `.env`, nanti dipindah ke master parameter quiz.
+- Coin dipotong dari `students.coin_balance` dan dicatat di `coin_transactions` (`type = usage`, `reference_type = daily_quiz`, `reference_id` = id Daily Quiz, `idempotency_key = daily_quiz_open:<id>`).
+- Coin tidak cukup → **402** `Coin tidak cukup: jatah gratis hari ini sudah habis, butuh 10 coin, saldo 5 coin`; tidak ada yang berubah.
+- **Membuka ulang** Daily Quiz yang sama tidak dihitung lagi dan tidak memotong coin (`usage.already_opened = true`).
+- Aman dari 2 request bersamaan: 1 transaksi, saldo siswa dikunci (`FOR UPDATE`) selama jatah dihitung & coin dipotong.
+- Daily Quiz siswa lain / tidak ada → 404.
+
+Respons 200: info Daily Quiz, `opened_at`, `usage: {free_per_day, opened_today, coin_charged, coin_balance, already_opened}`, dan `questions` lengkap dengan kunci jawaban (lihat bentuk soal di bawah).
+
+### Bentuk soal saat quiz dibuka (Daily Quiz, Uji Kom, Tryout)
+
+```json
+{
+  "no": 1, "id": "...", "code": "Q-12", "type": "single_choice",
+  "question": "KPK dari 4 dan 6 adalah ...", "formula": null,
+  "image_url": "http://.../storage/images/question/2026/11/a.png",
+  "table": null, "display_order": ["question", "image"], "difficulty": "easy",
+  "answer": {
+    "options": [
+      { "key": "A", "content": "10", "image_id": null },
+      { "key": "B", "content": "", "image_id": "...", "image_url": "http://.../b.png" }
+    ],
+    "correct_key": "B"
+  }
+}
+```
+
+- `answer` = opsi + **kunci jawaban**, bentuk sama dengan create soal (`correct_key` / `correct_keys` / `accepted_answers` + `input_type`, dst.).
+- **Pembahasan (`explanation`) tidak diberikan.**
+- Gambar Image Library (soal & opsi) sudah diubah menjadi link `image_url`. 2 query untuk semua soal (soal + link gambar opsi).
 
 ## Dropdown (`GET /api/v1/dropdowns/:type`)
 

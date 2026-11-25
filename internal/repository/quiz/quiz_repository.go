@@ -14,10 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/accesscode"
 	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scoring"
 )
 
 // QuizRepository mengakses tabel quizzes & quiz_questions.
@@ -123,9 +125,9 @@ func (r *QuizRepository) FindBundleQuestionIDs(ctx context.Context, quizIDs []st
 //	INSERT INTO quizzes (...) VALUES (...) RETURNING id, created_at, updated_at
 //	INSERT INTO quiz_questions (quiz_id, question_id, sort_order) VALUES (?, ?, 1), (?, ?, 2), ...
 //
-// Kalau kode akses sudah dipakai quiz lain, mengembalikan gorm.ErrDuplicatedKey (index unik
+// Kalau kode akses sudah dipakai quiz lain → quizmodel.ErrAccessCodeTaken (index unik
 // quizzes_access_code_unique = satu-satunya data unik yang diisi di sini); service lalu
-// membuat kode baru dan mencoba lagi.
+// membuat kode baru dan mencoba lagi. Jadwal beririsan → quizmodel.ErrScheduleConflict.
 // Setelah selesai, q.ID, q.CreatedAt, q.UpdatedAt sudah terisi.
 func (r *QuizRepository) Create(ctx context.Context, q *quizmodel.Quiz) error {
 	tx := r.db.WithContext(ctx).Begin()
@@ -143,35 +145,25 @@ func (r *QuizRepository) Create(ctx context.Context, q *quizmodel.Quiz) error {
 		INSERT INTO quizzes (
 			name, type,
 			education_level_id, grade_id, subject_id, subject_field_id, chapter_id, subchapter_id, topic_id,
-			start_at, duration_minutes, coin_cost, total_questions, status,
+			start_at, end_at, duration_minutes, coin_cost, total_questions, status,
 			access_code, access_code_updated_at, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
 		RETURNING id, created_at, updated_at`,
 		q.Name, q.Type,
 		q.EducationLevelID, q.GradeID, q.SubjectID, q.SubjectFieldID, q.ChapterID, q.SubchapterID, q.TopicID,
-		q.StartAt, q.DurationMinutes, q.CoinCost, q.TotalQuestions, q.Status,
+		q.StartAt, q.EndAt, q.DurationMinutes, q.CoinCost, q.TotalQuestions, q.Status,
 		q.AccessCode, q.CreatedBy).
 		Scan(&saved).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return quizmodel.ErrAccessCodeTaken
 	}
 	if err != nil {
-		return err
+		return translateScheduleError(err)
 	}
 
-	// Semua soal dalam 1 INSERT banyak baris. Nomor soal (sort_order) = posisi di request + 1.
-	rows := make([]string, 0, len(q.QuestionIDs))
-	args := make([]any, 0, len(q.QuestionIDs)*3)
-	for i, questionID := range q.QuestionIDs {
-		rows = append(rows, "(?, ?, ?)")
-		args = append(args, saved.ID, questionID, i+1)
-	}
-	err = tx.Exec(`INSERT INTO quiz_questions (quiz_id, question_id, sort_order) VALUES `+
-		strings.Join(rows, ", "), args...).Error
-	if err != nil {
+	if err := insertQuizQuestions(tx, saved.ID, q.QuestionIDs); err != nil {
 		return err
 	}
-
 	if err := tx.Commit().Error; err != nil {
 		return err
 	}
@@ -181,11 +173,113 @@ func (r *QuizRepository) Create(ctx context.Context, q *quizmodel.Quiz) error {
 	return nil
 }
 
-// quizDetailQuery mengambil 1 quiz dengan nama letak & nama pembuatnya. [Native SQL]
-// master_data_items di-JOIN 7x (1 per tingkat), users 2x (pembuat & pengubah terakhir).
-// Semua JOIN lewat primary key. Tingkat opsional memakai LEFT JOIN.
-const quizDetailQuery = `
-	SELECT
+// Update mengganti seluruh isi quiz (kecuali id, kode akses, status, pembuat) dan daftar soalnya,
+// dalam 1 transaksi. [Native SQL, 3 query]
+//
+//	UPDATE quizzes SET ... WHERE id = ? AND deleted_at IS NULL
+//	DELETE FROM quiz_questions WHERE quiz_id = ?
+//	INSERT INTO quiz_questions ... (soal baru, urut nomor)
+//
+// Quiz tidak ada / sudah dihapus → quizmodel.ErrQuizNotFound. Jadwal beririsan → ErrScheduleConflict.
+func (r *QuizRepository) Update(ctx context.Context, q quizmodel.Quiz) error {
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer tx.Rollback() // tidak berpengaruh kalau sudah Commit
+
+	result := tx.Exec(`
+		UPDATE quizzes SET
+			name = ?, type = ?,
+			education_level_id = ?, grade_id = ?, subject_id = ?, subject_field_id = ?,
+			chapter_id = ?, subchapter_id = ?, topic_id = ?,
+			start_at = ?, end_at = ?, duration_minutes = ?, coin_cost = ?, total_questions = ?, status = ?,
+			updated_by = ?, updated_at = NOW()
+		WHERE id = ? AND deleted_at IS NULL`,
+		q.Name, q.Type,
+		q.EducationLevelID, q.GradeID, q.SubjectID, q.SubjectFieldID,
+		q.ChapterID, q.SubchapterID, q.TopicID,
+		q.StartAt, q.EndAt, q.DurationMinutes, q.CoinCost, q.TotalQuestions, q.Status,
+		q.UpdatedBy, q.ID)
+	if result.Error != nil {
+		return translateScheduleError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return quizmodel.ErrQuizNotFound
+	}
+
+	if err := tx.Exec(`DELETE FROM quiz_questions WHERE quiz_id = ?`, q.ID).Error; err != nil {
+		return err
+	}
+	if err := insertQuizQuestions(tx, q.ID, q.QuestionIDs); err != nil {
+		return err
+	}
+	return tx.Commit().Error
+}
+
+// insertQuizQuestions menyimpan semua soal quiz dalam 1 INSERT banyak baris.
+// Nomor soal (sort_order) = posisi di questionIDs + 1.
+func insertQuizQuestions(tx *gorm.DB, quizID string, questionIDs []string) error {
+	rows := make([]string, 0, len(questionIDs))
+	args := make([]any, 0, len(questionIDs)*3)
+	for i, questionID := range questionIDs {
+		rows = append(rows, "(?, ?, ?)")
+		args = append(args, quizID, questionID, i+1)
+	}
+	return tx.Exec(`INSERT INTO quiz_questions (quiz_id, question_id, sort_order) VALUES `+
+		strings.Join(rows, ", "), args...).Error
+}
+
+// translateScheduleError mengubah penolakan exclusion constraint quizzes_no_overlap
+// (kode PostgreSQL 23P01) menjadi quizmodel.ErrScheduleConflict. Error lain dikembalikan apa adanya.
+func translateScheduleError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23P01" {
+		return quizmodel.ErrScheduleConflict
+	}
+	return err
+}
+
+// FindStartAt mengambil waktu mulai quiz (dipakai cek "sudah dimulai" sebelum update).
+// Quiz tidak ada / sudah dihapus → quizmodel.ErrQuizNotFound. [Native SQL, primary key]
+func (r *QuizRepository) FindStartAt(ctx context.Context, id string) (time.Time, error) {
+	var rows []time.Time
+	err := r.db.WithContext(ctx).
+		Raw(`SELECT start_at FROM quizzes WHERE id = ? AND deleted_at IS NULL`, id).
+		Scan(&rows).Error
+	if err != nil {
+		return time.Time{}, err
+	}
+	if len(rows) == 0 {
+		return time.Time{}, quizmodel.ErrQuizNotFound
+	}
+	return rows[0], nil
+}
+
+// FindScheduleConflicts mencari quiz lain (belum dihapus) dengan mapel & kelas sama yang
+// jadwalnya beririsan dengan [startAt, endAt). excludeID = quiz yang sedang diubah ("" saat create).
+// Memakai index GiST dari constraint quizzes_no_overlap. Maksimal 3 quiz (untuk pesan error).
+// [Native SQL, 1 tabel]
+func (r *QuizRepository) FindScheduleConflicts(ctx context.Context, subjectID, gradeID string, startAt, endAt time.Time, excludeID string) ([]quizmodel.ScheduleConflict, error) {
+	conflicts := []quizmodel.ScheduleConflict{}
+	err := r.db.WithContext(ctx).
+		Raw(`
+			SELECT id, name, start_at, end_at
+			FROM quizzes
+			WHERE deleted_at IS NULL
+			  AND subject_id = ? AND grade_id = ?
+			  AND tstzrange(start_at, end_at, '[)') && tstzrange(?, ?, '[)')
+			  AND id::text <> ?
+			ORDER BY start_at
+			LIMIT 3`, subjectID, gradeID, startAt, endAt, excludeID).
+		Scan(&conflicts).Error
+	return conflicts, err
+}
+
+// quizSelectColumns & quizJoins = kolom & JOIN 1 quiz lengkap dengan nama letak & nama user.
+// Dipakai detail (1 quiz) dan list (1 halaman). master_data_items di-JOIN 7x (1 per tingkat),
+// users 2x (pembuat & pengubah terakhir), semua lewat primary key; tingkat opsional LEFT JOIN.
+const quizSelectColumns = `
 		z.id, z.name, z.type,
 		z.education_level_id, level.name   AS education_level_name,
 		z.grade_id,           grade.name   AS grade_name,
@@ -194,12 +288,13 @@ const quizDetailQuery = `
 		z.chapter_id,         chapter.name AS chapter_name,
 		z.subchapter_id,      sub.name     AS subchapter_name,
 		z.topic_id,           topic.name   AS topic_name,
-		z.start_at, z.duration_minutes, z.coin_cost, z.total_questions, z.status,
+		z.start_at, z.end_at, z.duration_minutes, z.coin_cost, z.total_questions, z.status,
 		z.access_code, z.access_code_updated_at,
 		z.created_by,         u.real_name  AS created_by_name,
 		z.updated_by,         uu.real_name AS updated_by_name,
-		z.created_at, z.updated_at
-	FROM quizzes z
+		z.created_at, z.updated_at`
+
+const quizJoins = `
 	JOIN      master_data_items AS level   ON level.id   = z.education_level_id
 	JOIN      master_data_items AS grade   ON grade.id   = z.grade_id
 	JOIN      master_data_items AS subject ON subject.id = z.subject_id
@@ -208,10 +303,14 @@ const quizDetailQuery = `
 	LEFT JOIN master_data_items AS sub     ON sub.id     = z.subchapter_id
 	LEFT JOIN master_data_items AS topic   ON topic.id   = z.topic_id
 	LEFT JOIN users             AS u       ON u.id       = z.created_by
-	LEFT JOIN users             AS uu      ON uu.id      = z.updated_by
+	LEFT JOIN users             AS uu      ON uu.id      = z.updated_by`
+
+// quizDetailQuery mengambil 1 quiz dengan nama letak & nama pembuatnya. [Native SQL]
+const quizDetailQuery = `SELECT ` + quizSelectColumns + `
+	FROM quizzes z` + quizJoins + `
 	WHERE z.id = ? AND z.deleted_at IS NULL`
 
-// quizDetailRow menampung hasil quizDetailQuery apa adanya.
+// quizDetailRow menampung hasil quizSelectColumns apa adanya.
 type quizDetailRow struct {
 	ID, Name, Type string
 
@@ -223,7 +322,7 @@ type quizDetailRow struct {
 	SubchapterID, SubchapterName         *string
 	TopicID, TopicName                   *string
 
-	StartAt                                   time.Time
+	StartAt, EndAt                            time.Time
 	DurationMinutes, CoinCost, TotalQuestions int
 	Status                                    string
 	AccessCode                                *string
@@ -245,10 +344,10 @@ func (r *QuizRepository) FindDetailByID(ctx context.Context, id string) (quizmod
 	if len(rows) == 0 {
 		return quizmodel.QuizDetail{}, quizmodel.ErrQuizNotFound
 	}
-	row := rows[0]
+	detail := rows[0].toDetail()
 
 	// Soal quiz urut nomor soal (primary key quiz_questions diawali quiz_id → pakai index).
-	questions := []quizmodel.QuizQuestion{}
+	detail.Questions = []quizmodel.QuizQuestion{}
 	err := r.db.WithContext(ctx).
 		Raw(`
 			SELECT qq.sort_order, q.id, q.code, q.type, q.question_text, q.difficulty
@@ -256,18 +355,22 @@ func (r *QuizRepository) FindDetailByID(ctx context.Context, id string) (quizmod
 			JOIN questions q ON q.id = qq.question_id
 			WHERE qq.quiz_id = ?
 			ORDER BY qq.sort_order`, id).
-		Scan(&questions).Error
+		Scan(&detail.Questions).Error
 	if err != nil {
 		return quizmodel.QuizDetail{}, err
 	}
+	return detail, nil
+}
 
+// toDetail mengubah 1 baris query menjadi QuizDetail (tanpa daftar soal).
+func (row quizDetailRow) toDetail() quizmodel.QuizDetail {
 	return quizmodel.QuizDetail{
 		Quiz: quizmodel.Quiz{
 			ID: row.ID, Name: row.Name, Type: row.Type,
 			EducationLevelID: row.EducationLevelID, GradeID: row.GradeID, SubjectID: row.SubjectID,
 			SubjectFieldID: row.SubjectFieldID, ChapterID: row.ChapterID,
 			SubchapterID: row.SubchapterID, TopicID: row.TopicID,
-			StartAt: row.StartAt, DurationMinutes: row.DurationMinutes, CoinCost: row.CoinCost,
+			StartAt: row.StartAt, EndAt: row.EndAt, DurationMinutes: row.DurationMinutes, CoinCost: row.CoinCost,
 			TotalQuestions: row.TotalQuestions, Status: row.Status,
 			AccessCode: row.AccessCode, AccessCodeUpdatedAt: row.AccessCodeUpdatedAt,
 			CreatedBy: row.CreatedBy, UpdatedBy: row.UpdatedBy,
@@ -282,12 +385,111 @@ func (r *QuizRepository) FindDetailByID(ctx context.Context, id string) (quizmod
 		TopicName:          row.TopicName,
 		CreatedByName:      row.CreatedByName,
 		UpdatedByName:      row.UpdatedByName,
-		Questions:          questions,
-	}, nil
+	}
+}
+
+// listQuizWhere menyusun kondisi WHERE list quiz (dan jumlah per jadwal). now dipakai filter jadwal.
+// Hanya filter yang diisi yang dipakai; nilai selalu lewat placeholder ?.
+func listQuizWhere(f quizmodel.ListFilter, now time.Time) (string, []any) {
+	conds := []string{"z.deleted_at IS NULL"}
+	args := []any{}
+	equals := []struct{ column, value string }{
+		{"z.type", f.Type},
+		{"z.status", f.Status},
+		{"z.education_level_id", f.EducationLevelID},
+		{"z.grade_id", f.GradeID},
+		{"z.subject_id", f.SubjectID},
+	}
+	for _, e := range equals {
+		if e.value != "" {
+			conds = append(conds, e.column+" = ?")
+			args = append(args, e.value)
+		}
+	}
+	if f.Search != "" {
+		conds = append(conds, "z.name ILIKE ?")
+		args = append(args, "%"+likeEscaper.Replace(f.Search)+"%")
+	}
+
+	// Status jadwal: dihitung dari start_at & end_at terhadap now (sama dengan quizmodel.ScheduleStatus).
+	switch f.Schedule {
+	case quizmodel.ScheduleUpcoming:
+		conds = append(conds, "z.start_at > ?")
+		args = append(args, now)
+	case quizmodel.ScheduleOngoing:
+		conds = append(conds, "z.start_at <= ? AND z.end_at > ?")
+		args = append(args, now, now)
+	case quizmodel.ScheduleFinished:
+		conds = append(conds, "z.end_at <= ?")
+		args = append(args, now)
+	}
+	return strings.Join(conds, " AND "), args
+}
+
+// quizListQuery mengambil 1 halaman list quiz, terbaru dibuat dulu. [Native SQL]
+// Halaman dipotong dulu di tabel quizzes (CTE), baru JOIN nama untuk <= per_page quiz itu saja.
+// %s diganti kondisi dari listQuizWhere.
+const quizListQuery = `
+	WITH page AS (
+		SELECT z.id, z.created_at
+		FROM quizzes z
+		WHERE %s
+		ORDER BY z.created_at DESC, z.id DESC
+		LIMIT ? OFFSET ?
+	)
+	SELECT ` + quizSelectColumns + `
+	FROM page p
+	JOIN quizzes z ON z.id = p.id` + quizJoins + `
+	ORDER BY p.created_at DESC, p.id DESC`
+
+// List mengambil 1 halaman quiz (tanpa daftar soal) beserta total quiz yang cocok dengan filter.
+func (r *QuizRepository) List(ctx context.Context, f quizmodel.ListFilter, now time.Time) ([]quizmodel.QuizDetail, int, error) {
+	where, whereArgs := listQuizWhere(f, now)
+	offset := (f.Page - 1) * f.PerPage
+
+	var rows []quizDetailRow
+	args := append(append([]any{}, whereArgs...), f.PerPage, offset)
+	if err := r.db.WithContext(ctx).Raw(fmt.Sprintf(quizListQuery, where), args...).Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	items := make([]quizmodel.QuizDetail, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, row.toDetail())
+	}
+
+	// Halaman belum penuh = halaman terakhir, total sudah pasti (tanpa COUNT). Sama seperti list soal.
+	if len(items) < f.PerPage && (len(items) > 0 || offset == 0) {
+		return items, offset + len(items), nil
+	}
+	var total int
+	if err := r.db.WithContext(ctx).Raw("SELECT COUNT(*) FROM quizzes z WHERE "+where, whereArgs...).Scan(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// CountBySchedule menghitung quiz per status jadwal (akan dimulai / berjalan / sudah lewat)
+// dengan filter yang sama seperti List (kecuali filter jadwal). 1 query. [Native SQL]
+func (r *QuizRepository) CountBySchedule(ctx context.Context, f quizmodel.ListFilter, now time.Time) (quizmodel.ScheduleCounts, error) {
+	f.Schedule = ""
+	where, whereArgs := listQuizWhere(f, now)
+
+	var counts quizmodel.ScheduleCounts
+	args := append([]any{now, now, now, now}, whereArgs...)
+	err := r.db.WithContext(ctx).
+		Raw(`
+			SELECT
+				COUNT(*) FILTER (WHERE z.start_at > ?)                   AS upcoming,
+				COUNT(*) FILTER (WHERE z.start_at <= ? AND z.end_at > ?) AS ongoing,
+				COUNT(*) FILTER (WHERE z.end_at <= ?)                    AS finished
+			FROM quizzes z
+			WHERE `+where, args...).
+		Scan(&counts).Error
+	return counts, err
 }
 
 // likeEscaper membuat %, _, dan \ yang diketik user dicari apa adanya (bukan wildcard LIKE).
-var likeEscaper = strings.NewReplacer(`\`, `\`, `%`, `\%`, `_`, `\_`)
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 // bundleListQuery mengambil 1 halaman bundle (quiz) dengan nama jenjang, kelas, mapel. [Native SQL]
 // Sama seperti list soal: halaman dipotong dulu di tabel quizzes (CTE), baru JOIN nama.
@@ -356,10 +558,10 @@ const RefreshLockKey int64 = 720261125 // angka bebas, asal tidak dipakai fitur 
 const refreshChunkSize = 1000
 
 // RefreshAccessCodes mengganti kode akses semua quiz berkode yang BELUM SELESAI
-// (start_at + durasi > now), dalam 1 transaksi. [Native SQL]
+// (end_at > now: belum mulai maupun sedang berjalan), dalam 1 transaksi. [Native SQL]
 //
 //  1. pg_try_advisory_xact_lock: kalau server lain sedang mengerjakan, langsung berhenti (skipped = true).
-//  2. Ambil quiz yang belum selesai (index quizzes_access_code_start_at_idx), kunci barisnya (FOR UPDATE).
+//  2. Ambil quiz yang belum selesai (index quizzes_access_code_end_at_idx), kunci barisnya (FOR UPDATE).
 //  3. Buat kode baru yang tidak dipakai quiz mana pun (termasuk kode lama), lalu UPDATE sekaligus.
 //
 // Mengembalikan jumlah quiz yang kodenya diganti.
@@ -378,16 +580,12 @@ func (r *QuizRepository) RefreshAccessCodes(ctx context.Context, now time.Time) 
 		return 0, true, nil
 	}
 
-	// Durasi maksimal 600 menit, jadi quiz yang belum selesai pasti start_at > now - 600 menit
-	// (kondisi ini yang memakai index); kondisi kedua menghitung waktu selesai sebenarnya.
 	var ids []string
 	err = tx.Raw(`
 		SELECT id FROM quizzes
-		WHERE deleted_at IS NULL AND access_code IS NOT NULL
-		  AND start_at > ?::timestamptz - INTERVAL '600 minutes'
-		  AND start_at + make_interval(mins => duration_minutes) > ?
+		WHERE deleted_at IS NULL AND access_code IS NOT NULL AND end_at > ?
 		ORDER BY id
-		FOR UPDATE`, now, now).
+		FOR UPDATE`, now).
 		Scan(&ids).Error
 	if err != nil {
 		return 0, false, err
@@ -467,4 +665,189 @@ func newUnusedCodes(tx *gorm.DB, n int) ([]string, error) {
 		}
 	}
 	return nil, fmt.Errorf("gagal membuat %d kode akses unik setelah 10 percobaan", n)
+}
+
+// DeleteCandidate adalah quiz yang akan dihapus, beserta jadwalnya (untuk cek "sedang berjalan").
+type DeleteCandidate struct {
+	ID, Name       string
+	StartAt, EndAt time.Time
+}
+
+// SoftDeleteMany menghapus banyak quiz sekaligus dengan soft delete (deleted_at & deleted_by diisi),
+// dalam 1 transaksi. [Native SQL, 2 query]
+//
+//  1. SELECT ... FOR UPDATE: ambil & kunci quiz yang ada (belum dihapus).
+//  2. canDelete memeriksa hasilnya (service: semua ID ada, tidak ada yang sedang berjalan).
+//     Kalau canDelete mengembalikan error, transaksi dibatalkan dan tidak ada yang terhapus.
+//  3. UPDATE quizzes SET deleted_at = NOW(), deleted_by = ? WHERE id IN ?
+//
+// Setelah dihapus, kode akses & jadwal quiz itu tidak lagi menghalangi quiz lain (index unik
+// kode akses & constraint bentrok jadwal hanya berlaku untuk quiz yang belum dihapus).
+func (r *QuizRepository) SoftDeleteMany(ctx context.Context, ids []string, deletedBy string, canDelete func(found []DeleteCandidate) error) error {
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer tx.Rollback() // tidak berpengaruh kalau sudah Commit
+
+	found := []DeleteCandidate{}
+	err := tx.Raw(`
+		SELECT id, name, start_at, end_at
+		FROM quizzes
+		WHERE id IN ? AND deleted_at IS NULL
+		ORDER BY id
+		FOR UPDATE`, ids).
+		Scan(&found).Error
+	if err != nil {
+		return err
+	}
+	if err := canDelete(found); err != nil {
+		return err // ROLLBACK lewat defer
+	}
+
+	err = tx.Exec(`
+		UPDATE quizzes
+		SET deleted_at = NOW(), deleted_by = ?, updated_at = NOW()
+		WHERE id IN ? AND deleted_at IS NULL`, deletedBy, ids).Error
+	if err != nil {
+		return err
+	}
+	return tx.Commit().Error
+}
+
+// FindUserGrade mengambil kelas user (siswa). nil kalau user tidak ada atau kelasnya belum diisi.
+// [Native SQL, primary key]
+func (r *QuizRepository) FindUserGrade(ctx context.Context, userID string) (*string, error) {
+	var rows []struct{ GradeID *string } // struct, karena grade_id bisa NULL
+	err := r.db.WithContext(ctx).
+		Raw(`SELECT grade_id FROM users WHERE id = ? AND deleted_at IS NULL`, userID).
+		Scan(&rows).Error
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	return rows[0].GradeID, nil
+}
+
+// announcementQuery mengambil 1 halaman pengumuman quiz untuk siswa: quiz Uji Kom & Tryout yang
+// sudah publish, belum selesai, dan untuk kelas siswa; urut yang paling dekat dimulai. [Native SQL]
+// Filter memakai index quizzes_subject_grade_idx (grade) & kolom jadwal; JOIN nama hanya untuk 1 halaman.
+const announcementQuery = `
+	WITH page AS (
+		SELECT z.id, z.start_at
+		FROM quizzes z
+		WHERE z.deleted_at IS NULL
+		  AND z.status = 'published'
+		  AND z.type IN ('uji_kom', 'tryout')
+		  AND z.grade_id = ?
+		  AND z.end_at > ?
+		ORDER BY z.start_at, z.id
+		LIMIT ? OFFSET ?
+	)
+	SELECT ` + quizSelectColumns + `
+	FROM page p
+	JOIN quizzes z ON z.id = p.id` + quizJoins + `
+	ORDER BY p.start_at, p.id`
+
+// ListAnnouncements mengambil pengumuman quiz untuk 1 kelas (lihat announcementQuery) + totalnya.
+func (r *QuizRepository) ListAnnouncements(ctx context.Context, gradeID string, now time.Time, page, perPage int) ([]quizmodel.QuizDetail, int, error) {
+	var rows []quizDetailRow
+	err := r.db.WithContext(ctx).
+		Raw(announcementQuery, gradeID, now, perPage, (page-1)*perPage).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	items := make([]quizmodel.QuizDetail, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, row.toDetail())
+	}
+
+	var total int
+	err = r.db.WithContext(ctx).
+		Raw(`SELECT COUNT(*) FROM quizzes z
+			WHERE z.deleted_at IS NULL AND z.status = 'published' AND z.type IN ('uji_kom', 'tryout')
+			  AND z.grade_id = ? AND z.end_at > ?`, gradeID, now).
+		Scan(&total).Error
+	return items, total, err
+}
+
+// FindAttempt mengambil catatan siswa membuka quiz. nil kalau belum pernah dibuka.
+// [Native SQL, index unik (quiz_id, student_id)]
+func (r *QuizRepository) FindAttempt(ctx context.Context, quizID, studentID string) (*quizmodel.Attempt, error) {
+	var rows []struct {
+		ID              string
+		StartedAt       time.Time
+		SubmittedAt     *time.Time
+		Score           *float64
+		CorrectCount    *int
+		Answers         *string // JSON
+		DurationSeconds *int
+	}
+	err := r.db.WithContext(ctx).
+		Raw(`
+			SELECT id, started_at, submitted_at, score, correct_count, answers::text AS answers, duration_seconds
+			FROM quiz_attempts WHERE quiz_id = ? AND student_id = ?`, quizID, studentID).
+		Scan(&rows).Error
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	row := rows[0]
+	attempt := &quizmodel.Attempt{ID: row.ID, StartedAt: row.StartedAt, SubmittedAt: row.SubmittedAt}
+	if row.Score != nil {
+		attempt.Score = *row.Score
+	}
+	if row.CorrectCount != nil {
+		attempt.CorrectCount = *row.CorrectCount
+	}
+	if row.DurationSeconds != nil {
+		attempt.DurationSeconds = *row.DurationSeconds
+	}
+	if row.Answers != nil {
+		if err := json.Unmarshal([]byte(*row.Answers), &attempt.Answers); err != nil {
+			return nil, fmt.Errorf("jawaban quiz rusak: %w", err)
+		}
+	}
+	return attempt, nil
+}
+
+// SubmitAttempt menyimpan jawaban & nilai siswa (1 UPDATE). Hanya bisa sekali: kalau sudah pernah
+// submit (termasuk 2 request bersamaan), ok = false dan tidak ada yang berubah. [Native SQL]
+func (r *QuizRepository) SubmitAttempt(ctx context.Context, attemptID string, result scoring.Result, now time.Time) (ok bool, err error) {
+	answers, err := json.Marshal(result.Answers)
+	if err != nil {
+		return false, err
+	}
+	res := r.db.WithContext(ctx).Exec(`
+		UPDATE quiz_attempts
+		SET submitted_at = ?, score = ?, correct_count = ?, answers = ?::jsonb, duration_seconds = ?
+		WHERE id = ? AND submitted_at IS NULL`,
+		now, result.Score, result.CorrectCount, string(answers), result.DurationSeconds, attemptID)
+	return res.RowsAffected == 1, res.Error
+}
+
+// CreateAttempt mencatat siswa mulai mengerjakan quiz. Kalau ternyata sudah ada (2 request
+// bersamaan), catatan yang sudah ada yang dikembalikan; started_at tidak pernah tertimpa.
+// [Native SQL, INSERT ... ON CONFLICT DO NOTHING]
+func (r *QuizRepository) CreateAttempt(ctx context.Context, quizID, studentID string) (quizmodel.Attempt, error) {
+	var rows []struct {
+		ID        string
+		StartedAt time.Time
+	}
+	err := r.db.WithContext(ctx).
+		Raw(`
+			INSERT INTO quiz_attempts (quiz_id, student_id) VALUES (?, ?)
+			ON CONFLICT (quiz_id, student_id) DO NOTHING
+			RETURNING id, started_at`, quizID, studentID).
+		Scan(&rows).Error
+	if err != nil {
+		return quizmodel.Attempt{}, err
+	}
+	if len(rows) > 0 {
+		return quizmodel.Attempt{ID: rows[0].ID, StartedAt: rows[0].StartedAt}, nil
+	}
+	existing, err := r.FindAttempt(ctx, quizID, studentID)
+	if err != nil || existing == nil {
+		return quizmodel.Attempt{}, fmt.Errorf("catatan buka quiz tidak ditemukan: %w", err)
+	}
+	return *existing, nil
 }
