@@ -8,7 +8,8 @@ run:
 build:
 	go build -o bin/ ./cmd/...
 
-# Menjalankan semua test (memakai database test, lihat DB_NAME_TEST di .env).
+# Menjalankan semua test. Memakai database DB_NAME (.env) dan MENGOSONGKAN semua tabel data;
+# setelahnya isi ulang data dummy dengan make seed. Ditolak kalau APP_ENV=production.
 # -p 1 = package dites satu per satu, supaya test tidak berebut database yang sama.
 test:
 	go test -p 1 ./...

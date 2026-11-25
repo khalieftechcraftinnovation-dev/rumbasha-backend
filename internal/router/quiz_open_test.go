@@ -245,6 +245,24 @@ func TestOpenDailyQuiz_JatahGratisDanCoin(t *testing.T) {
 		t.Errorf("hari berikutnya: status %d, %+v, seharusnya gratis", code, d.Usage)
 	}
 
+	// Admin mengubah pengaturan global: tanpa jatah gratis, 3 coin per Daily Quiz → langsung berlaku.
+	res := sendRequest(r, http.MethodPut, "/api/v1/daily-quiz-settings",
+		`{"points":{"easy":10,"medium":15,"hard":20},"prize_coins":{"rank_1":0,"rank_2":0,"rank_3":0},"free_per_day":0,"coin_cost":3}`, admin)
+	if res.Code != http.StatusOK {
+		t.Fatalf("ubah pengaturan: status %d. body: %s", res.Code, res.Body)
+	}
+	code, body = generateDaily(r, student, dailyBody(placement, "easy", 5))
+	if code != http.StatusCreated {
+		t.Fatalf("generate: status %d", code)
+	}
+	var extra struct {
+		ID string `json:"id"`
+	}
+	decodeJSONData(t, body, &extra)
+	if code, d, body = open(extra.ID); code != http.StatusOK || d.Usage.CoinCharged != 3 || d.Usage.FreePerDay != 0 || d.Usage.CoinBalance != 2 {
+		t.Errorf("setelah pengaturan diubah: status %d, %+v, seharusnya potong 3 coin, saldo 2. body: %s", code, d.Usage, body)
+	}
+
 	// Daily Quiz siswa lain / tidak ada → 404; bukan siswa → 403.
 	for _, tc := range []struct {
 		token, id string

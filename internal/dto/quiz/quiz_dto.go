@@ -21,7 +21,9 @@ import (
 //	  "start_at": "2026-12-01T08:00", "end_at": "2026-12-03T17:00",
 //	  "duration_minutes": 60, "coin_cost": 0, "total_questions": 12,
 //	  "bundle_quiz_ids": ["..."],
-//	  "question_ids": ["...", "..."]
+//	  "question_ids": ["...", "..."],
+//	  "points": {"easy": 10, "medium": 15, "hard": 20},
+//	  "prize_coins": {"rank_1": 500, "rank_2": 300, "rank_3": 100}
 //	}
 //
 // Soal quiz = semua soal dari bundle_quiz_ids (urut bundle, lalu nomor soal di bundle), lalu
@@ -51,6 +53,59 @@ type CreateQuizRequest struct {
 	// Soal satuan. Urutan di array = urutan soal (setelah soal dari bundle).
 	// Total soal maksimal 200 per quiz, termasuk soal dari bundle (contoh desain Tryout: 40).
 	QuestionIDs []string `json:"question_ids" binding:"omitempty,max=200,unique,dive,uuid"`
+	// Point leaderboard 1 soal BENAR per level soal. Opsional; level yang tidak diisi memakai
+	// default (easy 10, medium 15, hard 20).
+	Points *QuizPointsRequest `json:"points"`
+	// Hadiah coin juara 1, 2, 3 leaderboard quiz. Opsional; tidak diisi = 0 (tanpa hadiah).
+	// Dibagikan otomatis jam 23:59 WIB setelah event selesai.
+	PrizeCoins *QuizPrizesRequest `json:"prize_coins"`
+}
+
+// QuizPointsRequest = point 1 soal yang dijawab benar per level. Contoh {"easy": 10, "medium": 15, "hard": 20}.
+type QuizPointsRequest struct {
+	Easy   *int `json:"easy" binding:"omitempty,min=0,max=1000"`
+	Medium *int `json:"medium" binding:"omitempty,min=0,max=1000"`
+	Hard   *int `json:"hard" binding:"omitempty,min=0,max=1000"`
+}
+
+// QuizPrizesRequest = hadiah coin juara. Contoh {"rank_1": 500, "rank_2": 300, "rank_3": 100}.
+type QuizPrizesRequest struct {
+	Rank1 *int `json:"rank_1" binding:"omitempty,min=0,max=1000000"`
+	Rank2 *int `json:"rank_2" binding:"omitempty,min=0,max=1000000"`
+	Rank3 *int `json:"rank_3" binding:"omitempty,min=0,max=1000000"`
+}
+
+// QuizPointsResponse = point 1 soal benar per level.
+type QuizPointsResponse struct {
+	Easy   int `json:"easy"`
+	Medium int `json:"medium"`
+	Hard   int `json:"hard"`
+}
+
+// QuizPrizesResponse = hadiah coin juara 1-3 (0 = tanpa hadiah).
+type QuizPrizesResponse struct {
+	Rank1 int `json:"rank_1"`
+	Rank2 int `json:"rank_2"`
+	Rank3 int `json:"rank_3"`
+}
+
+// ToPointsResponse & ToPrizesResponse mengubah model menjadi response.
+func ToPointsResponse(p quizmodel.Points) QuizPointsResponse {
+	return QuizPointsResponse{Easy: p.Easy, Medium: p.Medium, Hard: p.Hard}
+}
+
+func ToPrizesResponse(p quizmodel.Prizes) QuizPrizesResponse {
+	return QuizPrizesResponse{Rank1: p.Rank1, Rank2: p.Rank2, Rank3: p.Rank3}
+}
+
+// PrizeAwardResponse = 1 penerima hadiah juara (detail quiz admin).
+type PrizeAwardResponse struct {
+	Rank            int         `json:"rank"`
+	Student         RefResponse `json:"student"`
+	Points          int         `json:"points"`
+	DurationSeconds int         `json:"duration_seconds"`
+	CoinAmount      int         `json:"coin_amount"`
+	AwardedAt       time.Time   `json:"awarded_at"` // WIB
 }
 
 // QuizPlacementRequest adalah letak quiz. Jenjang, kelas, mapel wajib; sisanya opsional
@@ -78,11 +133,15 @@ type QuizResponse struct {
 	AccessCode      *string               `json:"access_code"`      // berganti setiap jam selama event belum selesai
 	CoinCost        int                   `json:"coin_cost"`
 	TotalQuestions  int                   `json:"total_questions"`
-	Status          string                `json:"status"`
-	CreatedBy       RefResponse           `json:"created_by"`
-	UpdatedBy       *RefResponse          `json:"updated_by"` // null kalau belum pernah diubah
-	CreatedAt       time.Time             `json:"created_at"`
-	UpdatedAt       time.Time             `json:"updated_at"`
+	Points          QuizPointsResponse    `json:"points"`      // point 1 soal benar per level
+	PrizeCoins      QuizPrizesResponse    `json:"prize_coins"` // hadiah coin juara 1-3
+	// Kapan hadiah dibagikan (WIB); null = belum (dibagikan 23:59 WIB setelah event selesai).
+	PrizesDistributedAt *time.Time   `json:"prizes_distributed_at"`
+	Status              string       `json:"status"`
+	CreatedBy           RefResponse  `json:"created_by"`
+	UpdatedBy           *RefResponse `json:"updated_by"` // null kalau belum pernah diubah
+	CreatedAt           time.Time    `json:"created_at"`
+	UpdatedAt           time.Time    `json:"updated_at"`
 }
 
 // QuizDetailResponse adalah data quiz lengkap + daftar soal (response create & update).
@@ -90,6 +149,8 @@ type QuizResponse struct {
 type QuizDetailResponse struct {
 	QuizResponse
 	Questions []QuizQuestionResponse `json:"questions"`
+	// Penerima hadiah juara (urut peringkat). [] sebelum dibagikan / tidak ada pemenang.
+	PrizeAwards []PrizeAwardResponse `json:"prize_awards"`
 }
 
 // QuizPlacementResponse adalah letak quiz dengan nama. Tingkat yang tidak diisi = null.
@@ -128,7 +189,15 @@ func ToQuizDetailResponse(d quizmodel.QuizDetail, now time.Time) QuizDetailRespo
 			No: q.SortOrder, ID: q.ID, Code: q.Code, Type: q.Type, Question: q.QuestionText, Difficulty: q.Difficulty,
 		})
 	}
-	return QuizDetailResponse{QuizResponse: ToQuizResponse(d, now), Questions: questions}
+	awards := make([]PrizeAwardResponse, 0, len(d.PrizeAwards))
+	for _, a := range d.PrizeAwards {
+		awards = append(awards, PrizeAwardResponse{
+			Rank: a.Rank, Student: RefResponse{ID: a.StudentID, Name: a.StudentName},
+			Points: a.Points, DurationSeconds: a.DurationSeconds, CoinAmount: a.CoinAmount,
+			AwardedAt: a.CreatedAt.In(clock.Jakarta),
+		})
+	}
+	return QuizDetailResponse{QuizResponse: ToQuizResponse(d, now), Questions: questions, PrizeAwards: awards}
 }
 
 // ToQuizResponses mengubah hasil list quiz menjadi response. Hasil kosong menjadi [] (bukan null).
@@ -155,19 +224,31 @@ func ToQuizResponse(d quizmodel.QuizDetail, now time.Time) QuizResponse {
 			Subchapter:     optionalRef(d.SubchapterID, d.SubchapterName),
 			Topic:          optionalRef(d.TopicID, d.TopicName),
 		},
-		StartAt:         d.StartAt.In(clock.Jakarta),
-		EndAt:           d.EndAt.In(clock.Jakarta),
-		ScheduleStatus:  quizmodel.ScheduleStatus(d.StartAt, d.EndAt, now),
-		DurationMinutes: d.DurationMinutes,
-		AccessCode:      d.AccessCode,
-		CoinCost:        d.CoinCost,
-		TotalQuestions:  d.TotalQuestions,
-		Status:          d.Status,
-		CreatedBy:       RefResponse{ID: d.CreatedBy, Name: d.CreatedByName},
-		UpdatedBy:       optionalRef(d.UpdatedBy, d.UpdatedByName),
-		CreatedAt:       d.CreatedAt,
-		UpdatedAt:       d.UpdatedAt,
+		StartAt:             d.StartAt.In(clock.Jakarta),
+		EndAt:               d.EndAt.In(clock.Jakarta),
+		ScheduleStatus:      quizmodel.ScheduleStatus(d.StartAt, d.EndAt, now),
+		DurationMinutes:     d.DurationMinutes,
+		AccessCode:          d.AccessCode,
+		CoinCost:            d.CoinCost,
+		TotalQuestions:      d.TotalQuestions,
+		Points:              ToPointsResponse(d.Points),
+		PrizeCoins:          ToPrizesResponse(d.Prizes),
+		PrizesDistributedAt: inWIB(d.PrizesDistributedAt),
+		Status:              d.Status,
+		CreatedBy:           RefResponse{ID: d.CreatedBy, Name: d.CreatedByName},
+		UpdatedBy:           optionalRef(d.UpdatedBy, d.UpdatedByName),
+		CreatedAt:           d.CreatedAt,
+		UpdatedAt:           d.UpdatedAt,
 	}
+}
+
+// inWIB mengubah waktu opsional ke WIB (nil tetap nil).
+func inWIB(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	w := t.In(clock.Jakarta)
+	return &w
 }
 
 // optionalRef mengembalikan nil (JSON null) kalau id kosong.
@@ -286,6 +367,8 @@ type AnnouncementResponse struct {
 	DurationMinutes int                   `json:"duration_minutes"`
 	TotalQuestions  int                   `json:"total_questions"`
 	CoinCost        int                   `json:"coin_cost"`
+	Points          QuizPointsResponse    `json:"points"`      // point 1 soal benar per level
+	PrizeCoins      QuizPrizesResponse    `json:"prize_coins"` // hadiah coin juara 1-3
 }
 
 // ToAnnouncementResponses mengubah daftar quiz menjadi pengumuman siswa. Hasil kosong = [].
@@ -297,6 +380,7 @@ func ToAnnouncementResponses(items []quizmodel.QuizDetail, now time.Time) []Anno
 			ID: q.ID, Name: q.Name, Type: q.Type, Placement: q.Placement,
 			StartAt: q.StartAt, EndAt: q.EndAt, ScheduleStatus: q.ScheduleStatus,
 			DurationMinutes: q.DurationMinutes, TotalQuestions: q.TotalQuestions, CoinCost: q.CoinCost,
+			Points: q.Points, PrizeCoins: q.PrizeCoins,
 		})
 	}
 	return result
@@ -331,6 +415,7 @@ type OpenedQuizResponse struct {
 	DeadlineAt      time.Time                             `json:"deadline_at"` // = min(started_at + durasi, end_at), WIB
 	TotalQuestions  int                                   `json:"total_questions"`
 	CoinCost        int                                   `json:"coin_cost"`
+	Points          QuizPointsResponse                    `json:"points"` // point 1 soal benar per level
 	Questions       []questiondto.AttemptQuestionResponse `json:"questions"`
 }
 
@@ -344,6 +429,7 @@ func ToOpenedQuizResponse(o quizmodel.OpenedQuiz, now time.Time) OpenedQuizRespo
 		StartedAt:      o.StartedAt.In(clock.Jakarta),
 		DeadlineAt:     o.DeadlineAt.In(clock.Jakarta),
 		TotalQuestions: q.TotalQuestions, CoinCost: q.CoinCost,
+		Points:    q.Points,
 		Questions: questiondto.ToAttemptQuestionResponses(o.Content),
 	}
 }
@@ -398,7 +484,7 @@ func ToQuizReviewResponse(r quizmodel.QuizReview, now time.Time) QuizReviewRespo
 		State: StateSubmitted,
 		ID:    q.ID, Name: q.Name, Type: q.Type, Placement: q.Placement,
 		StartedAt: r.StartedAt.In(clock.Jakarta),
-		Result:    questiondto.ToResultResponse(r.Score, r.CorrectCount, len(r.Items), *r.SubmittedAt, r.DurationSeconds),
+		Result:    questiondto.ToResultResponse(r.Score, r.Points, r.CorrectCount, len(r.Items), *r.SubmittedAt, r.DurationSeconds),
 		Questions: questiondto.ToReviewResponses(r.Items),
 	}
 }

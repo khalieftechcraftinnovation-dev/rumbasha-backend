@@ -25,21 +25,19 @@ import (
 type DailyQuizService struct {
 	repo         *dailyquizrepo.DailyQuizRepository
 	questionRepo *questionrepo.QuestionRepository // isi soal + kunci jawaban saat dibuka
-	freePerDay   int                              // jatah gratis per hari (DAILY_QUIZ_FREE_QUOTA)
-	coinCost     int                              // coin per Daily Quiz setelah jatah habis (DAILY_QUIZ_COIN_COST)
 }
 
 // NewDailyQuizService membuat DailyQuizService. Dipanggil sekali di main.go.
-// freePerDay & coinCost sementara dari .env; nanti dipindah ke master parameter quiz.
-func NewDailyQuizService(repo *dailyquizrepo.DailyQuizRepository, questionRepo *questionrepo.QuestionRepository, freePerDay, coinCost int) *DailyQuizService {
-	return &DailyQuizService{repo: repo, questionRepo: questionRepo, freePerDay: freePerDay, coinCost: coinCost}
+// Jatah gratis, biaya coin, point, dan hadiah dibaca dari pengaturan global (daily_quiz_settings).
+func NewDailyQuizService(repo *dailyquizrepo.DailyQuizRepository, questionRepo *questionrepo.QuestionRepository) *DailyQuizService {
+	return &DailyQuizService{repo: repo, questionRepo: questionRepo}
 }
 
 // Open membuka Daily Quiz milik siswa untuk dikerjakan, lalu mengembalikan soal lengkap dengan
 // kunci jawaban (tanpa pembahasan). Tidak ada kode akses & timer.
 //
-// Jatah: setiap hari (WIB) siswa bisa membuka freePerDay Daily Quiz gratis; berikutnya memotong
-// coinCost coin per Daily Quiz. Coin kurang → InsufficientCoinError (tidak ada yang berubah).
+// Jatah (pengaturan global, bisa diubah admin): setiap hari (WIB) siswa bisa membuka free_per_day
+// Daily Quiz gratis; berikutnya memotong coin_cost coin per Daily Quiz. Coin kurang → InsufficientCoinError (tidak ada yang berubah).
 // Membuka ulang Daily Quiz yang sama tidak dihitung lagi.
 //
 // Kalau Daily Quiz ini SUDAH di-submit, review yang dikembalikan (review != nil): FE langsung
@@ -71,16 +69,21 @@ func (s *DailyQuizService) Open(ctx context.Context, quizID, studentID string) (
 // open menjalankan buka Daily Quiz yang belum di-submit (jatah gratis / potong coin) lalu
 // mengambil soal + kunci jawaban.
 func (s *DailyQuizService) open(ctx context.Context, quizID, studentID string) (dailyquizmodel.OpenedDailyQuiz, error) {
+	// Jatah gratis & biaya coin = pengaturan global saat ini (1 query primary key).
+	settings, err := s.repo.FindSettings(ctx)
+	if err != nil {
+		return dailyquizmodel.OpenedDailyQuiz{}, err
+	}
 	now := time.Now()
 	result, err := s.repo.Open(ctx, quizID, studentID, now, clock.StartOfDayInJakarta(now),
 		func(openedToday, balance int) (int, error) {
-			if openedToday < s.freePerDay {
-				return 0, nil // masih jatah gratis
+			if openedToday < settings.FreePerDay || settings.CoinCost == 0 {
+				return 0, nil // masih jatah gratis (atau biaya 0 = selalu gratis)
 			}
-			if balance < s.coinCost {
-				return 0, &dailyquizmodel.InsufficientCoinError{Need: s.coinCost, Balance: balance}
+			if balance < settings.CoinCost {
+				return 0, &dailyquizmodel.InsufficientCoinError{Need: settings.CoinCost, Balance: balance}
 			}
-			return s.coinCost, nil
+			return settings.CoinCost, nil
 		})
 	if err != nil {
 		return dailyquizmodel.OpenedDailyQuiz{}, err
@@ -95,7 +98,7 @@ func (s *DailyQuizService) open(ctx context.Context, quizID, studentID string) (
 		return dailyquizmodel.OpenedDailyQuiz{}, err
 	}
 	return dailyquizmodel.OpenedDailyQuiz{
-		DailyQuizDetail: detail, OpenResult: result, FreePerDay: s.freePerDay, Content: content,
+		DailyQuizDetail: detail, OpenResult: result, FreePerDay: settings.FreePerDay, Content: content,
 	}, nil
 }
 

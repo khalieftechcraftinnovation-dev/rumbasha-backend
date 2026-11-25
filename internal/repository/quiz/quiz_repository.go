@@ -18,7 +18,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/accesscode"
+	leaderboardmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/leaderboard"
 	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
+	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/leaderboard"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scoring"
 )
 
@@ -146,15 +148,17 @@ func (r *QuizRepository) Create(ctx context.Context, q *quizmodel.Quiz) error {
 			name, type,
 			education_level_id, grade_id, subject_id, subject_field_id, chapter_id, subchapter_id, topic_id,
 			start_at, end_at, duration_minutes, coin_cost, total_questions, status,
+			points_easy, points_medium, points_hard, prize_rank_1, prize_rank_2, prize_rank_3,
 			access_code, access_code_updated_at, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
 		RETURNING id, created_at, updated_at`,
 		q.Name, q.Type,
 		q.EducationLevelID, q.GradeID, q.SubjectID, q.SubjectFieldID, q.ChapterID, q.SubchapterID, q.TopicID,
 		q.StartAt, q.EndAt, q.DurationMinutes, q.CoinCost, q.TotalQuestions, q.Status,
+		q.Points.Easy, q.Points.Medium, q.Points.Hard, q.Prizes.Rank1, q.Prizes.Rank2, q.Prizes.Rank3,
 		q.AccessCode, q.CreatedBy).
 		Scan(&saved).Error
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
+	if isAccessCodeTaken(err) {
 		return quizmodel.ErrAccessCodeTaken
 	}
 	if err != nil {
@@ -194,12 +198,14 @@ func (r *QuizRepository) Update(ctx context.Context, q quizmodel.Quiz) error {
 			education_level_id = ?, grade_id = ?, subject_id = ?, subject_field_id = ?,
 			chapter_id = ?, subchapter_id = ?, topic_id = ?,
 			start_at = ?, end_at = ?, duration_minutes = ?, coin_cost = ?, total_questions = ?, status = ?,
+			points_easy = ?, points_medium = ?, points_hard = ?, prize_rank_1 = ?, prize_rank_2 = ?, prize_rank_3 = ?,
 			updated_by = ?, updated_at = NOW()
 		WHERE id = ? AND deleted_at IS NULL`,
 		q.Name, q.Type,
 		q.EducationLevelID, q.GradeID, q.SubjectID, q.SubjectFieldID,
 		q.ChapterID, q.SubchapterID, q.TopicID,
 		q.StartAt, q.EndAt, q.DurationMinutes, q.CoinCost, q.TotalQuestions, q.Status,
+		q.Points.Easy, q.Points.Medium, q.Points.Hard, q.Prizes.Rank1, q.Prizes.Rank2, q.Prizes.Rank3,
 		q.UpdatedBy, q.ID)
 	if result.Error != nil {
 		return translateScheduleError(result.Error)
@@ -290,6 +296,8 @@ const quizSelectColumns = `
 		z.topic_id,           topic.name   AS topic_name,
 		z.start_at, z.end_at, z.duration_minutes, z.coin_cost, z.total_questions, z.status,
 		z.access_code, z.access_code_updated_at,
+		z.points_easy, z.points_medium, z.points_hard, z.prize_rank_1 AS prize_rank1, z.prize_rank_2 AS prize_rank2, z.prize_rank_3 AS prize_rank3,
+		z.prizes_distributed_at,
 		z.created_by,         u.real_name  AS created_by_name,
 		z.updated_by,         uu.real_name AS updated_by_name,
 		z.created_at, z.updated_at`
@@ -328,6 +336,10 @@ type quizDetailRow struct {
 	AccessCode                                *string
 	AccessCodeUpdatedAt                       *time.Time
 
+	PointsEasy, PointsMedium, PointsHard int
+	PrizeRank1, PrizeRank2, PrizeRank3   int
+	PrizesDistributedAt                  *time.Time
+
 	CreatedBy                string
 	CreatedByName            *string
 	UpdatedBy, UpdatedByName *string
@@ -359,6 +371,23 @@ func (r *QuizRepository) FindDetailByID(ctx context.Context, id string) (quizmod
 	if err != nil {
 		return quizmodel.QuizDetail{}, err
 	}
+
+	// Penerima hadiah: hanya dibaca kalau hadiah sudah dibagikan (quiz lain tidak perlu query ini).
+	detail.PrizeAwards = []quizmodel.PrizeAward{}
+	if detail.PrizesDistributedAt != nil {
+		err = r.db.WithContext(ctx).
+			Raw(`
+				SELECT a.rank, a.student_id, u.real_name AS student_name,
+				       a.points, a.duration_seconds, a.coin_amount, a.created_at
+				FROM quiz_prize_awards a
+				LEFT JOIN users u ON u.id = a.student_id
+				WHERE a.quiz_id = ?
+				ORDER BY a.rank, u.real_name`, id).
+			Scan(&detail.PrizeAwards).Error
+		if err != nil {
+			return quizmodel.QuizDetail{}, err
+		}
+	}
 	return detail, nil
 }
 
@@ -373,7 +402,10 @@ func (row quizDetailRow) toDetail() quizmodel.QuizDetail {
 			StartAt: row.StartAt, EndAt: row.EndAt, DurationMinutes: row.DurationMinutes, CoinCost: row.CoinCost,
 			TotalQuestions: row.TotalQuestions, Status: row.Status,
 			AccessCode: row.AccessCode, AccessCodeUpdatedAt: row.AccessCodeUpdatedAt,
-			CreatedBy: row.CreatedBy, UpdatedBy: row.UpdatedBy,
+			Points:              quizmodel.Points{Easy: row.PointsEasy, Medium: row.PointsMedium, Hard: row.PointsHard},
+			Prizes:              quizmodel.Prizes{Rank1: row.PrizeRank1, Rank2: row.PrizeRank2, Rank3: row.PrizeRank3},
+			PrizesDistributedAt: row.PrizesDistributedAt,
+			CreatedBy:           row.CreatedBy, UpdatedBy: row.UpdatedBy,
 			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 		},
 		EducationLevelName: row.EducationLevelName,
@@ -782,10 +814,11 @@ func (r *QuizRepository) FindAttempt(ctx context.Context, quizID, studentID stri
 		CorrectCount    *int
 		Answers         *string // JSON
 		DurationSeconds *int
+		Points          *int
 	}
 	err := r.db.WithContext(ctx).
 		Raw(`
-			SELECT id, started_at, submitted_at, score, correct_count, answers::text AS answers, duration_seconds
+			SELECT id, started_at, submitted_at, score, correct_count, answers::text AS answers, duration_seconds, points
 			FROM quiz_attempts WHERE quiz_id = ? AND student_id = ?`, quizID, studentID).
 		Scan(&rows).Error
 	if err != nil || len(rows) == 0 {
@@ -798,6 +831,9 @@ func (r *QuizRepository) FindAttempt(ctx context.Context, quizID, studentID stri
 	}
 	if row.CorrectCount != nil {
 		attempt.CorrectCount = *row.CorrectCount
+	}
+	if row.Points != nil {
+		attempt.Points = *row.Points
 	}
 	if row.DurationSeconds != nil {
 		attempt.DurationSeconds = *row.DurationSeconds
@@ -812,17 +848,32 @@ func (r *QuizRepository) FindAttempt(ctx context.Context, quizID, studentID stri
 
 // SubmitAttempt menyimpan jawaban & nilai siswa (1 UPDATE). Hanya bisa sekali: kalau sudah pernah
 // submit (termasuk 2 request bersamaan), ok = false dan tidak ada yang berubah. [Native SQL]
-func (r *QuizRepository) SubmitAttempt(ctx context.Context, attemptID string, result scoring.Result, now time.Time) (ok bool, err error) {
+//
+// Dalam transaksi yang sama, point dicatat ke leaderboard (leaderboardrepo.RecordPoints): submit &
+// leaderboard berhasil bersama atau gagal bersama.
+func (r *QuizRepository) SubmitAttempt(ctx context.Context, attemptID string, result scoring.Result, now time.Time, rec leaderboardmodel.PointRecord) (ok bool, err error) {
 	answers, err := json.Marshal(result.Answers)
 	if err != nil {
 		return false, err
 	}
-	res := r.db.WithContext(ctx).Exec(`
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return false, tx.Error
+	}
+	defer tx.Rollback() // tidak berpengaruh kalau sudah Commit
+
+	res := tx.Exec(`
 		UPDATE quiz_attempts
-		SET submitted_at = ?, score = ?, correct_count = ?, answers = ?::jsonb, duration_seconds = ?
+		SET submitted_at = ?, score = ?, correct_count = ?, answers = ?::jsonb, duration_seconds = ?, points = ?
 		WHERE id = ? AND submitted_at IS NULL`,
-		now, result.Score, result.CorrectCount, string(answers), result.DurationSeconds, attemptID)
-	return res.RowsAffected == 1, res.Error
+		now, result.Score, result.CorrectCount, string(answers), result.DurationSeconds, result.Points, attemptID)
+	if res.Error != nil || res.RowsAffected != 1 {
+		return false, res.Error
+	}
+	if err := leaderboardrepo.RecordPoints(tx, rec); err != nil {
+		return false, err
+	}
+	return true, tx.Commit().Error
 }
 
 // CreateAttempt mencatat siswa mulai mengerjakan quiz. Kalau ternyata sudah ada (2 request
@@ -850,4 +901,12 @@ func (r *QuizRepository) CreateAttempt(ctx context.Context, quizID, studentID st
 		return quizmodel.Attempt{}, fmt.Errorf("catatan buka quiz tidak ditemukan: %w", err)
 	}
 	return *existing, nil
+}
+
+// isAccessCodeTaken = true kalau database menolak karena kode akses sudah dipakai quiz lain
+// (index unik quizzes_access_code_unique, kode PostgreSQL 23505). Dicek langsung dari error
+// PostgreSQL karena error dari Raw().Scan() tidak diterjemahkan GORM menjadi gorm.ErrDuplicatedKey.
+func isAccessCodeTaken(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "quizzes_access_code_unique"
 }

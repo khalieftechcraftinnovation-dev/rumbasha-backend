@@ -22,7 +22,7 @@ type testPlacement struct {
 	LevelID, GradeID, OtherGradeID, SubjectID, FieldID, ChapterID, SubchapterID, TopicID string
 }
 
-// seedPlacement membuat hierarki mapel di database test (Kelas 4). Nama diberi akhiran acak supaya
+// seedPlacement membuat hierarki mapel di database (Kelas 4). Nama diberi akhiran acak supaya
 // tidak bentrok dengan test lain (tabel master_data_items tidak dikosongkan antar test).
 func seedPlacement(t *testing.T, db *gorm.DB) testPlacement {
 	t.Helper()
@@ -60,7 +60,11 @@ func seedPlacementInGrade(t *testing.T, db *gorm.DB, gradeCode string) testPlace
 
 	t.Cleanup(func() {
 		// Urutan penting: soal & gambar menunjuk ke master data, jadi dihapus lebih dulu.
-		db.Exec(`DELETE FROM daily_quizzes`) // daily_quiz_questions ikut terhapus (ON DELETE CASCADE)
+		db.Exec(`DELETE FROM daily_quizzes`)       // daily_quiz_questions ikut terhapus (ON DELETE CASCADE)
+		db.Exec(`DELETE FROM leaderboard_entries`) // leaderboard_point_logs ikut terhapus (ON DELETE CASCADE)
+		db.Exec(`DELETE FROM quiz_prize_awards`)   // menunjuk quizzes
+		db.Exec(`DELETE FROM daily_quiz_prize_awards`)
+		db.Exec(`DELETE FROM daily_quiz_prize_periods`)
 		db.Exec(`DELETE FROM quiz_attempts`)
 		db.Exec(`DELETE FROM quizzes`) // quiz_questions ikut terhapus (ON DELETE CASCADE)
 		db.Exec(`DELETE FROM questions`)

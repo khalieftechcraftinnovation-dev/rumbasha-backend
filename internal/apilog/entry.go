@@ -18,7 +18,7 @@ type Entry struct {
 	RequestID  string          `json:"request_id"` // sama dengan header X-Request-ID di response
 	Method     string          `json:"method"`
 	Endpoint   string          `json:"endpoint"`        // URL yang dipanggil, termasuk query string
-	Route      string          `json:"route,omitempty"` // pola route, contoh /api/v1/subjects/:id
+	Route      string          `json:"route,omitempty"` // pola route, contoh /api/v1/quizzes/:id
 	Status     int             `json:"status"`          // HTTP status code response
 	DurationMs float64         `json:"duration_ms"`     // lama proses dalam milidetik
 	ClientIP   string          `json:"client_ip"`

@@ -8,6 +8,7 @@ import (
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
 	dailyquizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/dailyquiz"
+	leaderboardmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/leaderboard"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scoring"
 )
 
@@ -33,7 +34,16 @@ func (s *DailyQuizService) Submit(ctx context.Context, quizID, studentID string,
 		return dailyquizmodel.DailyQuizReview{}, alreadySubmitted(*state.SubmittedAt)
 	}
 
-	result, fieldErrs := scoring.Grade(detail.QuestionIDs, submitted)
+	difficulties, err := s.questionRepo.FindDifficulties(ctx, detail.QuestionIDs)
+	if err != nil {
+		return dailyquizmodel.DailyQuizReview{}, err
+	}
+	// Point per level = pengaturan global Daily Quiz saat submit (diatur admin).
+	settings, err := s.repo.FindSettings(ctx)
+	if err != nil {
+		return dailyquizmodel.DailyQuizReview{}, err
+	}
+	result, fieldErrs := scoring.Grade(detail.QuestionIDs, difficulties, settings.PointTable(), submitted)
 	if len(fieldErrs) > 0 {
 		errs := &fieldErrors{}
 		for _, f := range fieldErrs {
@@ -44,7 +54,13 @@ func (s *DailyQuizService) Submit(ctx context.Context, quizID, studentID string,
 
 	now := time.Now()
 	result.DurationSeconds = scoring.DurationSeconds(*state.OpenedAt, now)
-	ok, err := s.repo.Submit(ctx, quizID, studentID, result, now)
+	// Point ikut dicatat ke leaderboard Daily Quiz bulan ini (WIB), dalam transaksi yang sama.
+	period := now.In(clock.Jakarta).Format(leaderboardmodel.PeriodLayout)
+	ok, err := s.repo.Submit(ctx, quizID, studentID, result, now, leaderboardmodel.PointRecord{
+		Board: leaderboardmodel.BoardDailyQuiz, Period: &period, StudentID: studentID,
+		Points: result.Points, DurationSeconds: result.DurationSeconds, SubmittedAt: now,
+		SourceType: leaderboardmodel.SourceDailyQuiz, SourceID: quizID,
+	})
 	if err != nil {
 		return dailyquizmodel.DailyQuizReview{}, err
 	}
@@ -53,6 +69,7 @@ func (s *DailyQuizService) Submit(ctx context.Context, quizID, studentID string,
 	}
 	state.SubmittedAt, state.Score, state.CorrectCount, state.Answers = &now, result.Score, result.CorrectCount, result.Answers
 	state.DurationSeconds = result.DurationSeconds
+	state.Points = result.Points
 	return s.buildReview(ctx, detail, state)
 }
 

@@ -85,12 +85,75 @@ type Quiz struct {
 	AccessCode          *string    // 6 karakter A-Z/0-9, wajib untuk Uji Kom & Tryout
 	AccessCodeUpdatedAt *time.Time // terakhir dibuat/diganti (scheduler per jam)
 
+	Points              Points     // point 1 soal benar per level (diatur admin)
+	Prizes              Prizes     // hadiah coin juara 1-3 leaderboard
+	PrizesDistributedAt *time.Time // kapan hadiah dibagikan scheduler; nil = belum
+
 	QuestionIDs []string // urutan = nomor soal di quiz (sort_order mulai 1)
 
 	CreatedBy string
 	UpdatedBy *string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// Points adalah point leaderboard 1 soal yang dijawab BENAR, per level soal. Diatur admin per quiz;
+// default = scoring.PointsByDifficulty (10 / 15 / 20). Salah / tidak dijawab tetap 0.
+type Points struct {
+	Easy, Medium, Hard int
+}
+
+// DefaultPoints = point bawaan kalau admin tidak mengisi (sama dengan Daily Quiz).
+var DefaultPoints = Points{
+	Easy:   scoring.PointsByDifficulty[questionmodel.DifficultyEasy],
+	Medium: scoring.PointsByDifficulty[questionmodel.DifficultyMedium],
+	Hard:   scoring.PointsByDifficulty[questionmodel.DifficultyHard],
+}
+
+// Table mengubah Points menjadi map level → point (dipakai scoring.Grade).
+func (p Points) Table() map[string]int {
+	return map[string]int{
+		questionmodel.DifficultyEasy:   p.Easy,
+		questionmodel.DifficultyMedium: p.Medium,
+		questionmodel.DifficultyHard:   p.Hard,
+	}
+}
+
+// Prizes adalah hadiah coin juara 1, 2, 3 leaderboard quiz. 0 = tanpa hadiah.
+type Prizes struct {
+	Rank1, Rank2, Rank3 int
+}
+
+// ForRank = hadiah coin untuk peringkat rank (1-3); peringkat lain 0.
+func (p Prizes) ForRank(rank int) int {
+	switch rank {
+	case 1:
+		return p.Rank1
+	case 2:
+		return p.Rank2
+	case 3:
+		return p.Rank3
+	}
+	return 0
+}
+
+// PrizeAward adalah 1 siswa penerima hadiah juara (tabel quiz_prize_awards).
+type PrizeAward struct {
+	Rank            int
+	StudentID       string
+	StudentName     *string
+	Points          int
+	DurationSeconds int
+	CoinAmount      int
+	CreatedAt       time.Time
+}
+
+// PrizeRunResult adalah hasil 1 kali scheduler membagikan hadiah.
+type PrizeRunResult struct {
+	Quizzes int // quiz yang selesai diproses (ditandai sudah dibagikan)
+	Awards  int // jumlah siswa yang menerima coin
+	Coins   int // total coin yang dibagikan
+	Failed  int // quiz yang gagal (dicoba lagi di jadwal berikutnya)
 }
 
 // MasterDataItem adalah item master data yang dibutuhkan untuk mengecek letak quiz.
@@ -133,7 +196,8 @@ type QuizDetail struct {
 	CreatedByName      *string
 	UpdatedByName      *string
 
-	Questions []QuizQuestion
+	Questions   []QuizQuestion
+	PrizeAwards []PrizeAward // penerima hadiah (terisi di detail admin setelah dibagikan)
 }
 
 // QuizQuestion adalah 1 soal di dalam quiz (ringkas, tanpa kunci jawaban).
@@ -229,6 +293,7 @@ type Attempt struct {
 	CorrectCount    int
 	Answers         []scoring.Answer
 	DurationSeconds int // lama mengerjakan total (submit - mulai)
+	Points          int // total point leaderboard
 }
 
 // QuizReview adalah hasil & review 1 quiz setelah siswa submit: nilai + setiap soal (urutan

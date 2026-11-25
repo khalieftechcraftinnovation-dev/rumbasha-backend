@@ -11,7 +11,7 @@ Backend API Rumbasha E-Learning dengan Go, framework [Gin](https://gin-gonic.com
    cp .env.example .env
    ```
 
-3. **Buat database** `rumbasha` dan `rumbasha_test`: buka [scripts/db/create_database.sql](scripts/db/create_database.sql) di DBeaver (koneksi `postgres`), lalu jalankan sebagai script dengan Alt+X.
+3. **Buat database** `rumbasha`: buka [scripts/db/create_database.sql](scripts/db/create_database.sql) di DBeaver (koneksi `postgres`), lalu jalankan sebagai script dengan Alt+X.
 
 4. **Buat tabel** dengan migration:
 
@@ -35,7 +35,7 @@ curl http://localhost:8080/health
 | Perintah               | Fungsi                                         |
 |------------------------|------------------------------------------------|
 | `make run`             | Menjalankan API                                |
-| `make test`            | Menjalankan semua test (pakai `rumbasha_test`) |
+| `make test`            | Menjalankan semua test di database `rumbasha` — **mengosongkan semua tabel data**, jalankan `make seed` setelahnya |
 | `make vet`             | Mengecek kode yang mencurigakan                |
 | `make fmt`             | Merapikan format kode                          |
 | `make build`           | Build ke folder `bin/`                         |
@@ -47,11 +47,14 @@ curl http://localhost:8080/health
 
 ## Akun dummy
 
-Setelah `make seed`, semua akun memakai password **`password123`**. Total 55 user, mengikuti contoh desain menu User: 47 siswa, 4 tutor, 3 admin, 1 super admin.
+Setelah `make seed`, semua akun memakai password **`password123`**. Total 158 user: 150 siswa, 4 tutor, 3 admin, 1 super admin. Ditambah ±730 soal Matematika SD di Bank Soal.
 
 - [cmd/seed/dummy_data.sql](cmd/seed/dummy_data.sql): cabang, akun utama di bawah, paket, dan coin (dijalankan sekali).
 - [cmd/seed/dummy_subjects.sql](cmd/seed/dummy_subjects.sql): 5 mapel (Matematika, IPA, B. Indonesia, B. Inggris, IPS) + hierarki lengkap **Matematika SD Kelas 1-6**: 15 bidang materi, 18 bab, 24 sub bab, 47 topik (aman dijalankan ulang).
-- [cmd/seed/dummy_users.sql](cmd/seed/dummy_users.sql): 2 admin, 3 tutor, dan 43 siswa tambahan yang tersebar di semua cabang dan jenjang (aman dijalankan ulang). Siswa tambahan memakai username `siswa.<nama depan>`, contoh `siswa.adit`. Siswa tambahan belum punya paket.
+- [cmd/seed/dummy_users.sql](cmd/seed/dummy_users.sql): 2 admin, 3 tutor, dan 43 siswa tambahan yang tersebar di semua cabang dan jenjang (aman dijalankan ulang). Siswa tambahan memakai username `siswa.<nama depan>`, contoh `siswa.adit`. Lalu 103 siswa lagi (total 150 siswa) dengan username `siswa.<nama depan>.<nama keluarga>`, contoh `siswa.arif.wijaya`, tersebar di semua kelas (SD & SMP lebih banyak). Siswa tambahan belum punya paket.
+- [cmd/seed/dummy_questions.sql](cmd/seed/dummy_questions.sql): ±730 soal **Matematika SD Kelas 1-6** di semua 47 topik, 4 tipe bergiliran (single choice, multiple choice, benar/salah, isian angka), 3 level (243 soal per level). Setiap bidang materi punya **minimal 15 soal per level**, jadi Daily Quiz 5/10/15 soal selalu bisa di-generate. Peruntukan Daily Quiz & Tryout (Kelas 6 juga Uji Kom). Aman dijalankan ulang (soal dengan topik & teks sama dilewati).
+- [cmd/seed/dummy_quiz_reports.sql](cmd/seed/dummy_quiz_reports.sql): 1 event **"Tryout Demo Matematika Kelas 6"** (publish, 10 soal, 7 hari lalu 08:00-10:00 WIB) yang sudah dikerjakan semua siswa aktif Kelas 6, beserta nilai, point, dan leaderboard-nya, untuk mencoba report & leaderboard quiz. Aman dijalankan ulang.
+- [cmd/seed/dummy_daily_quizzes.sql](cmd/seed/dummy_daily_quizzes.sql): 2-6 **Daily Quiz bulan berjalan** per siswa aktif SD (soal dari bidang materi kelasnya, level bergiliran), lengkap dengan jawaban, nilai, point, dan leaderboard bulanan, untuk mencoba report & leaderboard Daily Quiz. Aman dijalankan ulang (ID dari hash siswa + bulan).
 
 Akun utama untuk dicoba:
 
@@ -77,19 +80,19 @@ internal/
   router/                 ROUTE       Daftar URL → handler.
     router.go               Pintu utama: Gin, middleware global, /health, memanggil route tiap fitur.
     login/                  login_routes.go
-    subject/                subject_routes.go
+    quiz/                   quiz_routes.go   (dan folder lain: satu folder per fitur)
     *_test.go               Test endpoint dari ujung ke ujung (semua fitur).
   handler/                HANDLER     Baca request, panggil service, kirim response.
-    login/  subject/
+    login/  quiz/  dailyquiz/  user/  coin/  ...
   service/                SERVICE     Aturan bisnis.
-    login/  subject/  subscription/
+    login/  quiz/  dailyquiz/  user/  coin/  subscription/  ...
   repository/             REPOSITORY  Query database (GORM atau native SQL).
-    login/  subject/  subscription/
+    login/  quiz/  dailyquiz/  user/  coin/  subscription/  ...
   model/                  Struct yang mewakili tabel + daftar error.
-    login/  subject/  subscription/
+    login/  quiz/  dailyquiz/  user/  coin/  subscription/  ...
   dto/                    Bentuk request & response JSON.
     pagination.go           Dipakai bersama semua fitur.
-    login/  subject/
+    login/  quiz/  dailyquiz/  user/  coin/  ...
 
   middleware/             Log API (APILog), cek login (RequireAuth) dan role (RequireRole).
   apilog/                 Menulis log API ke file .txt harian + hapus file lama.
@@ -99,13 +102,13 @@ internal/
   response/               Helper format JSON (sukses, error, validasi).
   database/               Koneksi PostgreSQL + runner migration.
   config/                 Membaca konfigurasi dari .env.
-  testutil/               Helper untuk test (database test).
+  testutil/               Helper untuk test (database DB_NAME, tabel data dikosongkan).
 ```
 
 Setiap layer dikelompokkan per fitur: `<layer>/<fitur>/<fitur>_<layer>.go`, misalnya `service/login/login_service.go`.
 File di root folder layer (misalnya `dto/pagination.go`) dipakai bersama oleh semua fitur.
 
-Fitur saat ini: **login** (`/auth/...`), **subject** (`/subjects/...`), dan **subscription** (paket akses siswa; belum punya endpoint sendiri, dipakai oleh `/auth/me`). Fitur yang tidak punya endpoint sendiri tidak perlu folder di `handler/` dan `router/`.
+Contoh fitur: **login** (`/auth/...`), **quiz** (`/quizzes/...`), dan **subscription** (paket akses siswa; belum punya endpoint sendiri, dipakai oleh `/auth/me`). Fitur yang tidak punya endpoint sendiri tidak perlu folder di `handler/` dan `router/`.
 
 ### Import dengan alias
 
@@ -141,13 +144,14 @@ keluar             → POST /auth/logout  {refresh_token}
 - **Semua user wajib login ulang setiap tanggal 1, jam 00:00 WIB.** Refresh tidak bisa memperpanjang sesi melewati batas itu. Ini berkaitan dengan paket offline yang dibayar manual setiap bulan di bimbel.
 - **Paket dicek setiap hari** di `student_subscriptions` memakai tanggal hari ini (WIB), untuk paket offline maupun online. Paket yang habis tanggal 15 otomatis tidak berlaku mulai tanggal 16, tanpa perlu login ulang. Lihat `GET /auth/me`.
 - **Refresh token sekali pakai.** Setiap refresh menukar token lama dengan yang baru; token lama langsung tidak berlaku.
+- **Akun nonaktif atau lewat `end_date`** (tanggal berakhir akun, WIB, inklusif) ditolak saat login maupun refresh (403).
 - Di database hanya disimpan **hash** refresh token dan **hash bcrypt** password.
 
-Grup `public` (tanpa login) dan `private` (wajib login) dibuat di [router.go](internal/router/router.go), lalu diteruskan ke route tiap fitur. Contoh di [subject_routes.go](internal/router/subject/subject_routes.go):
+Grup `public` (tanpa login) dan `private` (wajib login) dibuat di [router.go](internal/router/router.go), lalu diteruskan ke route tiap fitur. Contoh di [quiz_routes.go](internal/router/quiz/quiz_routes.go):
 
 ```go
-private.GET("/subjects", h.List)                 // wajib login
-private.POST("/subjects", adminOnly, h.Create)   // wajib login + role admin/super_admin
+private.GET("/student/quiz-announcements", studentOnly, h.Announcements) // wajib login + role siswa
+private.POST("/quizzes", adminOnly, h.Create)                           // wajib login + role admin/super_admin
 ```
 
 Di handler, ID dan role user yang login dibaca dengan `middleware.GetUserID(c)` dan `middleware.GetRole(c)`.
@@ -155,11 +159,11 @@ Di handler, ID dan role user yang login dibaca dengan `middleware.GetUserID(c)` 
 ## Alur request
 
 ```text
-GET /api/v1/subjects
-  → router      router/subject/subject_routes.go          mencari handler untuk URL ini
-  → handler     handler/subject/subject_handler.go        SubjectHandler.List
-  → service     service/subject/subject_service.go        SubjectService.List
-  → repository  repository/subject/subject_repository.go  SubjectRepository.FindAll → PostgreSQL
+GET /api/v1/quizzes/:id
+  → router      router/quiz/quiz_routes.go          mencari handler untuk URL ini
+  → handler     handler/quiz/quiz_handler.go        QuizHandler.GetDetail
+  → service     service/quiz/quiz_service.go        QuizService.GetDetail
+  → repository  repository/quiz/quiz_repository.go  QuizRepository.FindDetailByID → PostgreSQL
 ```
 
 Saat debug, ikuti alur di atas: Ctrl+klik nama fungsinya di VS Code untuk langsung melompat ke layer berikutnya.
@@ -182,8 +186,8 @@ Tabel yang di-JOIN lebih dari sekali tetap dihitung per JOIN. Contoh: `users` + 
 Di native SQL, selalu pakai `?` untuk nilai dari user, jangan sambung string:
 
 ```go
-db.Raw(`SELECT * FROM subjects WHERE code = ?`, code)   // ✅ aman
-db.Raw(`SELECT * FROM subjects WHERE code = '` + code + `'`) // ❌ SQL injection
+db.Raw(`SELECT * FROM questions WHERE code = ?`, code)   // ✅ aman
+db.Raw(`SELECT * FROM questions WHERE code = '` + code + `'`) // ❌ SQL injection
 ```
 
 ### Tabel
@@ -197,8 +201,8 @@ Semua tabel ada di satu schema (`public`), jadi cukup ditulis `SELECT ... FROM u
 | Siswa     | `students` (kode siswa, tanggal lahir, target sekolah, saldo coin)                                  |
 | Paket     | `subscription_plans` (paket + harga + akses fitur), `student_subscriptions` (paket dibeli/riwayat), |
 |           | `student_feature_overrides` (akses khusus per siswa)                                                |
-| Coin      | `coin_packages` (paket isi coin), `coin_transactions` (riwayat coin, termasuk pembelian)            |
-| Lain-lain | `subjects` (contoh awal), `schema_migrations` (catatan versi migration, jangan diubah manual)       |
+| Coin      | `coin_packages` (paket isi coin), `coin_transactions` (riwayat coin, termasuk pembelian & hadiah `reward`), `quiz_prize_awards` & `daily_quiz_prize_awards` (penerima hadiah juara quiz & Daily Quiz bulanan), `daily_quiz_settings` (pengaturan global Daily Quiz) |
+| Lain-lain | `schema_migrations` (catatan versi migration, jangan diubah manual)       |
 
 `master_data_items` dibedakan lewat kolom `type` dan membentuk pohon lewat `parent_id`:
 
@@ -223,7 +227,7 @@ difficulty       Level      easy = Mudah                     ┘ (questions.type
 - Database menolak kelas yang bukan milik jenjangnya (Kelas 4 + SMP) lewat foreign key `(grade_id, education_level_id)`.
 - Nama bidang materi boleh sama di kelas berbeda ("Bilangan" Kelas 1 dan Kelas 4), tapi tidak boleh kembar di kelas yang sama.
 
-Tutor adalah user dengan `role = 'tutor'` dan boleh mengajar siswa mana pun. Jatah gratis Daily Quiz berlaku global untuk semua siswa dan diatur di `.env` (`DAILY_QUIZ_FREE_QUOTA`, `DAILY_QUIZ_COIN_COST`).
+Tutor adalah user dengan `role = 'tutor'` dan boleh mengajar siswa mana pun. Jatah gratis & biaya coin Daily Quiz berlaku global untuk semua siswa dan diatur admin di pengaturan Daily Quiz (tabel `daily_quiz_settings`, `PUT /api/v1/daily-quiz-settings`).
 
 Supaya tetap mudah dipecah jadi microservice nanti: data milik satu domain hanya ditulis oleh repository domain itu sendiri.
 
@@ -253,7 +257,7 @@ Kalau migration gagal di tengah jalan (status `dirty`), perbaiki tabelnya, lalu 
 1. **Arah panggilan hanya ke bawah:** handler → service → repository. Handler tidak boleh memanggil repository langsung.
 2. **Aturan bisnis hanya di service.** Handler cukup baca request dan kirim response.
 3. **Semua layer disusun di `main.go`.** Setiap layer menerima layer di bawahnya lewat parameter `New...()`.
-4. **Satu fitur = satu subfolder per layer**, misalnya `handler/subject/`, `service/subject/`, `repository/subject/`.
+4. **Satu fitur = satu subfolder per layer**, misalnya `handler/quiz/`, `service/quiz/`, `repository/quiz/`.
 5. **Service fitur A tidak boleh memakai repository fitur B.** Kalau butuh data fitur lain, panggil service-nya (contoh: `LoginHandler` memakai `SubscriptionService` untuk `/auth/me`). Ini yang membuat project mudah dipecah jadi microservice nanti.
 
 ## Menambah fitur baru (contoh: `material`)
@@ -279,11 +283,6 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | POST   | `/api/v1/auth/refresh` | Publik       | Tukar refresh token dengan token baru           |
 | POST   | `/api/v1/auth/logout`  | Publik       | Tutup sesi                                      |
 | GET    | `/api/v1/auth/me`      | Login        | Data user; untuk siswa + paket & fitur hari ini |
-| GET    | `/api/v1/subjects`     | Login        | Daftar subject (pagination)                     |
-| GET    | `/api/v1/subjects/:id` | Login        | Detail subject                                  |
-| POST   | `/api/v1/subjects`     | Admin        | Tambah subject                                  |
-| PUT    | `/api/v1/subjects/:id` | Admin        | Ubah subject                                    |
-| DELETE | `/api/v1/subjects/:id` | Admin        | Hapus subject                                   |
 | POST   | `/api/v1/log-reports`  | Admin        | Laporan bug: kirim log hari ini ke email dev    |
 | POST   | `/api/v1/questions`    | Admin        | Tambah 1-100 soal sekaligus (1 tipe)            |
 | GET    | `/api/v1/questions`    | Admin        | List Bank Soal: filter, search, pagination      |
@@ -303,8 +302,33 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | GET    | `/api/v1/quizzes/:id/access-code` | Tutor, Admin | Kode akses quiz yang berlaku sekarang |
 | POST   | `/api/v1/daily-quizzes/:id/submit` | Siswa | Kumpulkan jawaban Daily Quiz → nilai + review |
 | GET    | `/api/v1/daily-quizzes/:id/review` | Siswa | Hasil & review Daily Quiz |
+| GET    | `/api/v1/daily-quiz-settings` | Login | Pengaturan global Daily Quiz (point per level, hadiah juara bulanan) |
+| PUT    | `/api/v1/daily-quiz-settings` | Admin, Super Admin | Ubah pengaturan global Daily Quiz |
+| GET    | `/api/v1/daily-quiz-prizes` | Admin, Super Admin | Penerima hadiah juara Daily Quiz 1 bulan (per kelas) |
 | POST   | `/api/v1/quizzes/:id/submit` | Siswa  | Kumpulkan jawaban Uji Kom / Tryout → nilai + review |
 | GET    | `/api/v1/quizzes/:id/review` | Siswa  | Hasil & review Uji Kom / Tryout |
+| GET    | `/api/v1/leaderboards/daily-quiz` | Login | Leaderboard Daily Quiz 1 bulan (filter jenjang/kelas) |
+| GET    | `/api/v1/leaderboards/quizzes/:id` | Login | Leaderboard 1 quiz Uji Kom / Tryout |
+| GET    | `/api/v1/coin-packages` | Admin, Super Admin, Siswa | Paket isi coin (siswa: hanya aktif) |
+| GET    | `/api/v1/coin-packages/:id` | Admin, Super Admin | Detail paket coin |
+| POST   | `/api/v1/coin-packages` | Admin, Super Admin | Buat paket coin |
+| PUT    | `/api/v1/coin-packages/:id` | Admin, Super Admin | Ubah paket coin (ganti penuh) |
+| DELETE | `/api/v1/coin-packages` | Admin, Super Admin | Hapus banyak paket coin (soft delete) |
+| POST   | `/api/v1/coin-topups` | Admin, Super Admin | Tambah coin banyak siswa sekaligus sesuai 1 paket |
+| GET    | `/api/v1/student/coin-transactions` | Siswa | Saldo, jatah Daily Quiz hari ini, riwayat coin sendiri |
+| GET    | `/api/v1/students/:id/coin-transactions` | Admin, Super Admin | Riwayat coin 1 siswa |
+| GET    | `/api/v1/users` | Admin, Super Admin | List user (filter role, jenjang, kelas, cabang, status; cari nama/username/email) |
+| GET    | `/api/v1/users/role-counts` | Admin, Super Admin | Jumlah user per role (angka tab) |
+| POST   | `/api/v1/users` | Admin, Super Admin | Tambah 1-100 user sekaligus (admin: hanya tutor & siswa) |
+| POST   | `/api/v1/users/import/check` | Admin, Super Admin | Cek file Excel tambah user (tidak menyimpan) |
+| GET    | `/api/v1/quiz-reports` | Admin, Super Admin, Tutor | Report Uji Kom & Tryout per event (peserta, nilai rata-rata / tertinggi / terendah) |
+| GET    | `/api/v1/quiz-reports/:id` | Admin, Super Admin, Tutor | Detail report: peserta urut peringkat |
+| GET    | `/api/v1/quiz-reports/:id/questions` | Admin, Super Admin, Tutor | Soal urut dari yang paling sering salah |
+| GET    | `/api/v1/daily-quiz-reports` | Admin, Super Admin, Tutor | Report Daily Quiz per siswa (peringkat + rekap, filter periode/mapel/kelas) |
+| GET    | `/api/v1/daily-quiz-reports/students/:id` | Admin, Super Admin, Tutor | Report Daily Quiz 1 siswa: total + rincian per mapel |
+| GET    | `/api/v1/users/:id` | Admin, Super Admin | Detail user |
+| PUT    | `/api/v1/users/:id` | Admin, Super Admin | Ubah user (admin: hanya tutor & siswa) |
+| DELETE | `/api/v1/users` | Admin, Super Admin | Hapus banyak user (soft delete) |
 | GET    | `/api/v1/quiz-bundles` | Admin        | Daftar bundle (quiz lama) untuk dipakai ulang   |
 | GET    | `/api/v1/questions/:id`| Admin        | Detail soal + kunci jawaban & pembahasan        |
 | PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
@@ -589,7 +613,9 @@ Tabel (migration 000016 - 000018):
   "coin_cost": 0,
   "total_questions": 12,
   "bundle_quiz_ids": ["..."],
-  "question_ids": ["...", "..."]
+  "question_ids": ["...", "..."],
+  "points": { "easy": 10, "medium": 15, "hard": 20 },
+  "prize_coins": { "rank_1": 500, "rank_2": 300, "rank_3": 100 }
 }
 ```
 
@@ -606,6 +632,8 @@ Tabel (migration 000016 - 000018):
 | `bundle_quiz_ids` | Opsional, maks 20. **Semua** soal dari quiz-quiz ini (bundle) ikut masuk |
 | `question_ids` | Opsional, soal satuan. Minimal salah satu dari `bundle_quiz_ids` / `question_ids` diisi |
 | `total_questions` | Wajib, harus **sama** dengan jumlah soal akhir (soal bundle + soal satuan, setelah soal kembar dibuang). Maks 200 |
+| `points` | Opsional. Point leaderboard 1 soal **benar** per level soal: `easy`, `medium`, `hard` (0-1000). Level yang tidak diisi = default **10 / 15 / 20**. Salah / tidak dijawab tetap 0 |
+| `prize_coins` | Opsional. Hadiah coin juara 1, 2, 3 leaderboard quiz: `rank_1`, `rank_2`, `rank_3` (0-1.000.000). Tidak diisi = 0 (tanpa hadiah). Dibagikan otomatis 23:59 WIB setelah event selesai (lihat **Hadiah juara**) |
 
 Urutan soal: soal bundle (urut bundle di `bundle_quiz_ids`, lalu nomor soal di bundle itu), lalu `question_ids`. Soal yang muncul lebih dari sekali (di 2 bundle, atau di bundle + satuan) hanya diambil sekali, di posisi pertamanya.
 
@@ -623,7 +651,7 @@ Performa: soal bundle 1 query, cek letak 1 query, cek bentrok jadwal 1 query (in
 
 ### Ubah quiz (`PUT /api/v1/quizzes/:id`)
 
-Body **sama persis** dengan buat quiz (ganti penuh: nama, tipe, letak, jadwal, durasi, biaya, soal). Aturan validasi sama, dan quiz itu sendiri tidak dianggap bentrok dengan jadwal lamanya. Respons 200 = detail terbaru (`updated_by` terisi).
+Body **sama persis** dengan buat quiz (ganti penuh: nama, tipe, letak, jadwal, durasi, biaya, soal, point, hadiah; `points` / `prize_coins` yang tidak dikirim kembali ke default). Aturan validasi sama, dan quiz itu sendiri tidak dianggap bentrok dengan jadwal lamanya. Respons 200 = detail terbaru (`updated_by` terisi).
 
 - **Hanya quiz yang belum dimulai** (`start_at` > sekarang). Yang sudah dimulai / selesai → **409** `Quiz sudah dimulai, tidak bisa diubah`.
 - `access_code` dan `status` tidak berubah. Soal lama diganti seluruhnya dengan daftar soal baru.
@@ -631,7 +659,7 @@ Body **sama persis** dengan buat quiz (ganti penuh: nama, tipe, letak, jadwal, d
 
 ### Detail quiz (`GET /api/v1/quizzes/:id`)
 
-Bentuk sama dengan respons buat/ubah quiz: letak dengan nama, `start_at`/`end_at` (WIB), `schedule_status`, `duration_minutes`, `access_code`, `coin_cost`, `total_questions`, `status`, `created_by`/`updated_by`, dan `questions: [{no, id, code, type, question, difficulty}]` urut nomor soal (tanpa kunci jawaban; kunci ada di detail soal). ID tidak ada / bukan UUID / sudah dihapus → 404. 3 query: quiz + nama (JOIN lewat primary key), daftar soal.
+Bentuk sama dengan respons buat/ubah quiz: letak dengan nama, `start_at`/`end_at` (WIB), `schedule_status`, `duration_minutes`, `access_code`, `coin_cost`, `total_questions`, `points` (`{easy, medium, hard}`), `prize_coins` (`{rank_1, rank_2, rank_3}`), `prizes_distributed_at` (WIB, null = belum dibagikan), `status`, `created_by`/`updated_by`, `questions: [{no, id, code, type, question, difficulty}]` urut nomor soal (tanpa kunci jawaban; kunci ada di detail soal), dan `prize_awards: [{rank, student: {id, name}, points, duration_seconds, coin_amount, awarded_at}]` (penerima hadiah; `[]` sebelum dibagikan). ID tidak ada / bukan UUID / sudah dihapus → 404. 2 query: quiz + nama (JOIN lewat primary key) dan daftar soal; +1 query penerima hadiah hanya kalau hadiah sudah dibagikan.
 
 ### Hapus quiz (`DELETE /api/v1/quizzes`)
 
@@ -694,6 +722,18 @@ Daftar bundle: `GET /api/v1/quiz-bundles` (admin), terbaru dulu.
 - Performa: 1 transaksi, quiz dicari lewat index `end_at` (`quizzes_access_code_end_at_idx`), kode baru dicek sekaligus ke database, lalu UPDATE banyak baris per 1.000 quiz.
 - Hasil setiap jalan dicetak di terminal server, contoh `scheduler: kode akses 12 quiz diganti (35ms)`.
 
+### Hadiah juara (scheduler 23:59 WIB)
+
+Admin mengisi `prize_coins` saat buat/ubah quiz. Hadiah dibagikan **otomatis** oleh scheduler setiap hari **23:59 WIB** (`QUIZ_PRIZE_CRON` di `.env`, default `59 23 * * *`; `off` = mati) untuk quiz yang `published`, belum dihapus, event **sudah selesai** (`end_at` <= jam 23:59 itu), dan belum dibagikan (`prizes_distributed_at` null).
+
+Per quiz (1 transaksi per quiz; gagal → dicoba lagi besok 23:59):
+
+1. Juara diambil dari `leaderboard_entries` quiz itu dengan urutan yang **sama** dengan API leaderboard (point tertinggi, lalu waktu tersingkat). Point & waktu sama persis → peringkat sama → **hadiah sama** (contoh peringkat 1, 2, 2, 4: dua juara 2 dapat hadiah juara 2, peringkat 4 tidak dapat).
+2. Juara yang hadiahnya > 0: `students.coin_balance` ditambah, dicatat di `coin_transactions` (`type = reward`, `reference_type = quiz_prize`, `reference_id` = quiz, `idempotency_key = quiz_prize:<quiz>:<siswa>`) dan `quiz_prize_awards` (peringkat, point, waktu, coin, transaksi coin).
+3. `quizzes.prizes_distributed_at` diisi, juga untuk quiz tanpa hadiah / tanpa peserta, supaya tidak diproses lagi.
+
+Aman dijalankan di beberapa server: baris quiz dikunci (`FOR UPDATE`) lalu dicek ulang, ditambah `idempotency_key` unik, jadi coin tidak bisa dobel. Quiz yang dihapus sebelum 23:59 tidak dibagikan hadiahnya. Hasil dicetak di terminal, contoh `scheduler: hadiah quiz dibagikan: 3 quiz, 7 siswa, 2100 coin, 0 quiz gagal`. Pencarian quiz yang menunggu memakai partial index `quizzes_prize_pending_idx` (migration 000025).
+
 ### Kode akses untuk tutor (`GET /api/v1/quizzes/:id/access-code`)
 
 Role **tutor, admin, super admin**. Data: `quiz_id`, `name`, `type`, `status`, `start_at`/`end_at`, `schedule_status`, `access_code` (yang berlaku sekarang), `access_code_updated_at`. Tutor membagikan kode ini ke siswa saat quiz dimulai; kode berganti setiap jam selama event belum selesai. Quiz tidak ada / dihapus → 404.
@@ -730,6 +770,7 @@ Body submit (khusus siswa):
 - **Penilaian di FE**: FE menilai benar/salah tiap soal memakai kunci jawaban dari response buka quiz, lalu mengirim `is_correct` (wajib per item). `answer` = jawaban siswa apa adanya (bebas bentuknya, disimpan untuk review). Soal yang tidak dikirim = tidak dijawab (salah, `student_answer: null`).
 - Waktu per soal (opsional): `answered_at` & `time_spent_seconds` (lihat Waktu pengerjaan di bawah).
 - **Nilai total 100**: nilai per soal = 100 / total soal; nilai = jumlah benar x nilai per soal (dihitung server, 2 angka di belakang koma; semua benar selalu tepat 100). Contoh 3 soal, 2 benar → 66.67.
+- **Point (bukan nilai)**, untuk leaderboard: soal benar easy = 10, medium = 15, hard = 20 point (level soal saat submit); salah / tidak dijawab = 0. `result.points` = total point; per soal: `score` (nilai) & `points` (point). Berlaku untuk semua quiz.
 - **Hanya sekali.** Submit ke-2 → 409 `Jawaban sudah dikumpulkan pada ...`. Harus sudah dibuka (belum → 409). Uji Kom/Tryout: lewat `deadline_at` + toleransi 2 menit → 409 `Waktu mengerjakan sudah habis pada ...`. Daily Quiz tanpa batas waktu.
 - Soal yang bukan bagian quiz / dikirim 2x → 422 di `answers[i].question_id`.
 - Disimpan: `submitted_at`, `score`, `correct_count`, dan `answers` (JSONB, urut nomor soal: `{question_id, answer, is_correct, points}`) di `quiz_attempts` (Uji Kom/Tryout) atau `daily_quizzes` (Daily Quiz). Submit = 1 UPDATE (`... AND submitted_at IS NULL`, aman dari submit dobel); review = baca 1 baris + isi soal.
@@ -740,14 +781,14 @@ Response submit = response review (200):
 {
   "id": "...", "name": "Uji Kom Matematika", "type": "uji_kom", "placement": { ... }, "started_at": "...",
   "state": "submitted",
-  "result": { "score": 66.67, "correct_count": 2, "total_questions": 3, "points_per_question": 33.33, "submitted_at": "2026-12-01T09:05:00+07:00", "duration_seconds": 1520 },
+  "result": { "score": 66.67, "score_per_question": 33.33, "points": 25, "correct_count": 2, "total_questions": 3, "submitted_at": "2026-12-01T09:05:00+07:00", "duration_seconds": 1520 },
   "questions": [
     {
       "no": 1, "id": "...", "code": "Q-12", "type": "single_choice", "question": "...", "formula": null,
       "image_url": null, "table": null, "display_order": ["question"], "difficulty": "easy",
       "answer": { "options": [ ... ], "correct_key": "B" },
       "explanation": "Pembahasan ...",
-      "student_answer": "B", "is_correct": true, "points": 33.33,
+      "student_answer": "B", "is_correct": true, "score": 33.33, "points": 10,
       "answered_at": "2026-12-01T08:05:30+07:00", "time_spent_seconds": 42
     }
   ]
@@ -767,7 +808,7 @@ Urutan `questions` sama dengan saat dikerjakan, lengkap dengan **jawaban yang be
 
 Khusus siswa. Berisi quiz Uji Kom & Tryout yang **sudah publish**, **belum selesai** (`end_at` > sekarang), dan untuk **kelas siswa** (kelas akun siswa); urut yang paling dekat dimulai. Pagination `page`/`per_page` (default 20).
 
-Setiap item: `id`, `name`, `type`, `placement` (nama letak), `start_at`/`end_at` (WIB), `schedule_status` (`upcoming`/`ongoing`), `duration_minutes`, `total_questions`, `coin_cost`. **Tanpa kode akses** (dibagikan tutor saat quiz dimulai) dan tanpa soal. Siswa yang kelasnya belum diisi → `data: []`. Index `quizzes_announcement_idx (grade_id, start_at)` khusus quiz publish.
+Setiap item: `id`, `name`, `type`, `placement` (nama letak), `start_at`/`end_at` (WIB), `schedule_status` (`upcoming`/`ongoing`), `duration_minutes`, `total_questions`, `coin_cost`, `points` (point per level), `prize_coins` (hadiah juara 1-3). **Tanpa kode akses** (dibagikan tutor saat quiz dimulai) dan tanpa soal. Siswa yang kelasnya belum diisi → `data: []`. Index `quizzes_announcement_idx (grade_id, start_at)` khusus quiz publish.
 
 ## Daily Quiz (siswa)
 
@@ -813,7 +854,7 @@ Bidang materi untuk kelas yang dipilih: `GET /api/v1/dropdowns/subject_field?sub
 
 Siswa membuka Daily Quiz miliknya untuk dikerjakan. Tanpa body, tanpa kode akses, tanpa timer.
 
-- **Jatah gratis per hari (WIB)**: `DAILY_QUIZ_FREE_QUOTA` (default 2) Daily Quiz pertama yang dibuka hari itu gratis. Berikutnya memotong `DAILY_QUIZ_COIN_COST` coin (default 10) — sementara di `.env`, nanti dipindah ke master parameter quiz.
+- **Jatah gratis per hari (WIB)**: `free_per_day` (pengaturan global, nilai awal 2) Daily Quiz pertama yang dibuka hari itu gratis. Berikutnya memotong `coin_cost` coin (nilai awal 10; 0 = selalu gratis). Keduanya diubah admin lewat `PUT /api/v1/daily-quiz-settings` dan langsung berlaku untuk Daily Quiz yang dibuka setelahnya (tanpa restart server).
 - Coin dipotong dari `students.coin_balance` dan dicatat di `coin_transactions` (`type = usage`, `reference_type = daily_quiz`, `reference_id` = id Daily Quiz, `idempotency_key = daily_quiz_open:<id>`).
 - Coin tidak cukup → **402** `Coin tidak cukup: jatah gratis hari ini sudah habis, butuh 10 coin, saldo 5 coin`; tidak ada yang berubah.
 - **Membuka ulang** Daily Quiz yang sama tidak dihitung lagi dan tidak memotong coin (`usage.already_opened = true`).
@@ -821,6 +862,38 @@ Siswa membuka Daily Quiz miliknya untuk dikerjakan. Tanpa body, tanpa kode akses
 - Daily Quiz siswa lain / tidak ada → 404.
 
 Respons 200: info Daily Quiz, `opened_at`, `usage: {free_per_day, opened_today, coin_charged, coin_balance, already_opened}`, dan `questions` lengkap dengan kunci jawaban (lihat bentuk soal di bawah).
+
+### Pengaturan global Daily Quiz (`GET` / `PUT /api/v1/daily-quiz-settings`)
+
+Berlaku untuk **seluruh** Daily Quiz (tabel `daily_quiz_settings`, selalu 1 baris, migration 000026 & 000027): point per level, hadiah juara bulanan, jatah gratis per hari, dan biaya coin. Lihat: semua role yang login. Ubah: admin & super admin.
+
+```json
+{
+  "points": { "easy": 10, "medium": 15, "hard": 20 },
+  "prize_coins": { "rank_1": 300, "rank_2": 200, "rank_3": 100 },
+  "free_per_day": 2,
+  "coin_cost": 10
+}
+```
+
+| Field | Aturan |
+| ----- | ------ |
+| `points` | Wajib (ketiganya), 0-1000: point 1 soal **benar** per level. Dipakai untuk Daily Quiz yang di-submit **setelah** diubah; point yang sudah tercatat tidak berubah. Nilai awal 10 / 15 / 20 |
+| `prize_coins` | Wajib (ketiganya), 0-1.000.000: hadiah coin juara 1, 2, 3 bulanan **per kelas** (0 = tanpa hadiah). Nilai awal 0 |
+| `free_per_day` | Wajib, 0-100: Daily Quiz gratis per siswa per hari (WIB). Nilai awal 2 (migration 000027, sebelumnya `DAILY_QUIZ_FREE_QUOTA` di `.env`) |
+| `coin_cost` | Wajib, 0-1.000.000: coin per Daily Quiz setelah jatah gratis habis (0 = selalu gratis). Nilai awal 10 (sebelumnya `DAILY_QUIZ_COIN_COST`) |
+
+Respons: `points`, `prize_coins`, `free_per_day`, `coin_cost`, `updated_by` (`{id, name}`, null = belum pernah diubah), `updated_at` (WIB). Jatah gratis & biaya coin langsung berlaku untuk Daily Quiz yang dibuka setelah diubah.
+
+### Hadiah juara bulanan Daily Quiz (per kelas)
+
+Dibagikan otomatis oleh scheduler hadiah (`QUIZ_PRIZE_CRON`, jalan setiap hari 23:59 WIB) pada **hari terakhir bulan jam 23:59 WIB**. Bulan lalu yang terlewat (contoh server mati) ikut dibagikan di jadwal berikutnya.
+
+1. Bulan itu dicatat di `daily_quiz_prize_periods` beserta **snapshot** hadiah dari pengaturan saat itu (mengubah pengaturan setelahnya tidak mengubah bulan yang sudah dibagikan). Primary key `period` mencegah 1 bulan dibagikan 2x (juga kalau beberapa server jalan bersamaan).
+2. Juara 1-3 **per kelas** dari `leaderboard_entries` bulan itu (kelas = snapshot kelas saat point masuk), urutan sama dengan leaderboard yang difilter kelas: point tertinggi, lalu waktu tersingkat; sama persis → peringkat & hadiah sama.
+3. Setiap juara yang hadiahnya > 0: saldo coin bertambah + `coin_transactions` (`type = reward`, `reference_type = daily_quiz_prize`, `idempotency_key = daily_quiz_prize:<bulan>:<siswa>`) + `daily_quiz_prize_awards`.
+
+Penerima: `GET /api/v1/daily-quiz-prizes?month=2026-11&grade_id=...` (admin & super admin) → `month`, `distributed_at` (null = belum), `prize_coins` (snapshot), `awards: [{grade, rank, student: {id, name, student_code}, points, duration_seconds, coin_amount, awarded_at}]` urut kelas lalu peringkat.
 
 ### Bentuk soal saat quiz dibuka (Daily Quiz, Uji Kom, Tryout)
 
@@ -843,6 +916,303 @@ Respons 200: info Daily Quiz, `opened_at`, `usage: {free_per_day, opened_today, 
 - `answer` = opsi + **kunci jawaban**, bentuk sama dengan create soal (`correct_key` / `correct_keys` / `accepted_answers` + `input_type`, dst.).
 - **Pembahasan (`explanation`) tidak diberikan.**
 - Gambar Image Library (soal & opsi) sudah diubah menjadi link `image_url`. 2 query untuk semua soal (soal + link gambar opsi).
+
+## Leaderboard
+
+**Nilai ≠ point.** Nilai (0-100) hanya untuk hasil quiz. Leaderboard memakai **point**: setiap soal **benar** mendapat point sesuai level soal — easy **10**, medium **15**, hard **20**; salah / tidak dijawab **0**. Berlaku untuk semua quiz (Daily Quiz, Uji Kom, Tryout). Point dihitung server saat submit dan disimpan di kolom `points` (migration 000023). Besar point per level bisa diubah admin: **Uji Kom & Tryout** per quiz (`points` saat buat/ubah quiz, migration 000025), **Daily Quiz** global untuk seluruh Daily Quiz (`PUT /api/v1/daily-quiz-settings`, migration 000026).
+
+**Tabel leaderboard (migration 000024)** — diisi di **transaksi yang sama** dengan submit (submit & leaderboard berhasil/gagal bersama):
+
+| Tabel | Isi |
+| ----- | --- |
+| `leaderboard_entries` | 1 baris per siswa per papan: Daily Quiz per bulan (`board = daily_quiz`, `period = 2026-11`) atau 1 quiz Uji Kom/Tryout (`board = uji_kom/tryout`, `quiz_id`). Berisi total `points`, total `duration_seconds`, `quiz_count`, `score` (Uji Kom/Tryout), snapshot `education_level_id` & `grade_id`, `last_submitted_at`. Unik per (board, period, quiz_id, siswa) |
+| `leaderboard_point_logs` | Riwayat setiap point masuk: `entry_id`, `source_type` (`daily_quiz` / `quiz_attempt`) + `source_id` (pengerjaan asalnya), `points`, `duration_seconds`, `created_at`. 1 pengerjaan hanya bisa tercatat 1x (unik `source_type + source_id`) |
+
+Contoh melacak point 1 siswa: `SELECT * FROM leaderboard_point_logs WHERE student_id = ... ORDER BY created_at DESC`. Hasil quiz yang sudah di-submit sebelum tabel ini ada ikut diisi oleh migration.
+
+**Urutan peringkat:** point tertinggi; kalau point sama, **total waktu pengerjaan paling singkat** (`duration_seconds`) di atas; kalau point & waktu sama persis → peringkat sama (`RANK`, contoh 1, 2, 2, 4).
+
+Semua role yang login boleh melihat. Kalau yang melihat siswa, posisinya sendiri ada di `data.me` (null kalau belum ikut).
+
+### Daily Quiz (`GET /api/v1/leaderboards/daily-quiz`)
+
+Total point **semua Daily Quiz yang di-submit dalam 1 bulan** (WIB) per siswa.
+
+| Query | Isi |
+| ----- | --- |
+| `month` | `YYYY-MM`, default bulan ini (WIB). Rentang = tanggal 1 00:00 WIB s/d tanggal 1 bulan berikutnya |
+| `education_level_id` | Filter jenjang (jenjang akun siswa) |
+| `grade_id` | Filter kelas (kelas akun siswa) |
+| `page`, `per_page` | Default 1 & 20, maks 100 |
+
+Peringkat dihitung di dalam filter (contoh filter Kelas 5: juara 1 = siswa Kelas 5 dengan point tertinggi). Filter memakai **snapshot** jenjang & kelas siswa saat point masuk, jadi peringkat bulan lalu tidak berubah walaupun siswa naik kelas.
+
+```json
+{
+  "data": {
+    "month": "2026-11", "from": "2026-11-01T00:00:00+07:00", "to": "2026-12-01T00:00:00+07:00",
+    "entries": [{
+      "rank": 1,
+      "student": { "id": "...", "name": "Budi Santoso", "student_code": "STU000001", "school_origin": "SDN 1" },
+      "education_level": { "id": "...", "name": "SD" }, "grade": { "id": "...", "name": "Kelas 5" },
+      "points": 150, "duration_seconds": 1830, "quiz_count": 6
+    }],
+    "me": { "rank": 12, "...": "..." }
+  },
+  "meta": { "page": 1, "per_page": 20, "total": 87 }
+}
+```
+
+`duration_seconds` & `quiz_count` = total lama mengerjakan & jumlah Daily Quiz bulan itu. Dibaca langsung dari `leaderboard_entries` (`board = daily_quiz`, `period = YYYY-MM`), index `leaderboard_entries_daily_idx` — tidak menjumlah ulang hasil quiz.
+
+Hadiah bulanan: `data.prize_coins` (`{rank_1, rank_2, rank_3}`, hadiah juara per kelas: snapshot kalau bulan itu sudah dibagikan, selain itu pengaturan saat ini) dan `data.prizes_distributed_at` (WIB, null = belum). Kalau difilter `grade_id`, setiap entry (dan `me`) punya `prize_coins` = hadiah untuk peringkatnya di kelas itu (0 di luar juara 1-3); tanpa filter kelas field ini tidak ada, karena juara dihitung per kelas.
+
+### Uji Kom / Tryout (`GET /api/v1/leaderboards/quizzes/:id`)
+
+**1 quiz = 1 leaderboard** (Uji Kom & Tryout masing-masing, tidak digabung). Peserta = siswa yang sudah submit quiz itu; `points` & `duration_seconds` dari pengerjaannya, `score` = nilainya (info). `data.quiz` = `{id, name, type, start_at, end_at, prize_coins: {rank_1, rank_2, rank_3}, prizes_distributed_at}`; setiap entry punya `prize_coins` = hadiah untuk peringkatnya (0 di luar juara 1-3; sebelum hadiah dibagikan masih sementara). Pagination `page`/`per_page`.
+
+Siswa hanya boleh melihat quiz yang sudah publish untuk kelasnya (selain itu 404); tutor & admin boleh semua quiz. Dibaca dari `leaderboard_entries` (`quiz_id`), index `leaderboard_entries_quiz_idx`.
+
+## Report quiz (Uji Kom & Tryout)
+
+Report **per event** (1 quiz = 1 event) untuk quiz Uji Kom & Tryout yang sudah **publish** (draf & terhapus tidak ikut). Akses: super admin, admin, tutor (hanya membaca).
+
+- **Peserta** = siswa yang sudah **submit** (yang baru membuka belum dihitung); akun yang sudah dihapus tidak dihitung, sama dengan leaderboard.
+- **Peringkat** = aturan leaderboard & hadiah: point tertinggi, lalu waktu tersingkat; sama persis → peringkat sama.
+
+### List per event (`GET /api/v1/quiz-reports`)
+
+Event terbaru dulu (tanggal mulai). Query opsional: `type` (`uji_kom`/`tryout`), `search` (nama quiz), `education_level_id`, `grade_id`, `subject_id`, `date_from` & `date_to` (tanggal mulai event `YYYY-MM-DD` WIB, inklusif), `page`, `per_page` (maks 100).
+
+```json
+{ "quiz_id": "...", "name": "Tryout Demo Matematika Kelas 6", "type": "tryout",
+  "education_level": {...}, "grade": {...}, "subject": {...},
+  "start_at": "2026-11-18T08:00:00+07:00", "end_at": "2026-11-18T10:00:00+07:00", "total_questions": 10,
+  "participants": 13, "average_score": 61.54, "highest_score": 80, "lowest_score": 40 }
+```
+
+`average_score` / `highest_score` / `lowest_score` = nilai 0-100 (`null` kalau belum ada peserta). Performa: halaman quiz diambil dulu (CTE, index `quizzes_report_idx`), statistik dihitung hanya untuk quiz di halaman itu lewat index `quiz_attempts_report_idx` (migration 000032).
+
+### Detail per event (`GET /api/v1/quiz-reports/:id`)
+
+`quiz` = ringkasan event (bentuk sama dengan list) + `participants[]` urut peringkat: `rank`, `student {id, name, student_code}`, `correct_count`, `total_questions`, `correct_label` (contoh `"9/10"`), `score` (nilai), `points`, `duration_seconds` (waktu penyelesaian), `submitted_at`. Query: `search` (nama / kode siswa; peringkat tetap peringkat asli), `page`, `per_page`. Quiz tidak ada / draf / dihapus / bukan Uji Kom-Tryout → 404.
+
+### Soal paling sering salah (`GET /api/v1/quiz-reports/:id/questions`)
+
+Semua soal quiz, urut dari **persentase benar terendah** (paling sering salah) ke tertinggi; sama → salah lebih banyak dulu, lalu nomor soal. Setiap soal: `no` (nomor di quiz), `id`, `code`, `type`, `question`, `difficulty`, `participants`, `correct_count`, `wrong_count` (menjawab tapi salah), `unanswered_count` (tidak dijawab), `correct_percent` (0-100, contoh `13.33`), `correct_label` (contoh `"13%"`). Dihitung dari jawaban yang tersimpan saat submit (kolom JSONB `answers`), 1 query.
+
+## Report Daily Quiz (per siswa)
+
+Daily Quiz dibuat siswa sendiri (soal acak, mapel bebas), jadi **tidak ada event**: report langsung **per siswa**. Akses: super admin, admin, tutor (hanya membaca). Yang dihitung: Daily Quiz yang sudah **submit** di periode; akun yang sudah dihapus tidak ikut.
+
+**Periode** = tanggal submit (WIB): `date_from` & `date_to` (`YYYY-MM-DD`, inklusif, maks 366 hari). Kosong = **bulan berjalan** (sama dengan leaderboard Daily Quiz bulanan); hanya `date_from` = sampai hari ini; hanya `date_to` = mulai tanggal 1 bulan itu.
+
+**Mapel:** karena siswa bebas memilih mapel, report punya 2 cara melihatnya:
+
+- **Filter `subject_id`** di list → semua angka & peringkat hanya dari Daily Quiz mapel itu (peringkat per mapel). Tanpa filter = semua mapel digabung.
+- **Detail per siswa** → rekap total + **rincian per mapel**.
+
+### List (`GET /api/v1/daily-quiz-reports`)
+
+Query opsional: `date_from`, `date_to`, `subject_id`, `education_level_id` & `grade_id` (jenjang/kelas **akun** siswa), `search` (nama / kode siswa), `page`, `per_page` (maks 100).
+
+```json
+{
+  "data": {
+    "period": { "date_from": "2026-11-01", "date_to": "2026-11-30" },
+    "students": [{
+      "rank": 1,
+      "student": { "id": "...", "name": "Hafiz Pratama", "student_code": "STU000035", "education_level": {...}, "grade": {...} },
+      "total_quizzes": 6, "quizzes_by_difficulty": { "easy": 2, "medium": 2, "hard": 2 },
+      "average_score": 63.33, "average_duration_seconds": 467,
+      "total_questions": 55, "correct_count": 35, "wrong_count": 20, "correct_percent": 63.64,
+      "total_points": 505, "total_duration_seconds": 2804
+    }]
+  },
+  "meta": { "page": 1, "per_page": 20, "total": 66 }
+}
+```
+
+| Kolom | Isi |
+| ----- | --- |
+| `rank` | Peringkat di dalam filter: **total point tertinggi**, lalu **total waktu tersingkat** (aturan leaderboard); sama persis → peringkat sama. Pencarian nama tidak mengubah peringkat |
+| `total_quizzes`, `quizzes_by_difficulty` | Jumlah Daily Quiz, dan per level (level dipilih siswa saat generate) |
+| `average_score`, `average_duration_seconds` | Rata-rata nilai (0-100) & rata-rata waktu pengerjaan per Daily Quiz |
+| `total_questions` | Soal yang dikerjakan (semua soal di Daily Quiz yang di-submit) |
+| `correct_count`, `wrong_count`, `correct_percent` | Benar, tidak benar (salah + tidak dijawab), persentase benar |
+| `total_points`, `total_duration_seconds` | Total point & total waktu |
+
+### Detail 1 siswa (`GET /api/v1/daily-quiz-reports/students/:id`)
+
+Query: `date_from`, `date_to`. Respons: `period`, `student`, `total` (rekap gabungan semua mapel, kolom sama dengan list tanpa `rank`), `subjects[]` = `{subject: {id, name}, ...kolom rekap}` per mapel, urut jumlah Daily Quiz terbanyak. Bukan siswa / tidak ada → 404.
+
+Performa: rekap dihitung dari kolom ringkasan `daily_quizzes` (bukan jawaban per soal) lewat index `daily_quizzes_report_idx` & `daily_quizzes_student_report_idx` yang berisi semua kolom yang dijumlahkan (index-only scan, migration 000034).
+
+## User (menu admin)
+
+Semua endpoint `/api/v1/users` khusus **admin & super admin**. Melihat: semua akun. **Menambah, mengubah & menghapus**: super admin semua akun; **admin hanya tutor & siswa** (akun admin / super admin → 403). Akun sendiri tidak bisa dihapus atau dinonaktifkan. Role tidak bisa diubah.
+
+### List (`GET /api/v1/users`) & jumlah per role (`GET /api/v1/users/role-counts`)
+
+| Query | Isi |
+| ----- | --- |
+| `role` | `super_admin`, `admin`, `tutor`, `student` |
+| `education_level_id` | Jenjang (siswa) |
+| `grade_id` | Kelas (siswa) |
+| `branch_id` | Cabang |
+| `status` | `active` / `inactive` |
+| `search` | Nama, username, atau email (tidak peka huruf besar/kecil) |
+| `page`, `per_page` | Default 1 & 20, maks 100 |
+
+List urut terbaru dulu. Setiap baris: `id, username, name, email, phone, role, branch` (null untuk super admin = semua cabang), `education_level, grade, student_code, coin_balance` (siswa), `status, join_date, end_date, ended` (true = end_date sudah lewat, tidak bisa login), `last_login_at, created_at`. User yang sudah dihapus tidak tampil.
+
+`role-counts` = angka tab `{all, super_admin, admin, tutor, student}` dengan filter yang sama (role diabaikan), 1 query `GROUP BY`.
+
+Performa: halaman diambil dulu (CTE, index `users_list_idx`) lalu di-JOIN ke cabang/jenjang/kelas/siswa; pencarian memakai index trigram `users_real_name_trgm_idx`, `users_username_trgm_idx`, `users_email_trgm_idx` (migration 000029); COUNT dilewati di halaman terakhir yang tidak penuh.
+
+### Detail (`GET /api/v1/users/:id`) & ubah (`PUT /api/v1/users/:id`)
+
+Detail = data list + `parent_phone, school_origin, date_of_birth, target_school` (siswa), `updated_by, updated_at`. Tidak ada / dihapus → 404.
+
+```json
+{
+  "username": "siswa.budi", "name": "Budi Santoso", "email": null, "phone": "0812...",
+  "parent_phone": "0813...", "school_origin": "SMPN 1 Surabaya",
+  "branch_id": "...", "education_level_id": "...", "grade_id": "...", "status": "active",
+  "join_date": "2025-07-01", "end_date": "2026-06-30",
+  "password": "passwordBaru123", "date_of_birth": "2012-05-17", "target_school": "SMAN 5 Surabaya"
+}
+```
+
+| Field | Aturan |
+| ----- | ------ |
+| `username` | Wajib, 3-30 karakter huruf kecil/angka/titik/garis bawah (otomatis dikecilkan), unik termasuk akun yang sudah dihapus |
+| `name`, `status` | Wajib |
+| `email` | Opsional, format email |
+| `branch_id` | Wajib untuk siswa, tutor, admin (cabang aktif); harus kosong untuk super admin |
+| `education_level_id`, `grade_id` | Wajib untuk siswa, kelas harus milik jenjang; harus kosong untuk role lain |
+| `password` | Opsional 8-72 karakter: diisi = reset password |
+| `join_date` | **Wajib**, tanggal bergabung `YYYY-MM-DD` (migration 000031) |
+| `end_date` | Opsional, tanggal berakhir `YYYY-MM-DD`, tidak boleh sebelum `join_date`. **Lewat tanggal ini (WIB) akun tidak bisa login** (403 "Masa aktif akun Anda sudah berakhir"); di tanggal itu sendiri masih bisa. Kosong = tanpa batas |
+| `date_of_birth`, `target_school` | Khusus siswa (`YYYY-MM-DD`, tidak boleh di masa depan) |
+
+Ganti penuh: field opsional yang tidak dikirim menjadi kosong. Semua kesalahan dikembalikan sekaligus (422). **Dinonaktifkan, password diganti, atau `end_date` sudah lewat → semua sesi login user itu diakhiri** (refresh token dicabut; access token yang sudah terbit tetap berlaku sampai habis, maks `JWT_ACCESS_TTL`). Kolom `updated_by` mencatat admin pengubah.
+
+### Tambah (`POST /api/v1/users`, 1-100 akun sekaligus)
+
+```json
+{
+  "users": [
+    { "role": "student", "username": "siswa.andi", "name": "Andi Wijaya", "password": "password123",
+      "branch_id": "...", "education_level_id": "...", "grade_id": "...",
+      "parent_phone": "0813...", "school_origin": "SDN 1 Surabaya", "date_of_birth": "2014-02-01", "target_school": "SMPN 1 Surabaya" },
+    { "role": "tutor", "username": "tutor.sari", "name": "Sari Dewi", "password": "password123", "branch_id": "..." }
+  ]
+}
+```
+
+- Field per akun sama dengan **ubah** (tabel di atas, termasuk `join_date` wajib & `end_date`), ditambah `role` wajib (`super_admin`, `admin`, `tutor`, `student`), `password` wajib (8-72), `status` opsional (default `active`).
+- Admin hanya boleh menambah tutor & siswa (`users[i].role` → 422); super admin semua role.
+- **Semua atau tidak sama sekali**: semua kesalahan dikembalikan sekaligus per `users[i].<field>`, contoh username kembar di dalam request (`sama dengan users[0]`) atau sudah dipakai akun lain (termasuk akun yang sudah dihapus). Lebih dari 100 akun → 422 field `users`.
+- Respons 201: akun yang dibuat, urut sesuai request (bentuk sama dengan baris list). Kode siswa (`STU000123`) dibuat otomatis urut sesuai request. Kolom `users.created_by` mencatat admin pembuat (migration 000030).
+- Performa: data pendukung (cabang, jenjang/kelas, username terpakai) masing-masing **1 query untuk semua akun**; hash password bcrypt **paralel** (worker = jumlah CPU; 100 akun ±2 detik, berurutan bisa ±7 detik); simpan 2 query (`INSERT` banyak baris ke `users`, lalu `students`) dalam 1 transaksi.
+
+### Cek file Excel tambah user (`POST /api/v1/users/import/check`)
+
+Upload Excel **hanya mengecek**, tidak menyimpan (alur sama dengan import soal). Template: [docs/Template Upload/template_user.xlsx](docs/Template%20Upload/template_user.xlsx), contoh terisi: `contoh_terisi_user.xlsx` (sheet `Template` + `Petunjuk`).
+
+Request: `multipart/form-data`, field `file` (.xlsx, maks 5 MB, **maks 100 user**).
+
+| Kolom | Isi |
+| ----- | --- |
+| `role` | Wajib. `student`/`siswa`, `tutor`, `admin`, `super_admin` (tidak peka huruf besar/kecil) |
+| `username`, `name`, `password` | Wajib |
+| `email`, `phone` (no HP), `parent_phone` (no HP ortu) | Opsional. No HP yang terbaca sebagai angka (0 di depan hilang, contoh `812...`) otomatis ditambah `0` |
+| `branch_name` | **Nama** cabang (tidak peka huruf besar/kecil) → `branch_id` |
+| `education_level_name`, `grade_name` | **Nama** jenjang & kelas → ID. Jenjang boleh kosong kalau nama kelasnya hanya ada di 1 jenjang (contoh `Kelas 5` → SD) |
+| `school_origin`, `target_school` | Opsional |
+| `join_date` | **Wajib**. `2026-01-15`, `15/01/2026`, `15-01-2026`, atau sel berformat tanggal Excel |
+| `end_date`, `date_of_birth` | Opsional, format tanggal sama |
+| `status` | `active`/`aktif` atau `inactive`/`nonaktif`; kosong = active |
+
+- Kolom wajib (`role, username, name, password, join_date`) harus ada di baris 1; kolom tidak dikenal ditolak. Baris kosong dilewati.
+- Nama cabang (1 query) dan jenjang/kelas (1 query) dicocokkan sekali untuk seluruh file; setiap baris dicek dengan aturan yang **sama persis** dengan tambah user (format, role yang boleh dibuat, cabang/kelas per role, tanggal, username kembar di file maupun di database).
+- 1 sel = 1 error (error pertama, contoh `cabang "X" tidak ditemukan`, tidak ditumpuk "wajib diisi").
+
+Valid (200) → `data.users` bisa langsung dikirim FE sebagai `{"users": data.users}` ke `POST /api/v1/users` (field `row` & `*_name` diabaikan):
+
+```json
+{ "total": 2, "users": [{ "row": 2, "role": "student", "username": "siswa.andi", "password": "password123",
+  "branch_id": "...", "branch_name": "Surabaya Timur", "education_level_id": "...", "education_level_name": null,
+  "grade_id": "...", "grade_name": "Kelas 5", "join_date": "2026-01-15", "end_date": "2026-12-31", "status": "active", "...": "..." }] }
+```
+
+Ada error (422) → **semua data ditolak**, semua error dikembalikan sekaligus dengan `row` & `column` Excel, contoh `{"field": "branch_name", "message": "cabang \"Cabang X\" tidak ditemukan", "row": 3, "column": "H"}`.
+
+### Hapus (`DELETE /api/v1/users`)
+
+Body `{"ids": [...]}` (1-100). **Soft delete**: `deleted_at` & `deleted_by` diisi, baris & riwayat (nilai, coin, leaderboard) tetap ada, username tetap terpakai, sesi login diakhiri, tidak bisa login lagi. Semua atau tidak sama sekali: ID tidak ada, akun sendiri, atau akun yang tidak boleh dihapus → 422 per `ids[i]`.
+
+## Coin
+
+Saldo ada di `students.coin_balance` (tidak boleh negatif); setiap perubahan saldo selalu dicatat 1 baris `coin_transactions` di transaksi database yang sama (BR-010, BR-012).
+
+### Paket isi coin (`/api/v1/coin-packages`)
+
+| Method | Isi |
+| ------ | --- |
+| `GET /coin-packages` | Siswa: paket **aktif** saja (tab "Isi coin"): `id, name, coin_amount, price, description`. Admin & super admin: semua paket + `sort_order, status, created_by, updated_by, created_at, updated_at`; query `status` (active/inactive), `search` (nama). Urut `sort_order`, lalu jumlah coin. Tanpa pagination (paket sedikit) |
+| `GET /coin-packages/:id` | Detail 1 paket (admin). Tidak ada / dihapus → 404 |
+| `POST /coin-packages` | Buat paket (admin), respons 201 |
+| `PUT /coin-packages/:id` | Ubah paket, ganti penuh (admin). Harga baru hanya untuk top-up berikutnya; riwayat lama menyimpan `price_paid` saat itu |
+| `DELETE /coin-packages` | Hapus 1-100 paket, body `{"ids": [...]}` (soft delete). Ada ID yang tidak ada → 422 per `ids[i]`, tidak ada yang terhapus |
+
+```json
+{ "name": "300 coin", "coin_amount": 300, "price": 68000, "description": "Hemat 10%", "sort_order": 2, "status": "active" }
+```
+
+`name` wajib (maks 100, unik tanpa peduli huruf besar/kecil di antara paket yang belum dihapus: index `coin_packages_name_unique`), `coin_amount` 1-1.000.000, `price` wajib (rupiah, 0 boleh), `description` opsional (maks 150), `sort_order` default 0, `status` default `active`. Kolom audit `created_by`/`updated_by`/`deleted_by` (migration 000028).
+
+### Top-up coin siswa oleh admin (`POST /api/v1/coin-topups`)
+
+Admin memilih **1 paket aktif** lalu **1-100 siswa** sekaligus; setiap siswa mendapat coin sebanyak paket itu. Dicatat sebagai **pembelian tunai di cabang**: `coin_transactions` `type = purchase`, `reference_type = coin_package`, `price_paid` = harga paket, `created_by` = admin.
+
+```json
+{ "coin_package_id": "...", "student_ids": ["...", "..."], "note": "Bayar tunai di kasir", "request_id": "uuid-baru-setiap-klik" }
+```
+
+- **Semua atau tidak sama sekali**: paket tidak ada / nonaktif (`coin_package_id`) atau ID bukan siswa (`student_ids[i]`) → 422, tidak ada coin yang berubah.
+- `note` opsional (maks 150), ikut di deskripsi transaksi: `Isi coin paket 300 coin (dicatat admin): Bayar tunai di kasir`.
+- `request_id` opsional tapi disarankan (UUID baru dari FE setiap tombol simpan ditekan): request yang sama terkirim 2x → **409**, coin tidak bertambah 2x (`idempotency_key = coin_topup:<request_id>:<siswa>`).
+- Admin & super admin boleh semua siswa (belum ada pembatasan cabang).
+- Respons 201: `package`, `total_coins`, `total_price`, `students: [{id, name, student_code, coin_added, balance_after, transaction_id}]` urut sesuai `student_ids`.
+- Performa: cek paket 1 query, cek siswa 1 query, simpan **1 query** (`UPDATE students ... RETURNING` + `INSERT coin_transactions ... SELECT` dalam 1 CTE) di 1 transaksi.
+
+### Riwayat coin
+
+- `GET /api/v1/student/coin-transactions` (siswa sendiri) dan `GET /api/v1/students/:id/coin-transactions` (admin & super admin; bukan siswa / tidak ada → 404).
+- Query: `type` (`plan_grant`, `purchase`, `usage`, `admin_adjustment`, `refund`, `reward`), `page`, `per_page` (default 20, maks 100). Urut terbaru dulu.
+
+```json
+{
+  "data": {
+    "student": { "id": "...", "name": "Citra Ayu", "student_code": "STU000002", "coin_balance": 290 },
+    "daily_quiz": { "free_per_day": 2, "used_today": 1, "remaining_free": 1, "coin_cost_after": 10 },
+    "transactions": [{
+      "id": "...", "type": "purchase", "type_label": "Isi coin", "amount": 300, "balance_after": 300,
+      "price_paid": 68000, "reference": { "type": "coin_package", "id": "...", "name": "300 coin" },
+      "description": "Isi coin paket 300 coin (dicatat admin)", "created_by": { "id": "...", "name": "Admin Surabaya Timur" },
+      "created_at": "2026-11-25T10:00:00+07:00"
+    }]
+  },
+  "meta": { "page": 1, "per_page": 20, "total": 12 }
+}
+```
+
+- `daily_quiz` (jatah Daily Quiz gratis hari ini, FR-TOK-006) hanya di riwayat milik siswa sendiri; untuk admin `null`.
+- `amount` positif = masuk, negatif = keluar. `created_by` null = sistem / siswa sendiri (contoh buka Daily Quiz, hadiah).
+- `reference.name` diisi untuk paket coin (nama paket, juga paket yang sudah dihapus), hadiah quiz (nama quiz), dan paket langganan (nama plan).
+- Performa: halaman diambil dulu lewat index `coin_transactions_student_id_created_at_idx`, baru di-JOIN ke tabel referensi; COUNT dilewati di halaman terakhir yang tidak penuh.
 
 ## Dropdown (`GET /api/v1/dropdowns/:type`)
 

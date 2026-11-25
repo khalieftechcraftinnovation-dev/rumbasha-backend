@@ -127,3 +127,46 @@ func (h *DailyQuizHandler) handleError(c *gin.Context, err error) {
 		response.Error(c, http.StatusInternalServerError, "Terjadi kesalahan pada server")
 	}
 }
+
+// GetSettings menangani GET /api/v1/daily-quiz-settings: pengaturan global Daily Quiz
+// (point per level & hadiah juara bulanan).
+func (h *DailyQuizHandler) GetSettings(c *gin.Context) {
+	settings, err := h.service.GetSettings(c.Request.Context())
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Pengaturan Daily Quiz", dailyquizdto.ToSettingsResponse(settings))
+}
+
+// UpdateSettings menangani PUT /api/v1/daily-quiz-settings (admin & super admin). Berlaku untuk
+// seluruh Daily Quiz.
+func (h *DailyQuizHandler) UpdateSettings(c *gin.Context) {
+	var req dailyquizdto.SettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	settings, err := h.service.UpdateSettings(c.Request.Context(), req, middleware.GetUserID(c))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Pengaturan Daily Quiz berhasil disimpan", dailyquizdto.ToSettingsResponse(settings))
+}
+
+// MonthlyPrizes menangani GET /api/v1/daily-quiz-prizes: penerima hadiah juara Daily Quiz 1 bulan
+// (per kelas), untuk admin & super admin.
+func (h *DailyQuizHandler) MonthlyPrizes(c *gin.Context) {
+	var q dailyquizdto.MonthlyPrizesQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	month, period, awards, err := h.service.MonthlyPrizes(c.Request.Context(), q)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Hadiah juara Daily Quiz", dailyquizdto.ToMonthlyPrizesResponse(month, period, awards))
+}

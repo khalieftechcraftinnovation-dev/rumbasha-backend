@@ -1,7 +1,12 @@
-// Package scoring berisi aturan nilai quiz yang dipakai bersama oleh Daily Quiz, Uji Kom, dan
-// Tryout: menyusun jawaban yang dikumpulkan siswa, menghitung nilai, dan menyusun review.
+// Package scoring berisi aturan nilai & point quiz yang dipakai bersama oleh Daily Quiz, Uji Kom,
+// dan Tryout: menyusun jawaban yang dikumpulkan siswa, menghitung nilai & point, dan menyusun review.
 //
-// Aturan nilai: total 100, nilai per soal = 100 / total soal, nilai = jumlah benar x nilai per soal.
+// Nilai != point:
+//   - Nilai (score): total 100, per soal = 100 / total soal, nilai = jumlah benar x nilai per soal.
+//   - Point (points): untuk leaderboard, per soal BENAR sesuai level soal: easy 10, medium 15,
+//     hard 20 (default; diatur admin: per quiz untuk Uji Kom & Tryout, global untuk Daily Quiz);
+//     salah / tidak dijawab = 0.
+//
 // Benar/salah per soal dinilai di FE (FE sudah menerima kunci jawaban saat quiz dibuka).
 package scoring
 
@@ -17,6 +22,13 @@ import (
 // MaxScore adalah nilai total semua quiz.
 const MaxScore = 100.0
 
+// PointsByDifficulty adalah point 1 soal yang dijawab benar, menurut level (difficulty) soal.
+var PointsByDifficulty = map[string]int{
+	questionmodel.DifficultyEasy:   10,
+	questionmodel.DifficultyMedium: 15,
+	questionmodel.DifficultyHard:   20,
+}
+
 // SubmittedAnswer adalah 1 jawaban yang dikirim FE.
 type SubmittedAnswer struct {
 	QuestionID       string
@@ -31,18 +43,20 @@ type Answer struct {
 	QuestionID       string          `json:"question_id"`
 	Answer           json.RawMessage `json:"answer"`
 	IsCorrect        bool            `json:"is_correct"`
-	Points           float64         `json:"points"` // nilai yang didapat dari soal ini (0 kalau salah)
+	Score            float64         `json:"score"`  // nilai yang didapat dari soal ini (0 kalau salah)
+	Points           int             `json:"points"` // point leaderboard dari soal ini (0 kalau salah)
 	AnsweredAt       *time.Time      `json:"answered_at"`
 	TimeSpentSeconds *int            `json:"time_spent_seconds"`
 }
 
 // Result adalah hasil penilaian 1 pengerjaan quiz.
 type Result struct {
-	Answers           []Answer
-	CorrectCount      int
-	Score             float64 // 0-100, dibulatkan 2 angka di belakang koma
-	PointsPerQuestion float64
-	DurationSeconds   int // lama mengerjakan total (submit - mulai); diisi service
+	Answers          []Answer
+	CorrectCount     int
+	Score            float64 // nilai 0-100, dibulatkan 2 angka di belakang koma
+	ScorePerQuestion float64
+	Points           int // total point leaderboard
+	DurationSeconds  int // lama mengerjakan total (submit - mulai); diisi service
 }
 
 // DurationSeconds = lama mengerjakan dalam detik (submit - mulai), tidak pernah negatif.
@@ -59,10 +73,12 @@ type FieldError struct {
 	Field, Message string
 }
 
-// Grade menyusun jawaban sesuai urutan soal quiz (questionIDs) lalu menghitung nilai.
+// Grade menyusun jawaban sesuai urutan soal quiz (questionIDs) lalu menghitung nilai & point.
+// difficulties = level setiap soal (id → easy/medium/hard); pointTable = point 1 soal benar per level
+// (Daily Quiz: pengaturan global daily_quiz_settings; Uji Kom/Tryout: diatur admin per quiz).
 // Soal yang tidak dikirim dianggap tidak dijawab (salah). Jawaban untuk soal yang bukan bagian
 // quiz atau dikirim 2x dikembalikan sebagai kesalahan.
-func Grade(questionIDs []string, submitted []SubmittedAnswer) (Result, []FieldError) {
+func Grade(questionIDs []string, difficulties map[string]string, pointTable map[string]int, submitted []SubmittedAnswer) (Result, []FieldError) {
 	inQuiz := make(map[string]bool, len(questionIDs))
 	for _, id := range questionIDs {
 		inQuiz[id] = true
@@ -85,7 +101,7 @@ func Grade(questionIDs []string, submitted []SubmittedAnswer) (Result, []FieldEr
 		return Result{}, errs
 	}
 
-	result := Result{PointsPerQuestion: PointsPerQuestion(len(questionIDs))}
+	result := Result{ScorePerQuestion: ScorePerQuestion(len(questionIDs))}
 	result.Answers = make([]Answer, 0, len(questionIDs))
 	for _, id := range questionIDs {
 		a := Answer{QuestionID: id, Answer: json.RawMessage("null")}
@@ -98,19 +114,21 @@ func Grade(questionIDs []string, submitted []SubmittedAnswer) (Result, []FieldEr
 			a.TimeSpentSeconds = s.TimeSpentSeconds
 		}
 		if a.IsCorrect {
-			a.Points = round2(result.PointsPerQuestion)
+			a.Score = round2(result.ScorePerQuestion)
+			a.Points = pointTable[difficulties[id]]
 			result.CorrectCount++
+			result.Points += a.Points
 		}
 		result.Answers = append(result.Answers, a)
 	}
-	// Nilai dihitung dari jumlah benar (bukan menjumlah poin yang sudah dibulatkan), supaya
-	// semua benar selalu tepat 100.
+	// Nilai dihitung dari jumlah benar (bukan menjumlah nilai per soal yang sudah dibulatkan),
+	// supaya semua benar selalu tepat 100.
 	result.Score = round2(float64(result.CorrectCount) * MaxScore / float64(len(questionIDs)))
 	return result, nil
 }
 
-// PointsPerQuestion = 100 / total soal (belum dibulatkan).
-func PointsPerQuestion(total int) float64 {
+// ScorePerQuestion = 100 / total soal (belum dibulatkan).
+func ScorePerQuestion(total int) float64 {
 	if total == 0 {
 		return 0
 	}
@@ -134,7 +152,8 @@ type ReviewItem struct {
 	AnsweredAt       *time.Time
 	TimeSpentSeconds *int
 	IsCorrect        bool
-	Points           float64
+	Score            float64
+	Points           int
 }
 
 // Review menggabungkan isi soal (urut nomor soal, sudah berisi pembahasan) dengan jawaban yang
@@ -151,7 +170,8 @@ func Review(content []questionmodel.AttemptQuestion, answers []Answer) []ReviewI
 			a = Answer{Answer: json.RawMessage("null")}
 		}
 		items = append(items, ReviewItem{
-			AttemptQuestion: q, StudentAnswer: a.Answer, IsCorrect: a.IsCorrect, Points: a.Points,
+			AttemptQuestion: q, StudentAnswer: a.Answer, IsCorrect: a.IsCorrect,
+			Score: a.Score, Points: a.Points,
 			AnsweredAt: a.AnsweredAt, TimeSpentSeconds: a.TimeSpentSeconds,
 		})
 	}

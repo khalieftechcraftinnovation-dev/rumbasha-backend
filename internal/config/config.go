@@ -34,12 +34,10 @@ type Config struct {
 	JWTSecret    string        // kunci rahasia untuk menandatangani access token
 	JWTAccessTTL time.Duration // masa berlaku access token, contoh 15m
 
-	// Aturan Daily Quiz, berlaku sama untuk semua siswa (BR-019).
-	DailyQuizFreeQuota int // jatah gratis per hari
-	DailyQuizCoinCost  int // biaya coin per quiz setelah jatah gratis habis
-
 	// Jadwal ganti kode akses quiz (format cron 5 kolom, waktu WIB). Kosong = scheduler mati.
 	AccessCodeRefreshCron string
+	// Jadwal bagi hadiah coin juara quiz (format cron 5 kolom, WIB). "off" = mati.
+	QuizPrizeCron string
 
 	// Log API: satu file .txt per hari di folder LogDir.
 	LogDir           string
@@ -83,11 +81,10 @@ func Load() Config {
 		JWTSecret:    getEnv("JWT_SECRET", ""),
 		JWTAccessTTL: getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
 
-		DailyQuizFreeQuota: getEnvInt("DAILY_QUIZ_FREE_QUOTA", 2),
-		DailyQuizCoinCost:  getEnvInt("DAILY_QUIZ_COIN_COST", 10),
-
 		// Default: setiap jam tepat (menit 0). Isi "off" untuk mematikan scheduler.
 		AccessCodeRefreshCron: getEnv("ACCESS_CODE_REFRESH_CRON", "0 * * * *"),
+		// Default: setiap hari 23:59 WIB (hadiah quiz yang event-nya sudah selesai).
+		QuizPrizeCron: getEnv("QUIZ_PRIZE_CRON", "59 23 * * *"),
 
 		LogDir:           getEnv("LOG_DIR", "logs"),
 		LogRetentionDays: getEnvInt("LOG_RETENTION_DAYS", 15),

@@ -152,3 +152,20 @@ func (r *QuestionRepository) findImageURLs(ctx context.Context, ids []string) (m
 	}
 	return result, nil
 }
+
+// FindDifficulties mengambil level (easy/medium/hard) setiap soal, map id → level.
+// Dipakai menghitung point saat submit. [Native SQL, primary key]
+func (r *QuestionRepository) FindDifficulties(ctx context.Context, ids []string) (map[string]string, error) {
+	result := make(map[string]string, len(ids))
+	if len(ids) == 0 {
+		return result, nil
+	}
+	var rows []struct{ ID, Difficulty string }
+	if err := r.db.WithContext(ctx).Raw(`SELECT id, difficulty FROM questions WHERE id IN ?`, ids).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ID] = row.Difficulty
+	}
+	return result, nil
+}

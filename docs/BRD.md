@@ -19,7 +19,7 @@
 | 1.0       | 1 November 2026 | Draf awal BRD.                                                                                                                                                                                                                                                        |
 | 1.1       | 9 November 2026 | Penyesuaian dengan desain UI: login, beranda siswa, modul, Daily Quiz, isi quiz, Uji Kom & Tryout, RUMATH, peringkat, paket & coin, notifikasi, profil, dan beranda admin. Fitur admin lainnya menyusul.                                                              |
 | 1.2       | 9 November 2026 | Penyesuaian dengan desain panel admin: Materi, Bank Soal, Image, Master Data, Quiz, RUMATH, Leaderboard, Report Quiz, Report RUMATH, User, Coin & Akses, Paket, Landing Page, dan Task. Ditambahkan Bagian 3.16-3.20, BR-024 sampai BR-028, dan BD-025 sampai BD-033. |
-| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text"; Image Library: upload banyak gambar dengan kategori & hierarki mapel, hapus permanen banyak gambar (FR-IMG-005 sampai FR-IMG-008). Daftar Bank Soal: cari kode/teks soal, filter tipe, level, dan setiap tingkat hierarki, kolom pembuat & pengubah terakhir. Master Data: Tipe soal, Tipe quiz, dan Level (disimpan sebagai kode) serta data dropdown (FR-MST-009, FR-MST-010). Buat quiz Uji Kom/Tryout: info quiz, total soal harus sama dengan soal dipilih, syarat soal, penanda soal yang sudah dipakai quiz (FR-TRY-024, FR-TRY-025, FR-TRY-029); waktu mulai quiz (WIB), Uji Kom hanya Kelas 6/9/12, bundle soal (FR-TRY-030), kode akses acak 6 karakter yang diganti setiap jam (FR-TRY-026, FR-TRY-031); jendela event mulai-selesai (bisa lebih dari 1 hari), larangan jadwal beririsan untuk mapel & kelas sama (FR-TRY-032), list quiz dengan status jadwal, ubah, detail, dan hapus quiz (FR-TRY-022, FR-TRY-027); tombol Simpan draf / Publish dan pengumuman quiz di dashboard student (FR-TRY-024, FR-TRY-033); Daily Quiz di-generate student dari soal acak, level = tingkat kesulitan soal, kelas sesuai jenjang (SD: 1-3 & 4-6), total 5/10/15, tanpa kode akses & timer (FR-QUIZ-012 sampai FR-QUIZ-014); buka quiz: Daily Quiz dengan kuota gratis 2x/hari lalu potong coin (FR-QUIZ-021), Uji Kom/Tryout dengan kode akses (FR-TRY-034), kode akses untuk tutor/admin (FR-TRY-035), soal dibuka beserta kunci jawaban tanpa pembahasan; submit jawaban dinilai FE dengan nilai total 100 dan review berisi pembahasan (FR-QUIZ-041, FR-QUIZ-042); waktu pengerjaan per soal & total, quiz yang sudah dikerjakan langsung ke review (FR-QUIZ-043). Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-022, FR-QUIZ-023, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. |
+| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text"; Image Library: upload banyak gambar dengan kategori & hierarki mapel, hapus permanen banyak gambar (FR-IMG-005 sampai FR-IMG-008). Daftar Bank Soal: cari kode/teks soal, filter tipe, level, dan setiap tingkat hierarki, kolom pembuat & pengubah terakhir. Master Data: Tipe soal, Tipe quiz, dan Level (disimpan sebagai kode) serta data dropdown (FR-MST-009, FR-MST-010). Buat quiz Uji Kom/Tryout: info quiz, total soal harus sama dengan soal dipilih, syarat soal, penanda soal yang sudah dipakai quiz (FR-TRY-024, FR-TRY-025, FR-TRY-029); waktu mulai quiz (WIB), Uji Kom hanya Kelas 6/9/12, bundle soal (FR-TRY-030), kode akses acak 6 karakter yang diganti setiap jam (FR-TRY-026, FR-TRY-031); jendela event mulai-selesai (bisa lebih dari 1 hari), larangan jadwal beririsan untuk mapel & kelas sama (FR-TRY-032), list quiz dengan status jadwal, ubah, detail, dan hapus quiz (FR-TRY-022, FR-TRY-027); tombol Simpan draf / Publish dan pengumuman quiz di dashboard student (FR-TRY-024, FR-TRY-033); Daily Quiz di-generate student dari soal acak, level = tingkat kesulitan soal, kelas sesuai jenjang (SD: 1-3 & 4-6), total 5/10/15, tanpa kode akses & timer (FR-QUIZ-012 sampai FR-QUIZ-014); buka quiz: Daily Quiz dengan kuota gratis 2x/hari lalu potong coin (FR-QUIZ-021), Uji Kom/Tryout dengan kode akses (FR-TRY-034), kode akses untuk tutor/admin (FR-TRY-035), soal dibuka beserta kunci jawaban tanpa pembahasan; submit jawaban dinilai FE dengan nilai total 100 dan review berisi pembahasan (FR-QUIZ-041, FR-QUIZ-042); waktu pengerjaan per soal & total, quiz yang sudah dikerjakan langsung ke review (FR-QUIZ-043); point (easy 10 / medium 15 / hard 20, bukan nilai) dan leaderboard: Daily Quiz per bulan dengan filter jenjang & kelas, Uji Kom & Tryout per quiz, urut point lalu waktu tersingkat (FR-RNK-014 sampai FR-RNK-017); tabel leaderboard tersendiri + riwayat point (FR-RNK-018); point per level soal Uji Kom & Tryout dapat diatur admin per quiz dan hadiah coin juara 1-3 per quiz dibagikan otomatis jam 23:59 WIB setelah event selesai (FR-TRY-036 sampai FR-TRY-039); point per level Daily Quiz dapat diatur admin secara global, serta hadiah coin juara 1-3 bulanan Daily Quiz per kelas dibagikan otomatis hari terakhir bulan jam 23:59 WIB (FR-RNK-019 sampai FR-RNK-022); kuota gratis harian dan biaya coin Daily Quiz pindah dari konfigurasi server ke pengaturan global Daily Quiz yang dapat diubah admin (FR-TOK-008, FR-TOK-009); paket isi coin dikelola admin (CRUD), admin menambah coin banyak siswa sekaligus per paket yang dicatat sebagai pembelian tunai, serta riwayat coin untuk siswa dan admin (FR-TOK-007, FR-TOK-015, FR-TOK-018 sampai FR-TOK-020); menu User: list dengan filter & pencarian, detail, ubah, dan hapus (soft delete), admin hanya mengelola tutor & siswa (FR-STU-019 sampai FR-STU-022; BD-026 diputuskan soft delete); tambah user satu atau banyak sekaligus maksimal 100 akun per proses (FR-STU-023); tanggal bergabung (wajib) & tanggal berakhir akun yang memblokir login setelah lewat, serta import user dari Excel yang hanya mengecek lalu disimpan lewat tambah user (FR-STU-024 sampai FR-STU-026); report quiz Uji Kom & Tryout per event, detail peserta per event, dan soal yang paling sering salah (FR-TRY-040 sampai FR-TRY-042); report Daily Quiz per siswa dengan filter periode, mapel, jenjang, kelas dan rincian per mapel (FR-RNK-023 sampai FR-RNK-025); API contoh /subjects dan tabel subjects lama dihapus karena mapel dikelola di master data. Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-022, FR-QUIZ-023, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. |
 
 Catatan v1.2: perubahan v1.2 ditandai sebagai tracked changes (perubahan v1.1 sudah diterima). Hal yang diambil dari desain tetapi belum pasti dicatat di Bagian 15 (Business Decisions Pending).
 
@@ -351,13 +351,29 @@ Functional requirements:
 
 - FR-STU-014: Daftar user menampilkan nama, email, role, kelas atau keterangan (cabang untuk admin dan tutor; "Semua cabang" untuk super admin), dan status (Aktif).
 
-- FR-STU-015: Admin dapat menambah user (tombol "Tambah user"), mengubah (Edit), dan menghapus user. Akun yang sedang login tidak dapat menghapus dirinya sendiri (tombol hapus tidak tersedia pada baris sendiri di desain). Arti "hapus" (nonaktif atau hapus permanen) dikonfirmasi (lihat BD-026).
+- FR-STU-015 (diubah v1.3): Admin dapat menambah user (tombol "Tambah user"), mengubah (Edit), dan menghapus user. Akun yang sedang login tidak dapat menghapus dirinya sendiri (tombol hapus tidak tersedia pada baris sendiri di desain). Hapus user = soft delete (FR-STU-022); hak ubah & hapus per role di FR-STU-021.
 
 - FR-STU-016: Admin dapat menambah banyak akun sekaligus lewat Import Excel (contoh task "Import 120 akun siswa baru"). Sistem memvalidasi setiap baris dan menampilkan baris yang gagal beserta alasannya.
 
 - FR-STU-017: Setiap akun siswa, tutor, dan admin terhubung dengan satu cabang (lihat 3.16). Pembatasan data per cabang dikonfirmasi (lihat BD-025).
 
 - FR-STU-018: Form Tambah user dan Edit user belum tersedia pada desain. Field akun dan tutor mengikuti informasi minimal di bawah dan 3.3.
+
+- FR-STU-019 (baru v1.3): Daftar user di menu User dapat difilter per role, jenjang, kelas, cabang, dan status, serta dicari berdasarkan nama, username, atau email; urut dari yang terbaru dan dibagi per halaman. Angka di setiap tab role mengikuti filter dan pencarian yang sama.
+
+- FR-STU-020 (baru v1.3): Admin dan Super Admin dapat melihat detail user dan mengubah datanya (username, nama, email, telepon, telepon orang tua, asal sekolah, cabang, status, reset password; untuk siswa juga jenjang, kelas, tanggal lahir, dan target sekolah). Role tidak dapat diubah. Siswa wajib memiliki jenjang dan kelas yang sesuai; siswa, tutor, dan admin wajib memiliki cabang; super admin berlaku untuk semua cabang. Akun yang dinonaktifkan atau diganti passwordnya langsung keluar dari semua sesi login.
+
+- FR-STU-021 (baru v1.3): Hak ubah dan hapus: Super Admin dapat mengubah dan menghapus semua akun; Admin hanya akun tutor dan siswa. Akun yang sedang login tidak dapat menghapus atau menonaktifkan dirinya sendiri.
+
+- FR-STU-022 (baru v1.3): Hapus user adalah soft delete (keputusan BD-026): akun tidak tampil lagi dan tidak dapat login, tetapi datanya dan riwayatnya (nilai, coin, peringkat) tetap tersimpan dan username tidak dapat dipakai akun lain. Admin dapat menghapus beberapa user sekaligus; jika ada satu yang tidak boleh dihapus, tidak ada yang terhapus.
+
+- FR-STU-023 (baru v1.3): Admin dan Super Admin dapat menambah user satu per satu atau banyak sekaligus (maksimal 100 akun per proses) dengan role, username, nama, password, dan data lain seperti pada ubah user (FR-STU-020); status awal aktif kecuali dipilih nonaktif. Admin hanya dapat menambah tutor dan siswa; Super Admin semua role. Username tidak boleh kembar, baik di dalam satu proses maupun dengan akun yang sudah ada (termasuk akun yang sudah dihapus). Jika ada satu akun yang tidak valid, tidak ada akun yang disimpan dan semua kesalahan ditampilkan per akun. Kode siswa dibuat otomatis, dan sistem mencatat admin yang membuat akun.
+
+- FR-STU-024 (baru v1.3): Setiap akun memiliki tanggal bergabung (wajib saat tambah, ubah, dan import user) dan tanggal berakhir (opsional, tidak boleh sebelum tanggal bergabung). Data akun juga memuat email, nomor HP, dan nomor HP orang tua/wali.
+
+- FR-STU-025 (baru v1.3): Setelah tanggal berakhir lewat (WIB; di tanggal itu sendiri masih bisa), akun tidak dapat login maupun memperpanjang sesi, dengan pesan bahwa masa aktif akun sudah berakhir. Daftar dan detail user menandai akun yang sudah berakhir. Jika tanggal berakhir diubah ke tanggal yang sudah lewat, sesi login akun tersebut langsung diakhiri.
+
+- FR-STU-026 (baru v1.3): Import user dari Excel (melengkapi FR-STU-016): admin mengunggah file sesuai template (maksimal 100 user per file); sistem hanya mengecek isi file tanpa menyimpan. Cabang, jenjang, dan kelas diisi dengan nama. Setiap baris dicek dengan aturan yang sama dengan tambah user. Jika ada kesalahan, semua data ditolak dan setiap kesalahan ditampilkan dengan nomor baris dan kolom Excel; jika valid, data ditampilkan sebagai pratinjau lalu disimpan lewat tambah user.
 
 Informasi student minimal:
 
@@ -783,6 +799,20 @@ Sistem mendukung kategori tryout:
 
 - FR-TRY-035 (baru v1.3): Tutor, Admin, dan Super Admin dapat melihat kode akses quiz yang berlaku saat ini (beserta waktu terakhir kode diganti) untuk dibagikan kepada student.
 
+- FR-TRY-036 (baru v1.3): Saat membuat atau mengubah quiz Uji Kom dan Tryout, admin dapat mengatur point leaderboard untuk 1 soal yang dijawab benar per level soal (Mudah, Sedang, Sulit), masing-masing 0 sampai 1000. Level yang tidak diisi memakai nilai bawaan 10, 15, dan 20. Jawaban salah dan soal yang tidak dijawab tetap 0 point. Point Daily Quiz diatur terpisah secara global (FR-RNK-019).
+
+- FR-TRY-037 (baru v1.3): Saat membuat atau mengubah quiz Uji Kom dan Tryout, admin dapat mengatur hadiah coin untuk juara 1, 2, dan 3 leaderboard quiz tersebut (masing-masing 0 sampai 1.000.000; tidak diisi = tanpa hadiah). Hadiah tampil di detail quiz, pengumuman quiz, dan leaderboard quiz.
+
+- FR-TRY-038 (baru v1.3): Sistem membagikan hadiah coin juara secara otomatis setiap hari jam 23:59 WIB untuk quiz yang sudah di-publish dan event-nya sudah selesai. Juara ditentukan dengan urutan yang sama dengan leaderboard (FR-RNK-015); student dengan point dan waktu yang sama persis mendapat peringkat dan hadiah yang sama. Setiap hadiah menambah saldo coin student dan tercatat di riwayat coin (sesuai BR-010 dan BR-012) serta di daftar penerima hadiah quiz. Setiap student hanya menerima hadiah 1 kali per quiz. Quiz yang dihapus sebelum hadiah dibagikan tidak mendapat hadiah.
+
+- FR-TRY-039 (baru v1.3): Admin dapat melihat di detail quiz kapan hadiah dibagikan dan daftar penerimanya (peringkat, nama student, point, waktu pengerjaan, jumlah coin).
+
+- FR-TRY-040 (baru v1.3): Admin, Super Admin, dan Tutor dapat melihat report quiz Uji Kom dan Tryout per event (per quiz yang sudah di-publish): tanggal event, nama quiz, total peserta, nilai rata-rata, nilai tertinggi, dan nilai terendah. Peserta adalah student yang sudah mengumpulkan jawaban. Report dapat difilter per tipe, nama quiz, jenjang, kelas, mapel, dan rentang tanggal event, urut dari event terbaru.
+
+- FR-TRY-041 (baru v1.3): Detail report per event menampilkan setiap peserta: peringkat (aturan sama dengan leaderboard, FR-RNK-015), nama siswa, jumlah jawaban benar dari total soal (contoh 9/10), nilai, point, dan waktu penyelesaian; dapat dicari per nama atau kode siswa tanpa mengubah peringkat.
+
+- FR-TRY-042 (baru v1.3): Report per event juga menampilkan daftar soal quiz yang diurutkan dari yang paling sering salah sampai yang paling sedikit salah, dengan persentase peserta yang menjawab benar (contoh 13%), serta jumlah yang menjawab salah dan yang tidak menjawab.
+
 - FR-TRY-033 (baru v1.3): Quiz Uji Kom dan Tryout yang sudah di-publish dan event-nya belum selesai tampil sebagai pengumuman di dashboard student yang kelasnya sama dengan kelas quiz, berisi nama quiz, tipe, mapel, hari, tanggal, dan jam mulai serta selesai (WIB), status jadwal (akan dimulai / sedang berjalan), durasi, jumlah soal, dan biaya coin; urut dari yang paling dekat dimulai. Kode akses tidak ditampilkan di pengumuman. Quiz berstatus Draft tidak tampil.
 
 - FR-TRY-032 (baru v1.3): Tidak boleh ada dua quiz (yang belum dihapus, tipe dan status apa pun) dengan Mapel dan Kelas yang sama yang jendela event-nya beririsan. Quiz yang mulai tepat saat quiz lain selesai diperbolehkan. Jika bentrok, sistem menolak dan menampilkan nama serta jadwal quiz yang bentrok. Aturan berlaku saat membuat maupun mengubah quiz, dan dijaga juga oleh database.
@@ -1034,13 +1064,13 @@ Catatan penamaan: ID requirement FR-TOK dipertahankan agar traceability tetap te
 
 - FR-TOK-006: Student dapat melihat sisa coin dan sisa kuota gratis hari ini.
 
-- FR-TOK-007: Admin dapat melihat riwayat coin student.
+- FR-TOK-007 (diubah v1.3): Admin dan Super Admin dapat melihat riwayat coin setiap student; student dapat melihat riwayat coin miliknya sendiri. Riwayat berisi jenis transaksi, jumlah coin masuk/keluar, saldo setelahnya, harga (untuk pembelian), asal transaksi (contoh nama paket coin atau nama quiz), pencatat, dan waktu, urut terbaru, dapat difilter per jenis dan dibagi per halaman.
 
 <!-- -->
 
-- FR-TOK-008: Sistem menerapkan kuota gratis Daily Quiz 2 kali per hari dan menampilkan pemakaiannya ("Jatah gratis hari ini 0 dari 2").
+- FR-TOK-008 (diubah v1.3): Sistem menerapkan kuota gratis Daily Quiz per hari (WIB) dan menampilkan pemakaiannya ("Jatah gratis hari ini 0 dari 2"). Besar kuota diatur Admin dan Super Admin di pengaturan global Daily Quiz (nilai awal 2 kali per hari; FR-RNK-019).
 
-- FR-TOK-009: Setelah kuota gratis habis, sistem memotong 10 coin per Daily Quiz. Jika coin tidak cukup, quiz tidak dapat dimulai.
+- FR-TOK-009 (diubah v1.3): Setelah kuota gratis habis, sistem memotong coin per Daily Quiz sesuai pengaturan global Daily Quiz (nilai awal 10 coin; 0 = selalu gratis). Jika coin tidak cukup, quiz tidak dapat dimulai. Perubahan kuota dan biaya langsung berlaku untuk Daily Quiz yang dibuka setelahnya.
 
 - FR-TOK-010: Student dapat membeli coin pada tab "Isi coin" dengan memilih salah satu paket coin; tombol beli menampilkan jumlah coin dan harga.
 
@@ -1052,11 +1082,17 @@ Catatan penamaan: ID requirement FR-TOK dipertahankan agar traceability tetap te
 
 - FR-TOK-014: Kolom Akses merangkum fitur yang terbuka bagi siswa menurut paketnya (contoh desain: Reguler SD "Modul, Daily"; Reguler SMP "Modul, Daily, Uji Kom"; Intensif Masuk SMA "Semua + RUMATH"). Kolom Berlaku s/d menampilkan tanggal berakhir paket (FR-SUB-005).
 
-- FR-TOK-015: Admin dapat mengubah coin dan akses siswa satu per satu (tombol Edit) atau sekaligus (memilih beberapa baris dengan kotak centang). Form edit belum tersedia pada desain.
+- FR-TOK-015 (diubah v1.3): Admin dapat mengubah coin dan akses siswa satu per satu (tombol Edit) atau sekaligus (memilih beberapa baris dengan kotak centang). Penambahan coin dilakukan per paket coin (FR-TOK-019). Form edit akses belum tersedia pada desain.
 
 - FR-TOK-016: Setiap perubahan coin dan akses oleh admin harus tercatat dalam transaction history dengan referensi, sesuai BR-010 dan BR-012; saldo tidak boleh menjadi negatif.
 
 - FR-TOK-017: Admin dapat mengekspor daftar Coin & Akses (tombol Export; format dikonfirmasi).
+
+- FR-TOK-018 (baru v1.3): Admin dan Super Admin dapat mengelola paket isi coin (tambah, lihat, ubah, hapus banyak sekaligus dengan soft delete): nama (unik), jumlah coin, harga, keterangan, urutan tampil, dan status aktif/nonaktif. Student hanya melihat paket aktif. Perubahan harga tidak mengubah riwayat pembelian yang sudah tercatat.
+
+- FR-TOK-019 (baru v1.3): Admin dan Super Admin dapat menambah coin student secara manual dengan memilih satu paket coin aktif dan satu atau beberapa student sekaligus (maksimal 100 per proses). Setiap student mendapat coin sebanyak isi paket. Transaksi dicatat sebagai pembelian tunai di cabang beserta harga paket dan admin pencatatnya. Jika ada student atau paket yang tidak valid, tidak ada coin yang ditambahkan. Proses yang terkirim dua kali tidak menambah coin dua kali.
+
+- FR-TOK-020 (baru v1.3): Riwayat coin milik student juga menampilkan saldo coin saat ini dan sisa jatah Daily Quiz gratis hari ini (melengkapi FR-TOK-006).
 
 **Paket Isi Coin pada Desain**
 
@@ -1246,6 +1282,30 @@ Functional requirements:
 - FR-RNK-012: Setiap baris peringkat memiliki tombol Edit (diasumsikan untuk koreksi poin manual; lihat BD-028).
 
 - FR-RNK-013: Admin dapat mengekspor peringkat (tombol Export; format dikonfirmasi).
+
+- FR-RNK-014 (baru v1.3): Nilai berbeda dengan point. Nilai (0-100) hanya untuk hasil quiz; peringkat memakai point. Setiap soal yang dijawab benar mendapat point sesuai level soal: Mudah (easy) 10 point, Sedang (medium) 15 point, Sulit (hard) 20 point; jawaban salah dan soal yang tidak dijawab 0 point. Aturan ini berlaku untuk semua quiz (Daily Quiz, Uji Kom, Tryout); besar point per level dapat diatur admin: per quiz untuk Uji Kom dan Tryout (FR-TRY-036), dan secara global untuk seluruh Daily Quiz (FR-RNK-019). Point dihitung sistem saat jawaban dikumpulkan.
+
+- FR-RNK-015 (baru v1.3): Urutan peringkat: point tertinggi di atas; jika point dua student sama, yang total waktu pengerjaannya paling singkat di atas; jika point dan waktu sama persis, peringkatnya sama.
+
+- FR-RNK-016 (baru v1.3): Leaderboard Daily Quiz = jumlah point dari seluruh Daily Quiz yang dikumpulkan student dalam bulan yang sama (WIB); dapat dipilih bulannya dan difilter per jenjang dan per kelas student (peringkat dihitung di dalam filter tersebut).
+
+- FR-RNK-017 (baru v1.3): Uji Kom dan Tryout masing-masing memiliki leaderboard sendiri per quiz (tidak digabung): peserta adalah student yang sudah mengumpulkan jawaban quiz tersebut. Student hanya dapat melihat leaderboard quiz yang sudah di-publish untuk kelasnya; tutor dan admin dapat melihat semua.
+
+- FR-RNK-018 (baru v1.3): Point leaderboard disimpan di tabel leaderboard tersendiri: total per student per papan (Daily Quiz per bulan, Uji Kom/Tryout per quiz) beserta jenjang dan kelas student saat point masuk, dan riwayat setiap point yang masuk (dari pengerjaan quiz mana, berapa point dan waktunya, kapan) untuk pelacakan. Satu pengerjaan hanya dapat menambah point satu kali. Pencatatan dilakukan bersamaan dengan submit jawaban (berhasil atau gagal bersama). Filter jenjang dan kelas leaderboard memakai jenjang dan kelas saat point masuk, sehingga peringkat bulan lalu tidak berubah walaupun student naik kelas.
+
+- FR-RNK-019 (baru v1.3): Admin dan Super Admin dapat mengubah pengaturan global Daily Quiz yang berlaku untuk seluruh Daily Quiz: point 1 soal yang dijawab benar per level soal (Mudah, Sedang, Sulit; masing-masing 0 sampai 1000; nilai awal 10, 15, 20). Pengaturan yang sama juga memuat kuota gratis Daily Quiz per hari (0 sampai 100, nilai awal 2) dan biaya coin per Daily Quiz setelah kuota habis (0 sampai 1.000.000, nilai awal 10), lihat FR-TOK-008 dan FR-TOK-009. Point baru dipakai untuk Daily Quiz yang dikumpulkan setelah diubah; point yang sudah tercatat tidak berubah. Semua pengguna yang login dapat melihat pengaturan ini.
+
+- FR-RNK-020 (baru v1.3): Pada pengaturan yang sama, Admin dan Super Admin dapat mengatur hadiah coin untuk juara 1, 2, dan 3 leaderboard Daily Quiz bulanan (0 sampai 1.000.000; 0 = tanpa hadiah). Juara dihitung per kelas: setiap kelas memiliki juara 1, 2, dan 3 sendiri dengan besar hadiah yang sama.
+
+- FR-RNK-021 (baru v1.3): Sistem membagikan hadiah juara bulanan Daily Quiz secara otomatis pada hari terakhir setiap bulan jam 23:59 WIB, memakai besar hadiah pada saat itu. Juara per kelas ditentukan dengan urutan leaderboard (FR-RNK-015) memakai kelas student saat point masuk; student dengan point dan waktu yang sama persis mendapat peringkat dan hadiah yang sama. Setiap hadiah menambah saldo coin dan tercatat di riwayat coin (BR-010, BR-012). Satu bulan hanya dibagikan satu kali; bulan yang terlewat (contoh server mati) dibagikan pada jadwal berikutnya.
+
+- FR-RNK-022 (baru v1.3): Leaderboard Daily Quiz menampilkan hadiah juara bulan tersebut dan waktu pembagiannya; jika difilter per kelas, setiap peringkat menampilkan hadiah yang didapat. Admin dan Super Admin dapat melihat daftar penerima hadiah per bulan (kelas, peringkat, nama student, point, waktu pengerjaan, jumlah coin).
+
+- FR-RNK-023 (baru v1.3): Admin, Super Admin, dan Tutor dapat melihat report Daily Quiz per siswa (Daily Quiz dibuat siswa sendiri sehingga tidak ada event): peringkat, nama siswa, jumlah Daily Quiz, jumlah Daily Quiz per level (mudah, sedang, sulit), rata-rata nilai, rata-rata waktu pengerjaan, jumlah soal yang dikerjakan, jumlah benar dan salah (termasuk tidak dijawab), dan total point. Yang dihitung hanya Daily Quiz yang sudah dikumpulkan.
+
+- FR-RNK-024 (baru v1.3): Report Daily Quiz memakai periode tanggal pengumpulan (default bulan berjalan, maksimal 366 hari) dan dapat difilter per mapel, jenjang, dan kelas siswa, serta dicari per nama atau kode siswa. Peringkat dihitung di dalam filter dengan aturan leaderboard (total point tertinggi, lalu total waktu tersingkat); jika difilter mapel, semua angka dan peringkat hanya dari Daily Quiz mapel tersebut.
+
+- FR-RNK-025 (baru v1.3): Detail report Daily Quiz satu siswa menampilkan rekap total dan rincian per mapel (jumlah Daily Quiz, per level, rata-rata nilai dan waktu, jumlah soal, benar, salah, persentase benar, total point).
 
 **Konfigurasi Leaderboard pada Desain Admin**
 
@@ -1448,7 +1508,7 @@ Bagian ini berisi aturan bisnis yang wajib menjadi acuan seluruh implementasi.
 | BR-016 | Akun student dibuat oleh admin; student tidak dapat mendaftar sendiri.                                           |
 | BR-017 | Login menggunakan email atau nomor HP.                                                                           |
 | BR-018 | Nilai Daily Quiz, Uji Kom, Tryout, dan RUMATH berskala 0-100 (skala Tryout dikonfirmasi, lihat BD-033).          |
-| BR-019 | Daily Quiz memiliki kuota gratis 2 kali per hari; setelah itu 10 coin per quiz (nilai dapat dikonfigurasi).      |
+| BR-019 | Daily Quiz memiliki kuota gratis 2 kali per hari; setelah itu 10 coin per quiz (nilai dapat diubah admin di pengaturan global Daily Quiz).      |
 | BR-020 | Uji Kom dan Tryout hanya dapat dimasuki dengan kode akses dan pada waktu yang dijadwalkan.                       |
 | BR-021 | Peringkat dihitung dari poin pada tiga kategori terpisah: Daily Quiz, Uji Kom, dan Tryout.                       |
 | BR-022 | Materi, soal, dan statistik dikelompokkan berdasarkan jenjang (SD / SMP).                                        |

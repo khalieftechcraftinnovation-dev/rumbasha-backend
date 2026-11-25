@@ -73,6 +73,9 @@ func (s *LoginService) Login(ctx context.Context, username, password, userAgent 
 	}
 
 	now := time.Now()
+	if user.IsEnded(now) {
+		return Session{}, loginmodel.ErrAccountEnded
+	}
 	sessionEnd := clock.StartOfNextMonth(now) // semua sesi berakhir tiap awal bulan
 
 	refreshToken, err := token.NewRefreshToken()
@@ -117,6 +120,9 @@ func (s *LoginService) Refresh(ctx context.Context, refreshToken, userAgent stri
 	}
 	if !user.IsActive() {
 		return Session{}, loginmodel.ErrUserInactive
+	}
+	if user.IsEnded(now) {
+		return Session{}, loginmodel.ErrAccountEnded
 	}
 
 	newRefreshToken, err := token.NewRefreshToken()

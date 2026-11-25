@@ -58,14 +58,16 @@ func TestMasterDataItemsHierarchyRules(t *testing.T) {
 			name: "bab tanpa kelas ditolak",
 			sql: `INSERT INTO master_data_items (type, name, parent_id, subject_id, education_level_id)
 				SELECT 'chapter', 'Pecahan', f.id, f.subject_id, f.education_level_id
-				FROM master_data_items f WHERE f.type = 'subject_field' AND f.name = 'Bilangan'`,
+				FROM master_data_items f WHERE f.type = 'subject_field' AND f.name = 'Bilangan'
+				  AND f.subject_id = (SELECT id FROM master_data_items WHERE code = 'TEST_MTK')`,
 			wantErr: true,
 		},
 		{
 			name: "bab dengan data lengkap diterima",
 			sql: `INSERT INTO master_data_items (type, name, parent_id, subject_id, education_level_id, grade_id)
 				SELECT 'chapter', 'Pecahan', f.id, f.subject_id, f.education_level_id, f.grade_id
-				FROM master_data_items f WHERE f.type = 'subject_field' AND f.name = 'Bilangan'`,
+				FROM master_data_items f WHERE f.type = 'subject_field' AND f.name = 'Bilangan'
+				  AND f.subject_id = (SELECT id FROM master_data_items WHERE code = 'TEST_MTK')`,
 			wantErr: false,
 		},
 		{

@@ -44,6 +44,8 @@ type User struct {
 	GradeID          *string
 	Status           string
 	LastLoginAt      *time.Time
+	JoinDate         time.Time  // tanggal bergabung
+	EndDate          *time.Time // tanggal berakhir (inklusif, WIB); lewat = tidak bisa login. nil = tanpa batas
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	DeletedAt        *time.Time
@@ -101,6 +103,20 @@ var (
 	// supaya orang lain tidak bisa menebak username mana yang terdaftar.
 	ErrInvalidCredentials = errors.New("username atau kata sandi salah")
 	ErrUserInactive       = errors.New("akun tidak aktif")
+	ErrAccountEnded       = errors.New("masa aktif akun sudah berakhir")
 	ErrSessionExpired     = errors.New("sesi sudah berakhir")
 	ErrUserNotFound       = errors.New("user tidak ditemukan")
 )
+
+// IsEnded bernilai true kalau tanggal berakhir akun (end_date) sudah lewat pada waktu now (WIB).
+// end_date inklusif: di tanggal itu akun masih bisa login, besoknya tidak.
+// Tanggal dibandingkan sebagai teks "YYYY-MM-DD" supaya tidak terpengaruh zona waktu kolom DATE.
+func (u User) IsEnded(now time.Time) bool {
+	if u.EndDate == nil {
+		return false
+	}
+	return u.EndDate.Format(time.DateOnly) < now.In(jakarta).Format(time.DateOnly)
+}
+
+// jakarta = zona WIB (sama dengan clock.Jakarta; ditulis ulang supaya model tidak bergantung package lain).
+var jakarta = time.FixedZone("WIB", 7*60*60)

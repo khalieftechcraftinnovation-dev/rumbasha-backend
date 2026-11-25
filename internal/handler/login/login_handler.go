@@ -125,6 +125,8 @@ func (h *LoginHandler) handleError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, loginmodel.ErrInvalidCredentials):
 		response.Error(c, http.StatusUnauthorized, "Username atau kata sandi salah")
+	case errors.Is(err, loginmodel.ErrAccountEnded):
+		response.Error(c, http.StatusForbidden, "Masa aktif akun Anda sudah berakhir. Silakan hubungi admin")
 	case errors.Is(err, loginmodel.ErrUserInactive):
 		response.Error(c, http.StatusForbidden, "Akun Anda tidak aktif. Silakan hubungi admin")
 	case errors.Is(err, loginmodel.ErrSessionExpired), errors.Is(err, loginmodel.ErrUserNotFound):

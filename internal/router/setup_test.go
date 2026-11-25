@@ -1,7 +1,7 @@
 // Helper bersama untuk semua test endpoint di folder ini.
 //
 // Test di sini menguji dari ujung ke ujung: route → middleware → handler →
-// service → repository → PostgreSQL. Memakai database test (rumbasha_test).
+// service → repository → PostgreSQL. Memakai database DB_NAME (rumbasha); tabel data dikosongkan setiap test.
 // Jalankan dengan: make test   (atau: go test -p 1 ./...)
 //
 // Catatan Go: file test selalu berakhiran _test.go, dan fungsi test
@@ -21,32 +21,44 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/coin"
 	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
+	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquizreport"
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
+	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
-	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
+	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
+	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
+	coinrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/coin"
 	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
+	dailyquizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquizreport"
 	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
+	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/leaderboard"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
-	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
+	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quizreport"
 	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
+	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user"
+	coinservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/coin"
 	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquiz"
+	dailyquizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquizreport"
 	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
+	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/leaderboard"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/question"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
-	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
+	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quizreport"
 	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
+	userservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/testutil"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/token"
@@ -89,7 +101,7 @@ type testApp struct {
 	StorageDir string          // folder file upload sementara (gambar)
 }
 
-// setupRouter menyusun semua layer persis seperti di main.go, tapi memakai database test.
+// setupRouter menyusun semua layer persis seperti di main.go, tapi memakai database DB_NAME (tabel data dikosongkan).
 // db ikut dikembalikan supaya test bisa menyiapkan data langsung dengan SQL.
 func setupRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
@@ -118,7 +130,6 @@ func setupApp(t *testing.T) testApp {
 		15*time.Minute,
 	)
 	subscriptionService := subscriptionservice.NewSubscriptionService(subscriptionrepo.NewSubscriptionRepository(db))
-	subjectService := subjectservice.NewSubjectService(subjectrepo.NewSubjectRepository(db))
 	mail := &fakeMailSender{}
 	logReportService := logreportservice.NewLogReportService(mail, logDir, "dev@example.com", "test")
 
@@ -126,14 +137,18 @@ func setupApp(t *testing.T) testApp {
 	store := storage.NewLocal(storageDir, testAppURL)
 
 	r := New(Handlers{
-		Login:     loginhandler.NewLoginHandler(loginService, subscriptionService),
-		Subject:   subjecthandler.NewSubjectHandler(subjectService),
-		LogReport: logreporthandler.NewLogReportHandler(logReportService, loginService),
-		Question:  questionhandler.NewQuestionHandler(questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db))),
-		Image:     imagehandler.NewImageHandler(imageservice.NewImageService(imagerepo.NewImageRepository(db), store)),
-		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
-		Quiz:      quizhandler.NewQuizHandler(quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))),
-		DailyQuiz: dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db), 2, 10)),
+		Login:           loginhandler.NewLoginHandler(loginService, subscriptionService),
+		LogReport:       logreporthandler.NewLogReportHandler(logReportService, loginService),
+		Question:        questionhandler.NewQuestionHandler(questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db))),
+		Image:           imagehandler.NewImageHandler(imageservice.NewImageService(imagerepo.NewImageRepository(db), store)),
+		Dropdown:        dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
+		Quiz:            quizhandler.NewQuizHandler(quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))),
+		DailyQuiz:       dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db))),
+		Leaderboard:     leaderboardhandler.NewLeaderboardHandler(leaderboardservice.NewLeaderboardService(leaderboardrepo.NewLeaderboardRepository(db))),
+		Coin:            coinhandler.NewCoinHandler(coinservice.NewCoinService(coinrepo.NewCoinRepository(db))),
+		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db))),
+		QuizReport:      quizreporthandler.NewQuizReportHandler(quizreportservice.NewQuizReportService(quizreportrepo.NewQuizReportRepository(db))),
+		DailyQuizReport: dailyquizreporthandler.NewDailyQuizReportHandler(dailyquizreportservice.NewDailyQuizReportService(dailyquizreportrepo.NewDailyQuizReportRepository(db))),
 	}, testJWTSecret, apiLog, storageDir)
 
 	return testApp{Router: r, DB: db, APILog: apiLog, LogDir: logDir, Mail: mail, StorageDir: storageDir}
@@ -164,7 +179,7 @@ func tokenFor(t *testing.T, role string) string {
 	return accessToken
 }
 
-// createUser menyimpan user ke database test dengan password testPassword, lalu mengembalikan ID-nya.
+// createUser menyimpan user ke database dengan password testPassword, lalu mengembalikan ID-nya.
 func createUser(t *testing.T, db *gorm.DB, role, username, status string) string {
 	t.Helper()
 	var id string

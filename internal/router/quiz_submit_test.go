@@ -13,12 +13,13 @@ import (
 type reviewData struct {
 	State  string `json:"state"`
 	Result struct {
-		Score             float64 `json:"score"`
-		CorrectCount      int     `json:"correct_count"`
-		TotalQuestions    int     `json:"total_questions"`
-		PointsPerQuestion float64 `json:"points_per_question"`
-		SubmittedAt       string  `json:"submitted_at"`
-		DurationSeconds   int     `json:"duration_seconds"`
+		Score            float64 `json:"score"`
+		CorrectCount     int     `json:"correct_count"`
+		TotalQuestions   int     `json:"total_questions"`
+		ScorePerQuestion float64 `json:"score_per_question"`
+		Points           int     `json:"points"`
+		SubmittedAt      string  `json:"submitted_at"`
+		DurationSeconds  int     `json:"duration_seconds"`
 	} `json:"result"`
 	Questions []struct {
 		No               int            `json:"no"`
@@ -27,7 +28,8 @@ type reviewData struct {
 		Answer           map[string]any `json:"answer"`
 		StudentAnswer    any            `json:"student_answer"`
 		IsCorrect        bool           `json:"is_correct"`
-		Points           float64        `json:"points"`
+		Score            float64        `json:"score"`
+		Points           int            `json:"points"`
 		AnsweredAt       *string        `json:"answered_at"`
 		TimeSpentSeconds *int           `json:"time_spent_seconds"`
 	} `json:"questions"`
@@ -85,7 +87,7 @@ func TestSubmitQuiz_NilaiDanReview(t *testing.T) {
 	var review reviewData
 	decodeData(t, res, &review)
 	if review.Result.Score != 66.67 || review.Result.CorrectCount != 2 || review.Result.TotalQuestions != 3 ||
-		review.Result.PointsPerQuestion != 33.33 || !strings.HasSuffix(review.Result.SubmittedAt, "+07:00") {
+		review.Result.ScorePerQuestion != 33.33 || review.Result.Points != 20 || !strings.HasSuffix(review.Result.SubmittedAt, "+07:00") {
 		t.Errorf("hasil: %+v", review.Result)
 	}
 	wantIDs := []string{q1, q2, q3}
@@ -95,8 +97,8 @@ func TestSubmitQuiz_NilaiDanReview(t *testing.T) {
 		}
 	}
 	if len(review.Questions) != 3 || review.Questions[0].StudentAnswer != "B" || !review.Questions[0].IsCorrect ||
-		review.Questions[0].Points != 33.33 || review.Questions[0].Answer["correct_key"] != "B" ||
-		review.Questions[2].StudentAnswer != nil || review.Questions[2].IsCorrect || review.Questions[2].Points != 0 {
+		review.Questions[0].Score != 33.33 || review.Questions[0].Points != 10 || review.Questions[0].Answer["correct_key"] != "B" ||
+		review.Questions[2].StudentAnswer != nil || review.Questions[2].IsCorrect || review.Questions[2].Score != 0 || review.Questions[2].Points != 0 {
 		t.Errorf("review jawaban: %+v", review.Questions)
 	}
 	// Waktu: per soal dari FE (ditampilkan WIB), total = submit - mulai (± 10 menit).
@@ -119,6 +121,18 @@ func TestSubmitQuiz_NilaiDanReview(t *testing.T) {
 	if stored.Score != 66.67 || stored.CorrectCount != 2 || stored.DurationSeconds != review.Result.DurationSeconds ||
 		!strings.Contains(stored.Answers, `"is_correct": true`) || !strings.Contains(stored.Answers, `"time_spent_seconds": 42`) {
 		t.Errorf("tersimpan: %+v", stored)
+	}
+
+	// Leaderboard quiz ini ikut tercatat (1 baris + 1 riwayat) dalam transaksi submit.
+	var lb struct {
+		Board  string
+		Points int
+		Logs   int
+	}
+	db.Raw(`SELECT e.board, e.points, (SELECT COUNT(*) FROM leaderboard_point_logs l WHERE l.entry_id = e.id AND l.source_type = 'quiz_attempt') AS logs
+		FROM leaderboard_entries e WHERE e.quiz_id = ?`, quiz.ID).Scan(&lb)
+	if lb.Board != "uji_kom" || lb.Points != 20 || lb.Logs != 1 {
+		t.Errorf("leaderboard uji kom: %+v", lb)
 	}
 
 	// Sudah submit: buka quiz lagi (tanpa kode, walaupun event sudah selesai) → langsung review.
@@ -208,7 +222,7 @@ func TestSubmitDailyQuiz_NilaiDanReview(t *testing.T) {
 	if review.State != "submitted" || review.Result.DurationSeconds < 295 || review.Result.DurationSeconds > 360 {
 		t.Errorf("state %q, lama mengerjakan %d detik, seharusnya submitted & ±300", review.State, review.Result.DurationSeconds)
 	}
-	if review.Result.Score != 60 || review.Result.CorrectCount != 3 || review.Result.PointsPerQuestion != 20 || len(review.Questions) != 5 {
+	if review.Result.Score != 60 || review.Result.CorrectCount != 3 || review.Result.ScorePerQuestion != 20 || review.Result.Points != 30 || len(review.Questions) != 5 {
 		t.Errorf("hasil: %+v", review.Result)
 	}
 	for i, q := range review.Questions {

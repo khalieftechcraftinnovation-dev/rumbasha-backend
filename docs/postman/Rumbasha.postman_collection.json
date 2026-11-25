@@ -16,7 +16,6 @@
     { "key": "password", "value": "password123" },
     { "key": "access_token", "value": "" },
     { "key": "refresh_token", "value": "" },
-    { "key": "subject_id", "value": "" },
     { "key": "q_education_level_id", "value": "" },
     { "key": "q_grade_id", "value": "" },
     { "key": "q_subject_id", "value": "" },
@@ -36,6 +35,20 @@
     { "key": "quiz_access_code", "value": "" },
     { "key": "quiz2_id", "value": "" },
     { "key": "daily_quiz_id", "value": "" },
+    { "key": "daily_free_per_day", "value": "2" },
+    { "key": "daily_coin_cost", "value": "10" },
+    { "key": "coin_package_id", "value": "" },
+    { "key": "coin_student_id", "value": "" },
+    { "key": "coin_balance_before", "value": "0" },
+    { "key": "user_id", "value": "" },
+    { "key": "user_username", "value": "" },
+    { "key": "user_name", "value": "" },
+    { "key": "user_branch_id", "value": "" },
+    { "key": "user_level_id", "value": "" },
+    { "key": "user_grade_id", "value": "" },
+    { "key": "new_user_ids_json", "value": "[]" },
+    { "key": "report_quiz_id", "value": "" },
+    { "key": "report_student_id", "value": "" },
     { "key": "daily_answers_json", "value": "{\"answers\":[]}" }
   ],
   "item": [
@@ -436,127 +449,6 @@
                   "  const fields = pm.response.json().errors.map(e => e.field);",
                   "  pm.expect(fields).to.include('password');",
                   "});"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Subject",
-      "description": "CRUD mata pelajaran (contoh). Wajib login. Melihat: semua role. Tambah/ubah/hapus: hanya admin & super admin (role lain 403).\n\nLogin dulu sebagai admin (**Login per role > Admin**).\n\n**Catatan:** saat ini route subject sedang dimatikan di `internal/router/router.go` (baris `subjectrouter.Register` di-comment), jadi semua request di folder ini mendapat 404 sampai baris itu diaktifkan lagi.",
-      "item": [
-        {
-          "name": "Daftar subject",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/api/v1/subjects?page=1&per_page=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "subjects"],
-              "query": [
-                { "key": "page", "value": "1", "description": "Halaman, mulai dari 1" },
-                { "key": "per_page", "value": "20", "description": "Jumlah data per halaman, maksimal 100" }
-              ]
-            },
-            "description": "Daftar subject dengan pagination. Info halaman ada di `meta`."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Tambah subject (admin)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"code\": \"MTK\",\n  \"name\": \"Matematika\"\n}"
-            },
-            "url": "{{base_url}}/api/v1/subjects",
-            "description": "Tambah subject. Kode otomatis diubah ke huruf besar. Kode kembar → 409. ID hasilnya disimpan ke variable `subject_id`."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "pm.collectionVariables.set('subject_id', pm.response.json().data.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Detail subject",
-          "request": {
-            "method": "GET",
-            "url": "{{base_url}}/api/v1/subjects/{{subject_id}}",
-            "description": "Detail satu subject berdasarkan `subject_id`."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Ubah subject (admin)",
-          "request": {
-            "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"code\": \"MTK\",\n  \"name\": \"Matematika Dasar\"\n}"
-            },
-            "url": "{{base_url}}/api/v1/subjects/{{subject_id}}",
-            "description": "Ubah subject berdasarkan `subject_id`."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Hapus subject (admin)",
-          "request": {
-            "method": "DELETE",
-            "url": "{{base_url}}/api/v1/subjects/{{subject_id}}",
-            "description": "Hapus subject secara permanen berdasarkan `subject_id`."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set('subject_id', '');"
                 ]
               }
             }
@@ -1012,10 +904,10 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Tryout Matematika - KPK dan FPB\",\n  \"type\": \"tryout\",\n  \"status\": \"published\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"end_at\": \"{{quiz_end_at}}\",\n  \"duration_minutes\": 60,\n  \"coin_cost\": 0,\n  \"total_questions\": 2,\n  \"question_ids\": {{quiz_question_ids_json}}\n}"
+              "raw": "{\n  \"name\": \"Tryout Matematika - KPK dan FPB\",\n  \"type\": \"tryout\",\n  \"status\": \"published\",\n  \"placement\": {\n    \"education_level_id\": \"{{q_education_level_id}}\",\n    \"grade_id\": \"{{q_grade_id}}\",\n    \"subject_id\": \"{{q_subject_id}}\",\n    \"subject_field_id\": \"{{q_subject_field_id}}\",\n    \"chapter_id\": \"{{q_chapter_id}}\"\n  },\n  \"start_at\": \"{{quiz_start_at}}\",\n  \"end_at\": \"{{quiz_end_at}}\",\n  \"duration_minutes\": 60,\n  \"coin_cost\": 0,\n  \"total_questions\": 2,\n  \"question_ids\": {{quiz_question_ids_json}},\n  \"points\": { \"easy\": 10, \"medium\": 25, \"hard\": 40 },\n  \"prize_coins\": { \"rank_1\": 500, \"rank_2\": 300, \"rank_3\": 100 }\n}"
             },
             "url": "{{base_url}}/api/v1/quizzes",
-            "description": "Body:\n- `name`, `type` (`uji_kom` / `tryout`), `status`, `start_at`, `end_at`, `duration_minutes` (1-600) wajib.\n- `status`: tombol simpan, `draft` (Simpan draf) atau `published` (Publish: tampil di pengumuman siswa kelas tersebut).\n- `start_at` / `end_at`: jendela event WIB (boleh beberapa hari), contoh `2026-12-01T08:00` (tanpa zona = WIB) atau RFC3339 `2026-12-01T01:00:00Z`. start_at harus setelah sekarang; end_at minimal start_at + durasi.\n- Mapel & kelas sama tidak boleh punya jadwal beririsan dengan quiz lain.\n- `placement`: jenjang, kelas, mapel wajib; bidang materi, bab, sub bab, topik opsional (berurutan). Uji Kom hanya Kelas 6/9/12.\n- `coin_cost` opsional (default 0 = gratis).\n- `bundle_quiz_ids` (opsional, maks 20): semua soal dari quiz lain ikut.\n- `question_ids` (opsional): soal satuan, urutan = nomor soal (setelah soal bundle).\n- `total_questions` wajib = jumlah soal akhir (bundle + satuan, soal kembar dihitung sekali).\n\nQuiz baru berstatus `draft` dan langsung punya `access_code` acak 6 karakter (diganti tiap jam selama quiz belum selesai)."
+            "description": "Body:\n- `name`, `type` (`uji_kom` / `tryout`), `status`, `start_at`, `end_at`, `duration_minutes` (1-600) wajib.\n- `status`: tombol simpan, `draft` (Simpan draf) atau `published` (Publish: tampil di pengumuman siswa kelas tersebut).\n- `start_at` / `end_at`: jendela event WIB (boleh beberapa hari), contoh `2026-12-01T08:00` (tanpa zona = WIB) atau RFC3339 `2026-12-01T01:00:00Z`. start_at harus setelah sekarang; end_at minimal start_at + durasi.\n- Mapel & kelas sama tidak boleh punya jadwal beririsan dengan quiz lain.\n- `placement`: jenjang, kelas, mapel wajib; bidang materi, bab, sub bab, topik opsional (berurutan). Uji Kom hanya Kelas 6/9/12.\n- `coin_cost` opsional (default 0 = gratis).\n- `bundle_quiz_ids` (opsional, maks 20): semua soal dari quiz lain ikut.\n- `question_ids` (opsional): soal satuan, urutan = nomor soal (setelah soal bundle).\n- `total_questions` wajib = jumlah soal akhir (bundle + satuan, soal kembar dihitung sekali).\n- `points` (opsional): point leaderboard 1 soal BENAR per level (`easy`/`medium`/`hard`, 0-1000). Level yang tidak diisi = default 10/15/20.\n- `prize_coins` (opsional): hadiah coin juara 1-3 leaderboard quiz (`rank_1`/`rank_2`/`rank_3`, 0-1.000.000; tidak diisi = 0). Dibagikan otomatis oleh scheduler jam 23:59 WIB setelah event selesai; penerimanya tampil di `prize_awards` detail quiz.\n\nQuiz baru berstatus `draft` dan langsung punya `access_code` acak 6 karakter (diganti tiap jam selama quiz belum selesai)."
           },
           "event": [
             {
@@ -1057,7 +949,13 @@
                   "  pm.expect(data.access_code).to.match(/^[A-Z0-9]{6}$/);",
                   "});",
                   "pm.collectionVariables.set('quiz_access_code', data.access_code);",
-                  "pm.test('letak berisi nama', () => pm.expect(data.placement.chapter.name).to.eql('KPK dan FPB'));"
+                  "pm.test('letak berisi nama', () => pm.expect(data.placement.chapter.name).to.eql('KPK dan FPB'));",
+                  "pm.test('point per level & hadiah juara', () => {",
+                  "  pm.expect(data.points).to.eql({ easy: 10, medium: 25, hard: 40 });",
+                  "  pm.expect(data.prize_coins).to.eql({ rank_1: 500, rank_2: 300, rank_3: 100 });",
+                  "  pm.expect(data.prizes_distributed_at).to.eql(null);",
+                  "  pm.expect(data.prize_awards).to.eql([]);",
+                  "});"
                 ]
               }
             }
@@ -1458,6 +1356,90 @@
       ]
     },
     {
+      "name": "Pengaturan & hadiah Daily Quiz (admin)",
+      "description": "Pengaturan GLOBAL Daily Quiz (berlaku untuk seluruh Daily Quiz): point 1 soal benar per level dan hadiah coin juara 1-3 bulanan PER KELAS. Lihat: semua role yang login. Ubah & daftar penerima hadiah: admin & super admin.\n\nHadiah dibagikan otomatis oleh scheduler pada hari terakhir bulan jam 23:59 WIB (QUIZ_PRIZE_CRON).",
+      "item": [
+        {
+          "name": "Lihat pengaturan Daily Quiz",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/daily-quiz-settings" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('berisi point & hadiah', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.points).to.have.all.keys('easy', 'medium', 'hard');",
+                  "  pm.expect(data).to.include.keys('free_per_day', 'coin_cost');",
+                  "  pm.expect(data.prize_coins).to.have.all.keys('rank_1', 'rank_2', 'rank_3');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah pengaturan Daily Quiz",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": { \"easy\": 10, \"medium\": 15, \"hard\": 20 },\n  \"prize_coins\": { \"rank_1\": 300, \"rank_2\": 200, \"rank_3\": 100 },\n  \"free_per_day\": {{daily_free_per_day}},\n  \"coin_cost\": {{daily_coin_cost}}\n}"
+            },
+            "url": "{{base_url}}/api/v1/daily-quiz-settings",
+            "description": "Ganti penuh, semua field wajib.\n- `points`: point 1 soal BENAR per level (0-1000). Dipakai untuk Daily Quiz yang di-submit setelah diubah.\n- `prize_coins`: hadiah coin juara 1, 2, 3 bulanan per kelas (0-1.000.000, 0 = tanpa hadiah). Nilai saat hari terakhir bulan 23:59 WIB yang dipakai.\n- `free_per_day` (0-100): Daily Quiz gratis per siswa per hari (WIB).\n- `coin_cost` (0-1.000.000): coin per Daily Quiz setelah jatah gratis habis (0 = selalu gratis). Jatah & biaya langsung berlaku.\n\nNilai jatah & biaya di body diambil dari variable `daily_free_per_day` / `daily_coin_cost` (default 2 & 10)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('tersimpan', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.points).to.eql({ easy: 10, medium: 15, hard: 20 });",
+                  "  pm.expect(data.prize_coins).to.eql({ rank_1: 300, rank_2: 200, rank_3: 100 });",
+                  "  pm.expect(data.free_per_day).to.eql(Number(pm.variables.get('daily_free_per_day')));",
+                  "  pm.expect(data.coin_cost).to.eql(Number(pm.variables.get('daily_coin_cost')));",
+                  "  pm.expect(data.updated_by.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Penerima hadiah Daily Quiz bulan ini",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/daily-quiz-prizes",
+            "description": "Query: `month` (YYYY-MM, default bulan ini), `grade_id` (opsional). `distributed_at` & `prize_coins` null = belum dibagikan. `awards[]` urut kelas lalu peringkat: grade, rank, student, points, duration_seconds, coin_amount, awarded_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('bulan & daftar penerima', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.month).to.match(/^\\d{4}-\\d{2}$/);",
+                  "  pm.expect(data.awards).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Daily Quiz & Pengumuman (siswa)",
       "description": "Jalankan setelah login admin (request pertama membuat soal Daily Quiz), lalu folder ini login sebagai siswa.citra (SD Kelas 5).\n\nDaily Quiz: siswa memilih kelas (dropdown sesuai jenjang; SD dibagi Kelas 1-3 & 4-6), mapel & bidang materi (wajib), bab/sub bab/topik (opsional), level (easy/medium/hard = difficulty soal, tipe soal campur), dan total soal 5/10/15. Soal diambil acak. Tidak ada kode akses & timer.",
       "item": [
@@ -1565,7 +1547,7 @@
             "method": "POST",
             "header": [],
             "url": "{{base_url}}/api/v1/daily-quizzes/{{daily_quiz_id}}/open",
-            "description": "Buka Daily Quiz milik siswa. Jatah gratis 2x per hari (WIB, DAILY_QUIZ_FREE_QUOTA); berikutnya memotong 10 coin (DAILY_QUIZ_COIN_COST) dan dicatat di coin_transactions. Coin kurang → 402. Membuka ulang tidak dihitung lagi.\n\ndata = soal lengkap dengan `answer` (opsi + kunci jawaban), tanpa pembahasan; `usage` = jatah & coin. Tidak ada kode akses & timer.\n\nKalau collection dijalankan berkali-kali di hari yang sama, jatah gratis siswa.citra bisa habis → 402 (normal)."
+            "description": "Buka Daily Quiz milik siswa. Jatah gratis per hari (WIB) & biaya coin dari pengaturan global Daily Quiz (`free_per_day`, `coin_cost`; awal 2x gratis lalu 10 coin) dan dicatat di coin_transactions. Coin kurang → 402. Membuka ulang tidak dihitung lagi.\n\ndata = soal lengkap dengan `answer` (opsi + kunci jawaban), tanpa pembahasan; `usage` = jatah & coin. Tidak ada kode akses & timer.\n\nKalau collection dijalankan berkali-kali di hari yang sama, jatah gratis siswa.citra bisa habis → 402 (normal)."
           },
           "event": [
             {
@@ -1577,7 +1559,7 @@
                   "if (pm.response.code === 200) {",
                   "  const data = pm.response.json().data;",
                   "  pm.test('soal berisi kunci jawaban, tanpa pembahasan', () => {",
-                  "    pm.expect(data.questions[0].answer).to.have.property('correct_key');",
+                  "    data.questions.forEach(q => pm.expect(q.answer).to.include.any.keys('correct_key', 'correct_keys', 'accepted_answers'));",
                   "    pm.expect(pm.response.text()).to.not.include('explanation');",
                   "    pm.expect(data.usage).to.include.keys('free_per_day', 'opened_today', 'coin_charged', 'coin_balance');",
                   "  });",
@@ -1601,7 +1583,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{{daily_answers_json}}" },
             "url": "{{base_url}}/api/v1/daily-quizzes/{{daily_quiz_id}}/submit",
-            "description": "Body: `{\"answers\": [{\"question_id\": \"...\", \"answer\": \"A\", \"is_correct\": false}, ...]}`. Benar/salah dinilai FE (pakai kunci jawaban dari Buka Daily Quiz). Soal yang tidak dikirim = tidak dijawab (salah).\n\nNilai total 100: per soal = 100 / total soal; nilai = jumlah benar x per soal. Hanya sekali (submit ke-2 → 409). Harus sudah dibuka (belum → 409).\n\ndata = `result` (score, correct_count, total_questions, points_per_question, submitted_at) + `questions` urut sama dengan saat dikerjakan: soal, `answer` (kunci), `explanation`, `student_answer`, `is_correct`, `points`.\n\nKalau Buka Daily Quiz tadi 402 (jatah & coin habis), request ini 409 (belum dibuka) — normal."
+            "description": "Body: `{\"answers\": [{\"question_id\": \"...\", \"answer\": \"A\", \"is_correct\": false}, ...]}`. Benar/salah dinilai FE (pakai kunci jawaban dari Buka Daily Quiz). Soal yang tidak dikirim = tidak dijawab (salah).\n\nNilai total 100: per soal = 100 / total soal; nilai = jumlah benar x per soal. Hanya sekali (submit ke-2 → 409). Harus sudah dibuka (belum → 409).\n\ndata = `result` (score = nilai 0-100, score_per_question, points = point leaderboard, correct_count, total_questions, submitted_at, duration_seconds) + `questions` urut sama dengan saat dikerjakan: soal, `answer` (kunci), `explanation`, `student_answer`, `is_correct`, `score` (nilai soal), `points` (point soal: benar easy 10 / medium 15 / hard 20, salah 0).\n\nKalau Buka Daily Quiz tadi 402 (jatah & coin habis), request ini 409 (belum dibuka) — normal."
           },
           "event": [
             {
@@ -1614,7 +1596,8 @@
                   "  const data = pm.response.json().data;",
                   "  pm.test('nilai total 100 & review lengkap', () => {",
                   "    const r = data.result;",
-                  "    pm.expect(r.points_per_question).to.eql(Math.round(100 / r.total_questions * 100) / 100);",
+                  "    pm.expect(r.score_per_question).to.eql(Math.round(100 / r.total_questions * 100) / 100);",
+                  "    pm.expect(r.points).to.be.a('number'); // point leaderboard (bukan nilai)",
                   "    pm.expect(r.score).to.eql(Math.round(r.correct_count * 100 / r.total_questions * 100) / 100);",
                   "    pm.expect(data.questions[0]).to.include.keys('explanation', 'answer', 'student_answer', 'is_correct', 'points', 'answered_at', 'time_spent_seconds');",
                   "    pm.expect(data.state).to.eql('submitted');",
@@ -1752,6 +1735,749 @@
                   "pm.test('data array tanpa kode akses', () => {",
                   "  pm.expect(pm.response.json().data).to.be.an('array');",
                   "  pm.expect(pm.response.text()).to.not.include('access_code');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Leaderboard",
+      "description": "Semua role yang login. Siswa mendapat posisinya sendiri di `data.me`.\n\nPoint (bukan nilai): soal benar easy 10, medium 15, hard 20; salah / tidak dijawab 0 — berlaku untuk semua quiz. Peringkat: point tertinggi; point sama → total waktu pengerjaan paling singkat; point & waktu sama persis → peringkat sama.\n\nJalankan setelah folder Daily Quiz (token siswa.citra).",
+      "item": [
+        {
+          "name": "Leaderboard Daily Quiz (bulan ini)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/leaderboards/daily-quiz?education_level_id={{q_education_level_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "leaderboards", "daily-quiz"],
+              "query": [
+                { "key": "month", "value": "2026-11", "disabled": true, "description": "YYYY-MM (WIB), default bulan ini" },
+                { "key": "education_level_id", "value": "{{q_education_level_id}}", "description": "Filter jenjang (akun siswa)" },
+                { "key": "grade_id", "value": "{{q_grade_id}}", "disabled": true, "description": "Filter kelas (akun siswa)" },
+                { "key": "page", "value": "1", "disabled": true },
+                { "key": "per_page", "value": "20", "disabled": true }
+              ]
+            },
+            "description": "Total point semua Daily Quiz yang di-submit dalam 1 bulan (WIB) per siswa. `entries[]`: rank, student, education_level, grade, points, duration_seconds (total), quiz_count. `meta` = pagination."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('urut point tertinggi, lalu waktu tersingkat', () => {",
+                  "  pm.expect(data.month).to.match(/^\\d{4}-\\d{2}$/);",
+                  "  for (let i = 1; i < data.entries.length; i++) {",
+                  "    const a = data.entries[i - 1], b = data.entries[i];",
+                  "    pm.expect(a.points > b.points || (a.points === b.points && a.duration_seconds <= b.duration_seconds)).to.be.true;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leaderboard 1 quiz Uji Kom / Tryout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/leaderboards/quizzes/{{quiz_id}}",
+            "description": "1 quiz = 1 leaderboard (Uji Kom & Tryout tidak digabung). Peserta = siswa yang sudah submit. `entries[]`: rank, student, points, duration_seconds, score (nilai, info), prize_coins (hadiah coin untuk peringkat itu, juara 1-3). `quiz.prize_coins` = hadiah juara 1-3; `quiz.prizes_distributed_at` = kapan dibagikan (null = belum; scheduler 23:59 WIB setelah event selesai). Siswa hanya boleh melihat quiz publish untuk kelasnya (selain itu 404); tutor/admin semua quiz.\n\nDi collection ini quiz_id sudah dihapus di akhir folder Quiz → 404; ganti `quiz_id` untuk mencoba."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('respons terdefinisi', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Coin (paket, top-up, riwayat)",
+      "description": "Paket isi coin (CRUD admin, siswa melihat paket aktif), top-up coin siswa oleh admin per paket (banyak siswa sekaligus, dicatat sebagai pembelian tunai), dan riwayat coin.\n\nFolder ini login sendiri: admin (variable `username`) dan siswa.citra.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buat paket coin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Paket Postman {{$timestamp}}\",\n  \"coin_amount\": 250,\n  \"price\": 55000,\n  \"description\": \"Contoh dari Postman\",\n  \"sort_order\": 9,\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/coin-packages",
+            "description": "Admin & super admin. Body:\n- `name` wajib, maks 100, unik (tidak peka huruf besar/kecil) di antara paket yang belum dihapus.\n- `coin_amount` wajib 1-1.000.000.\n- `price` wajib, rupiah (0 boleh).\n- `description` opsional (maks 150), `sort_order` opsional (default 0), `status` `active`/`inactive` (default active).\n\nPUT memakai body yang sama (ganti penuh)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('coin_package_id', data.id);",
+                  "pm.test('tersimpan dengan pembuat', () => {",
+                  "  pm.expect(data.coin_amount).to.eql(250);",
+                  "  pm.expect(data.price).to.eql(55000);",
+                  "  pm.expect(data.created_by.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List paket coin (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/coin-packages",
+            "description": "Admin: semua paket (termasuk nonaktif), urut sort_order lalu jumlah coin. Query opsional: `status` (active/inactive), `search` (nama). Siswa memanggil URL yang sama dan hanya mendapat paket aktif tanpa data admin."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('berisi paket baru', () => pm.expect(pm.response.json().data.map(p => p.id)).to.include(pm.collectionVariables.get('coin_package_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah paket coin",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Paket Postman {{$timestamp}}\",\n  \"coin_amount\": 300,\n  \"price\": 60000,\n  \"sort_order\": 9\n}"
+            },
+            "url": "{{base_url}}/api/v1/coin-packages/{{coin_package_id}}",
+            "description": "Ganti penuh (field yang tidak dikirim kembali ke default). Harga baru hanya untuk top-up berikutnya; riwayat lama menyimpan harga saat itu."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('terubah', () => { pm.expect(data.coin_amount).to.eql(300); pm.expect(data.updated_by.id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail paket coin",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/coin-packages/{{coin_package_id}}" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login siswa.citra",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.citra\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access_token', data.access_token);",
+                  "pm.collectionVariables.set('coin_student_id', data.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paket coin (siswa, tab Isi coin)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/coin-packages" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('tanpa data admin', () => pm.response.json().data.forEach(p => pm.expect(p).to.not.have.property('created_by')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Riwayat coin saya (siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/coin-transactions?page=1&per_page=20",
+            "description": "Siswa yang login: `student` (saldo coin), `daily_quiz` (jatah Daily Quiz gratis hari ini: free_per_day, used_today, remaining_free, coin_cost_after), `transactions` terbaru dulu: type, type_label, amount (+ masuk / - keluar), balance_after, price_paid, reference {type, id, name}, description, created_by, created_at.\n\nQuery: `type` (plan_grant, purchase, usage, admin_adjustment, refund, reward), `page`, `per_page` (maks 100)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('coin_balance_before', data.student.coin_balance);",
+                  "pm.test('saldo, jatah harian, riwayat', () => {",
+                  "  pm.expect(data.daily_quiz).to.include.keys('free_per_day', 'used_today', 'remaining_free', 'coin_cost_after');",
+                  "  pm.expect(data.transactions).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin lagi",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Top-up coin siswa (banyak sekaligus)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coin_package_id\": \"{{coin_package_id}}\",\n  \"student_ids\": [\"{{coin_student_id}}\"],\n  \"note\": \"Bayar tunai di kasir\",\n  \"request_id\": \"{{$guid}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/coin-topups",
+            "description": "Admin & super admin. Tambah coin 1-100 siswa sekaligus sesuai 1 paket AKTIF. Dicatat sebagai pembelian tunai: coin_transactions type `purchase`, price_paid = harga paket, created_by = admin.\n\n- Semua atau tidak sama sekali: paket nonaktif / siswa tidak ditemukan → 422 per field (`coin_package_id`, `student_ids[i]`).\n- `note` opsional, ikut di deskripsi transaksi.\n- `request_id` opsional (UUID baru setiap klik simpan): request yang sama terkirim 2x → 409, coin tidak bertambah 2x.\n\nRespons: package, total_coins, total_price, students [{id, name, student_code, coin_added, balance_after, transaction_id}] urut sesuai request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('saldo bertambah sesuai paket', () => {",
+                  "  pm.expect(data.students[0].id).to.eql(pm.collectionVariables.get('coin_student_id'));",
+                  "  pm.expect(data.students[0].coin_added).to.eql(300);",
+                  "  pm.expect(data.students[0].balance_after).to.eql(Number(pm.collectionVariables.get('coin_balance_before')) + 300);",
+                  "  pm.expect(data.total_price).to.eql(60000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Riwayat coin 1 siswa (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/students/{{coin_student_id}}/coin-transactions",
+            "description": "Admin & super admin: riwayat coin 1 siswa (bentuk sama dengan riwayat siswa, tanpa `daily_quiz`). Bukan siswa / tidak ada → 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('transaksi terbaru = isi coin dari admin', () => {",
+                  "  const t = data.transactions[0];",
+                  "  pm.expect(t.type).to.eql('purchase');",
+                  "  pm.expect(t.price_paid).to.eql(60000);",
+                  "  pm.expect(t.reference.id).to.eql(pm.collectionVariables.get('coin_package_id'));",
+                  "  pm.expect(t.created_by.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus paket coin (soft delete, bisa banyak)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{coin_package_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/coin-packages",
+            "description": "Hapus 1-100 paket. Semua ID harus ada, kalau tidak → 422 per `ids[i]` dan tidak ada yang terhapus. Riwayat pembelian dengan paket ini tetap ada (nama paket tetap tampil di riwayat)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('terhapus', () => pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('coin_package_id')]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User (menu admin)",
+      "description": "Menu User di panel admin: list (filter role, jenjang, kelas, cabang, status; cari nama/username/email), jumlah per role (tab), detail, tambah (1-100 sekaligus), ubah, hapus (soft delete). Admin & super admin.\n\nTambah, ubah & hapus: super admin semua akun; admin hanya tutor & siswa. Akun sendiri tidak bisa dihapus / dinonaktifkan. Role tidak bisa diubah.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List user (filter & cari)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/users?role=student&search=arif&page=1&per_page=20",
+            "description": "Terbaru dulu. Query (semua opsional): `role` (super_admin, admin, tutor, student), `education_level_id` (jenjang), `grade_id` (kelas), `branch_id`, `status` (active/inactive), `search` (nama, username, atau email), `page`, `per_page` (maks 100).\n\nSetiap baris: id, username, name, email, phone, role, branch (null untuk super admin = semua cabang), education_level, grade, student_code & coin_balance (siswa), status, last_login_at, created_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('hanya siswa yang cocok', () => {",
+                  "  pm.expect(data.length).to.be.above(0);",
+                  "  data.forEach(u => { pm.expect(u.role).to.eql('student'); pm.expect((u.name + u.username).toLowerCase()).to.include('arif'); });",
+                  "});",
+                  "pm.collectionVariables.set('user_id', data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jumlah user per role (tab)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/users/role-counts",
+            "description": "Angka di tab Semua / Siswa / Tutor / Admin / Super Admin. Query sama dengan list (role diabaikan), jadi angka ikut filter & pencarian."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json().data;",
+                  "pm.test('semua = jumlah per role', () => pm.expect(c.all).to.eql(c.super_admin + c.admin + c.tutor + c.student));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/users/{{user_id}}",
+            "description": "Data list + parent_phone, school_origin, date_of_birth & target_school (siswa), updated_by, updated_at. Tidak ada / dihapus → 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const u = pm.response.json().data;",
+                  "pm.collectionVariables.set('user_username', u.username);",
+                  "pm.collectionVariables.set('user_name', u.name);",
+                  "pm.collectionVariables.set('user_branch_id', u.branch.id);",
+                  "pm.collectionVariables.set('user_level_id', u.education_level.id);",
+                  "pm.collectionVariables.set('user_grade_id', u.grade.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah user (ganti penuh)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{user_username}}\",\n  \"name\": \"{{user_name}}\",\n  \"email\": null,\n  \"phone\": \"081200001111\",\n  \"parent_phone\": \"081300002222\",\n  \"school_origin\": \"SDN 3 Surabaya\",\n  \"branch_id\": \"{{user_branch_id}}\",\n  \"education_level_id\": \"{{user_level_id}}\",\n  \"grade_id\": \"{{user_grade_id}}\",\n  \"status\": \"active\",\n  \"join_date\": \"2025-07-01\",\n  \"end_date\": null,\n  \"date_of_birth\": \"2014-08-17\",\n  \"target_school\": \"SMPN 1 Surabaya\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/users/{{user_id}}",
+            "description": "Ganti penuh, role tetap. Aturan:\n- `username` wajib: 3-30 karakter huruf kecil/angka/titik/garis bawah, unik (termasuk akun yang sudah dihapus).\n- `name`, `status` wajib.\n- `branch_id`: wajib untuk siswa, tutor, admin; harus kosong untuk super admin.\n- `education_level_id` & `grade_id`: wajib untuk siswa (kelas harus milik jenjang); harus kosong untuk role lain.\n- `password` opsional (8-72): diisi = reset password.\n- `join_date` wajib (YYYY-MM-DD); `end_date` opsional, tidak boleh sebelum join_date. Lewat end_date (WIB) akun tidak bisa login.\n- `date_of_birth` (YYYY-MM-DD) & `target_school`: khusus siswa.\n\nDinonaktifkan, password diganti, atau end_date sudah lewat → semua sesi login user itu diakhiri. Admin hanya boleh mengubah tutor & siswa (selain itu 403)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const u = pm.response.json().data;",
+                  "pm.test('tersimpan', () => {",
+                  "  pm.expect(u.school_origin).to.eql('SDN 3 Surabaya');",
+                  "  pm.expect(u.date_of_birth).to.eql('2014-08-17');",
+                  "  pm.expect(u.updated_by.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cek file Excel tambah user (tidak menyimpan)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "docs/Template Upload/contoh_terisi_user.xlsx" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/users/import/check",
+            "description": "multipart/form-data, field `file` (.xlsx, maks 5 MB, maks 100 user). Template: `docs/Template Upload/template_user.xlsx` (contoh terisi: `contoh_terisi_user.xlsx`).\n\nHanya MENGECEK, tidak menyimpan. Kolom: role, username, name, password, email, phone (no HP), parent_phone (no HP ortu), branch_name, education_level_name, grade_name, school_origin, join_date (wajib), end_date, status, date_of_birth, target_school. Cabang/jenjang/kelas diisi NAMA (dicocokkan ke ID). Tanggal boleh 2026-01-15, 15/01/2026, atau sel berformat tanggal.\n\nValid (200) → `data.users` bisa langsung dikirim sebagai body `{\"users\": data.users}` ke **Tambah user**. Ada error (422) → semua data ditolak, setiap error dengan `row` & `column` Excel.\n\nKalau menjalankan lewat Postman CLI, jalankan dari folder project supaya path file ketemu."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('3 user siap disimpan, cabang & kelas berisi ID', () => {",
+                  "  pm.expect(data.total).to.eql(3);",
+                  "  pm.expect(data.users[0].branch_id).to.be.a('string');",
+                  "  pm.expect(data.users[0].grade_id).to.be.a('string');",
+                  "  pm.expect(data.users[1].join_date).to.eql('2026-01-15');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah user (banyak sekaligus)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"users\": [\n    {\n      \"role\": \"student\",\n      \"username\": \"siswa.pm{{$timestamp}}\",\n      \"name\": \"Siswa Postman\",\n      \"password\": \"password123\",\n      \"branch_id\": \"{{user_branch_id}}\",\n      \"education_level_id\": \"{{user_level_id}}\",\n      \"grade_id\": \"{{user_grade_id}}\",\n      \"parent_phone\": \"081300003333\",\n      \"school_origin\": \"SDN 2 Surabaya\",\n      \"join_date\": \"2026-01-15\",\n      \"end_date\": \"2026-12-31\",\n      \"date_of_birth\": \"2014-01-20\",\n      \"target_school\": \"SMPN 3 Surabaya\"\n    },\n    {\n      \"role\": \"tutor\",\n      \"username\": \"tutor.pm{{$timestamp}}\",\n      \"name\": \"Tutor Postman\",\n      \"join_date\": \"2026-01-10\",\n      \"password\": \"password123\",\n      \"email\": \"tutor.postman@example.com\",\n      \"phone\": \"081200004444\",\n      \"branch_id\": \"{{user_branch_id}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{base_url}}/api/v1/users",
+            "description": "Tambah 1-100 akun sekaligus, body `{\"users\": [...]}`. Semua atau tidak sama sekali: kesalahan per `users[i].<field>` (contoh username kembar di request maupun dengan akun yang ada, termasuk akun terhapus).\n\nField per akun sama dengan Ubah user, ditambah:\n- `role` wajib (`super_admin`, `admin`, `tutor`, `student`). Admin hanya boleh menambah tutor & siswa.\n- `password` wajib (8-72).\n- `join_date` wajib, `end_date` opsional.\n- `status` opsional (default active).\n\nRespons 201: akun yang dibuat (urut sesuai request, bentuk sama dengan list). Kode siswa dibuat otomatis."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('2 akun urut sesuai request', () => {",
+                  "  pm.expect(data.map(u => u.role)).to.eql(['student', 'tutor']);",
+                  "  pm.expect(data[0].student_code).to.match(/^STU/);",
+                  "  pm.expect(data[1].student_code).to.eql(null);",
+                  "});",
+                  "pm.collectionVariables.set('new_user_ids_json', JSON.stringify(data.map(u => u.id)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus user (soft delete, bisa banyak)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": {{new_user_ids_json}}\n}" },
+            "url": "{{base_url}}/api/v1/users",
+            "description": "Body `{\"ids\": [...]}` (1-100). Soft delete: deleted_at & deleted_by diisi, username tetap terpakai, riwayat tetap ada, sesi login diakhiri, tidak bisa login lagi.\n\nSemua atau tidak sama sekali: ID tidak ada, akun sendiri, atau akun yang tidak boleh dihapus (admin → admin/super admin) → 422 per `ids[i]`.\n\nDi collection ini menghapus 2 akun yang dibuat request **Tambah user**, supaya data dummy tidak berubah."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('2 akun terhapus', () => pm.expect(pm.response.json().data.deleted_ids).to.eql(JSON.parse(pm.collectionVariables.get('new_user_ids_json'))));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Report quiz (Uji Kom & Tryout)",
+      "description": "Report per event (quiz Uji Kom & Tryout yang sudah publish): ringkasan, detail peserta, dan analisis soal. Super admin, admin, tutor (hanya membaca).\n\nPeserta = siswa yang sudah submit. Peringkat = aturan leaderboard (point tertinggi, lalu waktu tersingkat).",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List report per event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quiz-reports?page=1&per_page=20",
+            "description": "Event terbaru dulu (tanggal mulai event). Setiap baris: quiz_id, name, type, education_level, grade, subject, start_at & end_at (tanggal event, WIB), total_questions, participants (total peserta), average_score, highest_score, lowest_score (null kalau belum ada peserta).\n\nQuery opsional: `type` (uji_kom / tryout), `search` (nama quiz), `education_level_id`, `grade_id`, `subject_id`, `date_from` & `date_to` (tanggal mulai event, YYYY-MM-DD, inklusif), `page`, `per_page` (maks 100)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('kolom ringkasan', () => data.forEach(s => pm.expect(s).to.include.keys('start_at', 'name', 'participants', 'average_score', 'highest_score', 'lowest_score')));",
+                  "pm.collectionVariables.set('report_quiz_id', data.length ? data[0].quiz_id : '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail report (peserta urut peringkat)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quiz-reports/{{report_quiz_id}}?page=1&per_page=20",
+            "description": "`quiz` = ringkasan event (sama dengan baris list). `participants[]`: rank, student {id, name, student_code}, correct_count, total_questions, correct_label (contoh \"9/10\"), score (nilai 0-100), points, duration_seconds (waktu penyelesaian), submitted_at.\n\nQuery: `search` (nama / kode siswa; peringkat tetap peringkat asli), `page`, `per_page`. Quiz draf / dihapus / bukan Uji Kom-Tryout → 404."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["if (!pm.collectionVariables.get('report_quiz_id')) { pm.execution.skipRequest(); }"] }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('peserta urut peringkat', () => {",
+                  "  const ranks = data.participants.map(p => p.rank);",
+                  "  pm.expect(ranks).to.eql([...ranks].sort((a, b) => a - b));",
+                  "  data.participants.forEach(p => pm.expect(p.correct_label).to.match(/^\\d+\\/\\d+$/));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analisis soal (paling sering salah dulu)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quiz-reports/{{report_quiz_id}}/questions",
+            "description": "Semua soal quiz, urut dari persentase benar TERENDAH (paling sering salah) ke tertinggi. Setiap soal: no, id, code, type, question, difficulty, participants, correct_count, wrong_count (menjawab tapi salah), unanswered_count (tidak dijawab), correct_percent (contoh 13.33), correct_label (contoh \"13%\")."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["if (!pm.collectionVariables.get('report_quiz_id')) { pm.execution.skipRequest(); }"] }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const qs = pm.response.json().data.questions;",
+                  "pm.test('urut persentase benar naik', () => {",
+                  "  const p = qs.map(q => q.correct_percent);",
+                  "  pm.expect(p).to.eql([...p].sort((a, b) => a - b));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Report Daily Quiz (per siswa)",
+      "description": "Report Daily Quiz langsung PER SISWA (Daily Quiz dibuat siswa sendiri, tidak ada event). Super admin, admin, tutor (hanya membaca). Folder ini memakai token admin dari folder sebelumnya (Report quiz > Login admin).\n\nPeriode = tanggal submit (WIB), default bulan ini. Peringkat = total point tertinggi, lalu total waktu tersingkat (aturan leaderboard).",
+      "item": [
+        {
+          "name": "List report per siswa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/daily-quiz-reports?page=1&per_page=20",
+            "description": "`data.period` = periode yang dipakai. `data.students[]`: rank, student {id, name, student_code, education_level, grade}, total_quizzes, quizzes_by_difficulty {easy, medium, hard}, average_score, average_duration_seconds, total_questions (soal yang dikerjakan), correct_count, wrong_count (salah + tidak dijawab), correct_percent, total_points, total_duration_seconds.\n\nQuery opsional: `date_from` & `date_to` (YYYY-MM-DD, inklusif, maks 366 hari; kosong = bulan ini), `subject_id` (mapel; semua angka & peringkat hanya dari Daily Quiz mapel itu; kosong = semua mapel digabung), `education_level_id` & `grade_id` (jenjang/kelas akun siswa; peringkat dihitung di dalam filter), `search` (nama / kode siswa; peringkat tetap), `page`, `per_page`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('periode & kolom rekap', () => {",
+                  "  pm.expect(data.period.date_from).to.match(/^\\d{4}-\\d{2}-01$/);",
+                  "  data.students.forEach(s => {",
+                  "    pm.expect(s).to.include.keys('rank', 'total_quizzes', 'quizzes_by_difficulty', 'average_score', 'average_duration_seconds', 'total_questions', 'correct_count', 'wrong_count', 'total_points');",
+                  "    pm.expect(s.correct_count + s.wrong_count).to.eql(s.total_questions);",
+                  "  });",
+                  "});",
+                  "pm.collectionVariables.set('report_student_id', data.students.length ? data.students[0].student.id : '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail report 1 siswa (per mapel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/daily-quiz-reports/students/{{report_student_id}}",
+            "description": "`student`, `period`, `total` (rekap gabungan semua mapel, kolom sama dengan list), `subjects[]` (rekap per mapel: subject {id, name} + kolom rekap, urut jumlah Daily Quiz terbanyak). Query: `date_from`, `date_to`. Bukan siswa / tidak ada → 404."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["if (!pm.collectionVariables.get('report_student_id')) { pm.execution.skipRequest(); }"] }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('total = jumlah per mapel', () => {",
+                  "  const sum = data.subjects.reduce((n, s) => n + s.total_quizzes, 0);",
+                  "  pm.expect(sum).to.eql(data.total.total_quizzes);",
                   "});"
                 ]
               }

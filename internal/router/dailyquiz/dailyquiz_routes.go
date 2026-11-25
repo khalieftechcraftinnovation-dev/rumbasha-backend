@@ -13,7 +13,8 @@ import (
 	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
 )
 
-// Register mendaftarkan route /daily-quizzes. Wajib login, khusus siswa (kelas diambil dari akunnya).
+// Register mendaftarkan route /daily-quizzes (khusus siswa, kelas diambil dari akunnya) dan
+// pengaturan / hadiah Daily Quiz (admin). Semua wajib login.
 func Register(private *gin.RouterGroup, h *dailyquizhandler.DailyQuizHandler) {
 	studentOnly := middleware.RequireRole(loginmodel.RoleStudent)
 
@@ -22,4 +23,10 @@ func Register(private *gin.RouterGroup, h *dailyquizhandler.DailyQuizHandler) {
 	private.POST("/daily-quizzes/:id/open", studentOnly, h.Open)             // buka: jatah gratis / potong coin, soal + kunci
 	private.POST("/daily-quizzes/:id/submit", studentOnly, h.Submit)         // kumpulkan jawaban (dinilai FE) → nilai + review
 	private.GET("/daily-quizzes/:id/review", studentOnly, h.Review)          // hasil & review setelah submit
+
+	// Pengaturan global Daily Quiz: semua role yang login boleh melihat, admin & super admin mengubah.
+	adminOnly := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin)
+	private.GET("/daily-quiz-settings", h.GetSettings)
+	private.PUT("/daily-quiz-settings", adminOnly, h.UpdateSettings)
+	private.GET("/daily-quiz-prizes", adminOnly, h.MonthlyPrizes) // penerima hadiah juara bulanan per kelas
 }

@@ -498,19 +498,21 @@ type ReviewQuestionResponse struct {
 	Explanation      string          `json:"explanation"`
 	StudentAnswer    json.RawMessage `json:"student_answer"` // null = tidak dijawab
 	IsCorrect        bool            `json:"is_correct"`
-	Points           float64         `json:"points"`             // nilai yang didapat dari soal ini
+	Score            float64         `json:"score"`              // NILAI yang didapat dari soal ini (100 / total soal kalau benar)
+	Points           int             `json:"points"`             // POINT leaderboard dari soal ini (benar: easy 10, medium 15, hard 20)
 	AnsweredAt       *time.Time      `json:"answered_at"`        // jam soal terakhir dijawab (WIB); null = tidak dikirim FE
 	TimeSpentSeconds *int            `json:"time_spent_seconds"` // lama mengerjakan soal ini (detik); null = tidak dikirim FE
 }
 
-// ResultResponse adalah ringkasan nilai 1 pengerjaan quiz (total nilai 100).
+// ResultResponse adalah ringkasan hasil 1 pengerjaan quiz: nilai (total 100) dan point leaderboard.
 type ResultResponse struct {
-	Score             float64   `json:"score"`               // 0-100
-	CorrectCount      int       `json:"correct_count"`       // jumlah benar
-	TotalQuestions    int       `json:"total_questions"`     // jumlah soal
-	PointsPerQuestion float64   `json:"points_per_question"` // = 100 / total soal (2 angka di belakang koma)
-	SubmittedAt       time.Time `json:"submitted_at"`
-	DurationSeconds   int       `json:"duration_seconds"` // lama mengerjakan total = submit - mulai
+	Score            float64   `json:"score"`              // NILAI 0-100
+	CorrectCount     int       `json:"correct_count"`      // jumlah benar
+	TotalQuestions   int       `json:"total_questions"`    // jumlah soal
+	ScorePerQuestion float64   `json:"score_per_question"` // nilai per soal = 100 / total soal (2 angka di belakang koma)
+	Points           int       `json:"points"`             // total POINT leaderboard (bukan nilai)
+	SubmittedAt      time.Time `json:"submitted_at"`
+	DurationSeconds  int       `json:"duration_seconds"` // lama mengerjakan total = submit - mulai
 }
 
 // ToSubmittedAnswers mengubah body submit menjadi input penilaian.
@@ -540,6 +542,7 @@ func ToReviewResponses(items []scoring.ReviewItem) []ReviewQuestionResponse {
 			Explanation:             it.Explanation,
 			StudentAnswer:           it.StudentAnswer,
 			IsCorrect:               it.IsCorrect,
+			Score:                   it.Score,
 			Points:                  it.Points,
 			AnsweredAt:              inJakarta(it.AnsweredAt),
 			TimeSpentSeconds:        it.TimeSpentSeconds,
@@ -549,14 +552,15 @@ func ToReviewResponses(items []scoring.ReviewItem) []ReviewQuestionResponse {
 }
 
 // ToResultResponse menyusun ringkasan nilai. submittedAt ditampilkan dalam WIB.
-func ToResultResponse(score float64, correct, total int, submittedAt time.Time, durationSeconds int) ResultResponse {
+func ToResultResponse(score float64, points, correct, total int, submittedAt time.Time, durationSeconds int) ResultResponse {
 	return ResultResponse{
-		Score:             score,
-		CorrectCount:      correct,
-		TotalQuestions:    total,
-		PointsPerQuestion: math.Round(scoring.PointsPerQuestion(total)*100) / 100,
-		SubmittedAt:       submittedAt.In(clock.Jakarta),
-		DurationSeconds:   durationSeconds,
+		Score:            score,
+		CorrectCount:     correct,
+		TotalQuestions:   total,
+		ScorePerQuestion: math.Round(scoring.ScorePerQuestion(total)*100) / 100,
+		Points:           points,
+		SubmittedAt:      submittedAt.In(clock.Jakarta),
+		DurationSeconds:  durationSeconds,
 	}
 }
 

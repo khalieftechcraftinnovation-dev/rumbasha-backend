@@ -215,7 +215,7 @@ func ToDailyQuizReviewResponse(r dailyquizmodel.DailyQuizReview) DailyQuizReview
 	return DailyQuizReviewResponse{
 		State: quizdto.StateSubmitted,
 		ID:    base.ID, Placement: base.Placement, Difficulty: base.Difficulty, OpenedAt: openedAt,
-		Result:    questiondto.ToResultResponse(r.Score, r.CorrectCount, len(r.Items), *r.SubmittedAt, r.DurationSeconds),
+		Result:    questiondto.ToResultResponse(r.Score, r.Points, r.CorrectCount, len(r.Items), *r.SubmittedAt, r.DurationSeconds),
 		Questions: questiondto.ToReviewResponses(r.Items),
 	}
 }

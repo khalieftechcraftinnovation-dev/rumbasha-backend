@@ -21,6 +21,13 @@ const (
 	TypeFreeText       = "free_text"       // isian (angka atau teks)
 )
 
+// Level (tingkat kesulitan) soal. Nilainya sama persis dengan isi kolom questions.difficulty.
+const (
+	DifficultyEasy   = "easy"
+	DifficultyMedium = "medium"
+	DifficultyHard   = "hard"
+)
+
 // Bagian soal yang bisa diatur urutan tampilnya (display_order).
 const (
 	PartQuestion = "question"

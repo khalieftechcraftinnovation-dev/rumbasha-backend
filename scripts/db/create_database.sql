@@ -16,13 +16,8 @@ CREATE DATABASE rumbasha
     WITH ENCODING 'UTF8'
     TEMPLATE template0;
 
--- Database khusus test (isinya dihapus setiap kali test berjalan)
-CREATE DATABASE rumbasha_test
-    WITH ENCODING 'UTF8'
-    TEMPLATE template0;
 
 -- Zona waktu tampilan mengikuti aturan bisnis BR-014 (Asia/Jakarta).
 -- Kolom TIMESTAMPTZ tetap menyimpan waktu yang sama persis; setting ini hanya
 -- mengubah cara waktu ditampilkan, misalnya saat membuka tabel di DBeaver.
-ALTER DATABASE rumbasha      SET timezone TO 'Asia/Jakarta';
-ALTER DATABASE rumbasha_test SET timezone TO 'Asia/Jakarta';
+ALTER DATABASE rumbasha SET timezone TO 'Asia/Jakarta';

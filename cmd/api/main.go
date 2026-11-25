@@ -22,26 +22,37 @@ import (
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
 
-	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
-	subjectrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subject"
-	subjectservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subject"
-
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 
+	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/coin"
 	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
+	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquizreport"
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
+	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
+	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
+	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
+	coinrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/coin"
 	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
+	dailyquizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquizreport"
 	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
+	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/leaderboard"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
+	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quizreport"
+	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user"
+	coinservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/coin"
 	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquiz"
+	dailyquizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquizreport"
 	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
+	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/leaderboard"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
+	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quizreport"
+	userservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
@@ -84,10 +95,6 @@ func main() {
 	)
 	loginHandler := loginhandler.NewLoginHandler(loginService, subscriptionService)
 
-	// Fitur: subject
-	subjectService := subjectservice.NewSubjectService(subjectrepo.NewSubjectRepository(db))
-	subjectHandler := subjecthandler.NewSubjectHandler(subjectService)
-
 	// Fitur: kirim log ke email (laporan bug dari admin).
 	// Kalau SMTP belum diisi di .env, server tetap jalan; endpoint-nya saja yang membalas 503.
 	emailSender := mailer.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
@@ -107,12 +114,17 @@ func main() {
 		imageservice.NewImageService(imagerepo.NewImageRepository(db), storage.NewLocal(cfg.StorageDir, cfg.AppURL)),
 	)
 
-	// Fitur: Quiz (Uji Kom & Tryout). Service juga dipakai scheduler (ganti kode akses tiap jam).
+	// Fitur: Quiz (Uji Kom & Tryout). Service juga dipakai scheduler (kode akses tiap jam, hadiah juara 23:59).
 	quizService := quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))
 
-	// Scheduler (cron di dalam proses API): ganti kode akses quiz yang belum selesai.
-	// Jadwal dari ACCESS_CODE_REFRESH_CRON (default setiap jam tepat, WIB).
-	jobs, err := scheduler.Start(cfg.AccessCodeRefreshCron, quizService)
+	// Fitur: Daily Quiz. Service juga dipakai scheduler (hadiah juara bulanan per kelas).
+	dailyQuizService := dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db))
+
+	// Scheduler (cron di dalam proses API):
+	//   - ganti kode akses quiz yang belum selesai: ACCESS_CODE_REFRESH_CRON (default setiap jam tepat, WIB)
+	//   - bagi hadiah coin juara quiz yang sudah selesai + juara bulanan Daily Quiz (hari terakhir bulan):
+	//     QUIZ_PRIZE_CRON (default setiap hari 23:59 WIB)
+	jobs, err := scheduler.Start(scheduler.Specs{AccessCode: cfg.AccessCodeRefreshCron, QuizPrize: cfg.QuizPrizeCron}, quizService, dailyQuizService)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,14 +139,18 @@ func main() {
 	defer apiLog.Close() // menulis sisa log di antrean sebelum aplikasi berhenti
 
 	r := router.New(router.Handlers{
-		Login:     loginHandler,
-		Subject:   subjectHandler,
-		LogReport: logReportHandler,
-		Question:  questionHandler,
-		Image:     imageHandler,
-		Dropdown:  dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
-		Quiz:      quizhandler.NewQuizHandler(quizService),
-		DailyQuiz: dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db), cfg.DailyQuizFreeQuota, cfg.DailyQuizCoinCost)),
+		Login:           loginHandler,
+		LogReport:       logReportHandler,
+		Question:        questionHandler,
+		Image:           imageHandler,
+		Dropdown:        dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
+		Quiz:            quizhandler.NewQuizHandler(quizService),
+		DailyQuiz:       dailyquizhandler.NewDailyQuizHandler(dailyQuizService),
+		Leaderboard:     leaderboardhandler.NewLeaderboardHandler(leaderboardservice.NewLeaderboardService(leaderboardrepo.NewLeaderboardRepository(db))),
+		Coin:            coinhandler.NewCoinHandler(coinservice.NewCoinService(coinrepo.NewCoinRepository(db))),
+		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db))),
+		QuizReport:      quizreporthandler.NewQuizReportHandler(quizreportservice.NewQuizReportService(quizreportrepo.NewQuizReportRepository(db))),
+		DailyQuizReport: dailyquizreporthandler.NewDailyQuizReportHandler(dailyquizreportservice.NewDailyQuizReportService(dailyquizreportrepo.NewDailyQuizReportRepository(db))),
 	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

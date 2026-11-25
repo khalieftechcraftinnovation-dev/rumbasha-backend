@@ -147,6 +147,7 @@ type Submission struct {
 	CorrectCount    int
 	Answers         []scoring.Answer
 	DurationSeconds int // lama mengerjakan total (submit - dibuka)
+	Points          int // total point leaderboard
 }
 
 // DailyQuizReview adalah hasil & review Daily Quiz setelah submit.

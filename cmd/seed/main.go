@@ -6,8 +6,11 @@
 //
 // File SQL yang dijalankan (urut), bisa juga dibuka di DBeaver:
 //  1. dummy_data.sql  → cabang, akun utama tiap role, paket, coin (hanya sekali)
-//  2. dummy_users.sql → akun tambahan sampai total 55 user (aman diulang)
+//  2. dummy_users.sql → akun tambahan sampai total 158 user, 150 siswa (aman diulang)
 //  3. dummy_subjects.sql → 5 mapel + hierarki Matematika SD Kelas 1-6: bidang materi → bab → sub bab → topik (aman diulang)
+//  4. dummy_questions.sql → ±730 soal Matematika SD (semua topik, 4 tipe, 3 level) (aman diulang)
+//  5. dummy_quiz_reports.sql → 1 event Tryout Kelas 6 yang sudah selesai + hasil siswa (untuk report & leaderboard)
+//  6. dummy_daily_quizzes.sql → 2-6 Daily Quiz bulan ini per siswa SD + leaderboard bulanan (untuk report & leaderboard)
 package main
 
 import (
@@ -29,6 +32,15 @@ var (
 
 	//go:embed dummy_subjects.sql
 	dummySubjectsSQL string
+
+	//go:embed dummy_questions.sql
+	dummyQuestionsSQL string
+
+	//go:embed dummy_quiz_reports.sql
+	dummyQuizReportsSQL string
+
+	//go:embed dummy_daily_quizzes.sql
+	dummyDailyQuizzesSQL string
 )
 
 func main() {
@@ -72,6 +84,24 @@ func main() {
 	}
 	log.Println("dummy_subjects.sql berhasil diisi")
 
+	// 4. dummy_questions.sql: aman diulang (soal dengan topik & teks yang sama dilewati).
+	if err := db.Exec(dummyQuestionsSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_questions.sql: %v", err)
+	}
+	log.Println("dummy_questions.sql berhasil diisi")
+
+	// 5. dummy_quiz_reports.sql: aman diulang (quiz demo yang sudah ada dilewati).
+	if err := db.Exec(dummyQuizReportsSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_quiz_reports.sql: %v", err)
+	}
+	log.Println("dummy_quiz_reports.sql berhasil diisi")
+
+	// 6. dummy_daily_quizzes.sql: aman diulang (ID Daily Quiz dari hash, yang sudah ada dilewati).
+	if err := db.Exec(dummyDailyQuizzesSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_daily_quizzes.sql: %v", err)
+	}
+	log.Println("dummy_daily_quizzes.sql berhasil diisi")
+
 	// Ringkasan jumlah data mapel per tingkat.
 	type typeCount struct {
 		Type  string
@@ -103,6 +133,21 @@ func main() {
 	fmt.Println("\nMaster data mapel (contoh lengkap: Matematika SD Kelas 1-6)")
 	for _, c := range subjectCounts {
 		fmt.Printf("  %-14s %d data\n", c.Type, c.Total)
+	}
+
+	// Ringkasan jumlah soal per level.
+	var questionCounts []struct {
+		Difficulty string
+		Total      int
+	}
+	db.Raw(`
+		SELECT difficulty, COUNT(*) AS total FROM questions WHERE deleted_at IS NULL
+		GROUP BY difficulty
+		ORDER BY MIN(CASE difficulty WHEN 'easy' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END)`).
+		Scan(&questionCounts)
+	fmt.Println("\nBank soal (contoh: Matematika SD Kelas 1-6, semua tipe)")
+	for _, c := range questionCounts {
+		fmt.Printf("  %-14s %d soal\n", c.Difficulty, c.Total)
 	}
 	fmt.Println(`
 Akun utama untuk dicoba:

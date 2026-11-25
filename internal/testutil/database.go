@@ -13,11 +13,14 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/database"
 )
 
-// SetupTestDB menyiapkan database KHUSUS TEST (default: rumbasha_test, diatur
-// lewat DB_NAME_TEST di .env), supaya data development tidak ikut terhapus.
+// SetupTestDB menyiapkan database untuk test: database development yang sama dengan aplikasi
+// (DB_NAME di .env, contoh rumbasha).
 //
-// Yang dilakukan: konek → jalankan migration → kosongkan semua tabel.
-// Kalau database test belum dibuat, test di-skip (bukan gagal).
+// Yang dilakukan: konek → jalankan migration → KOSONGKAN semua tabel data (lihat TRUNCATE di
+// bawah). Artinya data development (akun dummy, soal, quiz, dst.) TERHAPUS setiap kali test
+// jalan; isi ulang dengan `make seed` setelah test.
+// Kalau database tidak bisa dihubungi, test di-skip (bukan gagal). Di production (APP_ENV=production)
+// test langsung dihentikan supaya data asli tidak terhapus.
 func SetupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -26,20 +29,19 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	loadEnvFromProjectRoot()
 
 	cfg := config.Load()
-	cfg.DBName = os.Getenv("DB_NAME_TEST")
-	if cfg.DBName == "" {
-		cfg.DBName = "rumbasha_test"
+	if cfg.IsProduction() {
+		t.Fatal("test tidak boleh dijalankan di production: test mengosongkan semua tabel (APP_ENV=production)")
 	}
 	cfg.DBDebug = false
 
 	db, err := database.Connect(cfg)
 	if err != nil {
-		t.Skipf("test di-skip, database test tidak tersedia: %v", err)
+		t.Skipf("test di-skip, database %s tidak tersedia: %v", cfg.DBName, err)
 	}
 	t.Cleanup(func() { database.Close(db) })
 
 	if err := database.MigrateUp(cfg); err != nil {
-		t.Fatalf("migration database test gagal: %v", err)
+		t.Fatalf("migration database gagal: %v", err)
 	}
 
 	// Kosongkan semua tabel supaya setiap test mulai dari data kosong.
@@ -48,7 +50,6 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	// (jenjang & kelas) yang tidak dibuat ulang.
 	err = db.Exec(`
 		TRUNCATE
-			subjects,
 			branches,
 			users,
 			refresh_tokens,
@@ -57,7 +58,13 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			student_subscriptions,
 			student_feature_overrides,
 			coin_packages,
+			quiz_prize_awards,
+			daily_quiz_prize_awards,
+			daily_quiz_prize_periods,
+			daily_quiz_settings,
 			coin_transactions,
+			leaderboard_point_logs,
+			leaderboard_entries,
 			daily_quiz_questions,
 			daily_quizzes,
 			quiz_attempts,
@@ -68,6 +75,11 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		RESTART IDENTITY`).Error
 	if err != nil {
 		t.Fatalf("gagal mengosongkan tabel: %v", err)
+	}
+
+	// Pengaturan global Daily Quiz selalu 1 baris: isi ulang nilai awal (10/15/20, tanpa hadiah).
+	if err := db.Exec(`INSERT INTO daily_quiz_settings (id) VALUES (1)`).Error; err != nil {
+		t.Fatalf("gagal mengisi pengaturan Daily Quiz: %v", err)
 	}
 
 	return db

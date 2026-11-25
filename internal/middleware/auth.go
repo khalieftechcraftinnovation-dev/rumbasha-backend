@@ -50,7 +50,7 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 
 // RequireRole hanya mengizinkan role tertentu. Wajib dipasang SETELAH RequireAuth.
 //
-//	api.POST("/subjects", middleware.RequireRole(model.RoleAdmin, model.RoleSuperAdmin), h.Create)
+//	api.POST("/quizzes", middleware.RequireRole(model.RoleAdmin, model.RoleSuperAdmin), h.Create)
 func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !slices.Contains(allowedRoles, GetRole(c)) {

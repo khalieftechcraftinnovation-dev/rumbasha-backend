@@ -4,8 +4,8 @@
 -- Dijalankan otomatis oleh "make seed" SETELAH dummy_data.sql.
 -- Aman dijalankan berkali-kali: username yang sudah ada dilewati (ON CONFLICT DO NOTHING).
 --
--- Bersama dummy_data.sql, totalnya mengikuti contoh desain menu User (FR-STU-012):
---   Semua 55 = Siswa 47 + Tutor 4 + Admin 3 + Super Admin 1
+-- Bersama dummy_data.sql: 47 siswa awal (mengikuti contoh desain menu User FR-STU-012)
+-- + 103 siswa tambahan = Semua 158 = Siswa 150 + Tutor 4 + Admin 3 + Super Admin 1
 --
 -- Semua akun memakai password: password123
 -- ============================================================================
@@ -90,6 +90,65 @@ SELECT 'student',
        grade.id,
        CASE WHEN s.n % 15 = 0 THEN 'inactive' ELSE 'active' END
 FROM new_students s
+JOIN branches b                  ON b.name = s.branch_name
+JOIN master_data_items AS grade  ON grade.type = 'grade' AND grade.code = s.grade_code
+JOIN master_data_items AS level  ON level.id = grade.parent_id
+ON CONFLICT (username) DO NOTHING;
+
+
+-- ----------------------------------------------------------------------------
+-- 103 siswa tambahan lagi (total siswa 150), untuk mencoba list, leaderboard, dan filter kelas.
+--
+--   nama     → nama depan bergiliran + nama keluarga (ganti setiap 1 putaran nama depan)
+--   username → siswa.<nama depan>.<nama keluarga>, contoh siswa.arif.wijaya (selalu sama tiap seed)
+--   kelas    → bergiliran semua kelas (SD & SMP lebih banyak)
+--   cabang   → bergiliran; setiap siswa ke-25 nonaktif
+-- ----------------------------------------------------------------------------
+WITH names AS (
+    SELECT ARRAY[
+        'Arif', 'Bunga', 'Citra', 'Dimas', 'Elsa', 'Fikri', 'Gilang', 'Hesti', 'Ilham', 'Jihan',
+        'Kamal', 'Laras', 'Malik', 'Nisa', 'Omar', 'Prita', 'Raka', 'Sekar', 'Tegar', 'Ulfa',
+        'Valen', 'Wisnu', 'Yasmin', 'Zaki', 'Anisa', 'Bima', 'Cinta', 'Doni', 'Erika', 'Faris',
+        'Gina', 'Hafiz', 'Ira', 'Jefri', 'Kartika', 'Luthfi', 'Mira', 'Naufal', 'Olivia', 'Pandu',
+        'Rania', 'Satria', 'Tasya', 'Utami', 'Vito', 'Widya', 'Yudha', 'Zara', 'Alya', 'Bayu',
+        'Clara', 'Dafa'
+    ] AS first_names,
+    ARRAY['Wijaya', 'Pratama', 'Saputra', 'Lestari', 'Kusuma', 'Hidayat'] AS last_names,
+    ARRAY[
+        'NOL_KECIL', 'NOL_BESAR',
+        'GRADE_1', 'GRADE_2', 'GRADE_3', 'GRADE_4', 'GRADE_5', 'GRADE_6',
+        'GRADE_4', 'GRADE_5', 'GRADE_6',
+        'GRADE_7', 'GRADE_8', 'GRADE_9', 'GRADE_7', 'GRADE_8', 'GRADE_9',
+        'GRADE_10', 'GRADE_11', 'GRADE_12'
+    ] AS grade_codes,
+    ARRAY['Surabaya Timur', 'Surabaya Barat', 'Sidoarjo'] AS branch_names
+),
+more_students AS (
+    SELECT n,
+           first_names[((n - 1) % array_length(first_names, 1)) + 1]                          AS first_name,
+           last_names[(((n - 1) / array_length(first_names, 1)) % array_length(last_names, 1)) + 1] AS last_name,
+           grade_codes[((n - 1) % array_length(grade_codes, 1)) + 1]                          AS grade_code,
+           branch_names[((n - 1) % array_length(branch_names, 1)) + 1]                        AS branch_name
+    FROM names, generate_series(1, 103) AS n
+)
+INSERT INTO users (role, username, password_hash, real_name, branch_id, parent_phone,
+                   school_origin, education_level_id, grade_id, status)
+SELECT 'student',
+       'siswa.' || LOWER(s.first_name) || '.' || LOWER(s.last_name),
+       '$2a$10$CLjXDk4dqnL0gJHw5b6iW.FTDmBleeSo/Vy9soguhl6AF3LYB6Pc2',  -- password123
+       s.first_name || ' ' || s.last_name,
+       b.id,
+       '0857' || LPAD((20000000 + s.n * 6911)::TEXT, 8, '0'),            -- nomor HP ortu unik
+       CASE level.code
+           WHEN 'PRA_SD' THEN 'TK Pelita ' || (s.n % 5 + 1)
+           WHEN 'SD'     THEN 'SDN ' || (s.n % 12 + 1) || ' ' || split_part(s.branch_name, ' ', 1)
+           WHEN 'SMP'    THEN 'SMPN ' || (s.n % 12 + 1) || ' ' || split_part(s.branch_name, ' ', 1)
+           ELSE               'SMAN ' || (s.n % 12 + 1) || ' ' || split_part(s.branch_name, ' ', 1)
+       END,
+       level.id,
+       grade.id,
+       CASE WHEN s.n % 25 = 0 THEN 'inactive' ELSE 'active' END
+FROM more_students s
 JOIN branches b                  ON b.name = s.branch_name
 JOIN master_data_items AS grade  ON grade.type = 'grade' AND grade.code = s.grade_code
 JOIN master_data_items AS level  ON level.id = grade.parent_id

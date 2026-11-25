@@ -4,6 +4,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
 	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
@@ -636,5 +638,28 @@ func TestListQuestions_PenandaQuizDanFilterPeruntukan(t *testing.T) {
 	fields := errorFields(t, res.Body.String())
 	if fields["used_for"] == "" || fields["status"] == "" || fields["quiz_id"] == "" {
 		t.Errorf("filter tidak valid seharusnya 422: %s", res.Body)
+	}
+}
+
+// Kode akses kembar (sangat jarang, 36^6 kemungkinan) harus dikenali sebagai ErrAccessCodeTaken
+// supaya service membuat kode baru, bukan membalas 500.
+func TestQuizRepository_KodeAksesKembarDikenali(t *testing.T) {
+	r, db := setupRouter(t)
+	p := seedPlacementInGrade(t, db, "GRADE_6")
+	admin := adminToken(t, db)
+	q := createQuestionID(t, r, admin, questionBody(p, "single_choice", singleChoiceAnswer, nil))
+	existing := createQuiz(t, r, admin, quizBody(basePlacement(p), []string{q}, nil))
+
+	repo := quizrepo.NewQuizRepository(db)
+	detail, err := repo.FindDetailByID(context.Background(), existing.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyQuiz := detail.Quiz
+	copyQuiz.StartAt = copyQuiz.StartAt.AddDate(0, 0, 400) // jadwal lain supaya tidak bentrok
+	copyQuiz.EndAt = copyQuiz.EndAt.AddDate(0, 0, 400)
+	copyQuiz.QuestionIDs = []string{q}
+	if err := repo.Create(context.Background(), &copyQuiz); !errors.Is(err, quizmodel.ErrAccessCodeTaken) {
+		t.Errorf("kode akses kembar: err %v, seharusnya ErrAccessCodeTaken", err)
 	}
 }

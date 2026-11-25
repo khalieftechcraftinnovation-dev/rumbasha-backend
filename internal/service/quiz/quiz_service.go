@@ -18,6 +18,7 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/accesscode"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
 	quizdto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/quiz"
+	leaderboardmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/leaderboard"
 	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
@@ -194,6 +195,8 @@ func (s *QuizService) buildQuiz(ctx context.Context, req quizdto.CreateQuizReque
 		CoinCost:         coinCost,
 		TotalQuestions:   len(questionIDs),
 		QuestionIDs:      questionIDs,
+		Points:           pointsFrom(req.Points),
+		Prizes:           prizesFrom(req.PrizeCoins),
 	}, nil
 }
 
@@ -721,10 +724,12 @@ func (s *QuizService) Submit(ctx context.Context, quizID, studentID string, subm
 	}
 
 	questionIDs := make([]string, 0, len(detail.Questions))
+	difficulties := make(map[string]string, len(detail.Questions))
 	for _, q := range detail.Questions {
 		questionIDs = append(questionIDs, q.ID)
+		difficulties[q.ID] = q.Difficulty // level soal → point sesuai pengaturan quiz ini
 	}
-	result, fieldErrs := scoring.Grade(questionIDs, submitted)
+	result, fieldErrs := scoring.Grade(questionIDs, difficulties, detail.Points.Table(), submitted)
 	if len(fieldErrs) > 0 {
 		errs := &fieldErrors{}
 		for _, f := range fieldErrs {
@@ -734,7 +739,14 @@ func (s *QuizService) Submit(ctx context.Context, quizID, studentID string, subm
 	}
 
 	result.DurationSeconds = scoring.DurationSeconds(attempt.StartedAt, now)
-	ok, err := s.repo.SubmitAttempt(ctx, attempt.ID, result, now)
+	// Point ikut dicatat ke leaderboard quiz ini (1 quiz = 1 papan), dalam transaksi yang sama.
+	score := result.Score
+	quizRef := detail.ID
+	ok, err := s.repo.SubmitAttempt(ctx, attempt.ID, result, now, leaderboardmodel.PointRecord{
+		Board: detail.Type, QuizID: &quizRef, StudentID: studentID,
+		Points: result.Points, DurationSeconds: result.DurationSeconds, Score: &score, SubmittedAt: now,
+		SourceType: leaderboardmodel.SourceQuizAttempt, SourceID: attempt.ID,
+	})
 	if err != nil {
 		return quizmodel.QuizReview{}, err
 	}
@@ -743,6 +755,7 @@ func (s *QuizService) Submit(ctx context.Context, quizID, studentID string, subm
 	}
 	attempt.SubmittedAt, attempt.Score, attempt.CorrectCount, attempt.Answers = &now, result.Score, result.CorrectCount, result.Answers
 	attempt.DurationSeconds = result.DurationSeconds
+	attempt.Points = result.Points
 	return s.buildReview(ctx, detail, *attempt)
 }
 
@@ -790,4 +803,40 @@ func (s *QuizService) GetAccessCode(ctx context.Context, quizID string) (quizmod
 		return quizmodel.QuizDetail{}, quizmodel.ErrQuizNotFound
 	}
 	return s.repo.FindDetailByID(ctx, quizID)
+}
+
+// pointsFrom = point per level dari request; level yang tidak diisi memakai default (10/15/20).
+func pointsFrom(req *quizdto.QuizPointsRequest) quizmodel.Points {
+	p := quizmodel.DefaultPoints
+	if req == nil {
+		return p
+	}
+	if req.Easy != nil {
+		p.Easy = *req.Easy
+	}
+	if req.Medium != nil {
+		p.Medium = *req.Medium
+	}
+	if req.Hard != nil {
+		p.Hard = *req.Hard
+	}
+	return p
+}
+
+// prizesFrom = hadiah coin juara 1-3 dari request; tidak diisi = 0 (tanpa hadiah).
+func prizesFrom(req *quizdto.QuizPrizesRequest) quizmodel.Prizes {
+	var p quizmodel.Prizes
+	if req == nil {
+		return p
+	}
+	if req.Rank1 != nil {
+		p.Rank1 = *req.Rank1
+	}
+	if req.Rank2 != nil {
+		p.Rank2 = *req.Rank2
+	}
+	if req.Rank3 != nil {
+		p.Rank3 = *req.Rank3
+	}
+	return p
 }

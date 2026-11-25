@@ -4,7 +4,7 @@
 // lalu memanggil route setiap fitur. Daftar URL per fitur ada di subfolder:
 //
 //	router/login/login_routes.go      → /auth/...
-//	router/subject/subject_routes.go  → /subjects/...
+//	router/quiz/quiz_routes.go        → /quizzes/...
 //	router/question/question_routes.go → /questions/...
 //	router/image/image_routes.go       → /images/...
 package router
@@ -17,38 +17,50 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/coin"
 	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
+	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquizreport"
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
+	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
-	subjecthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subject"
+	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
+	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
+	coinrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/coin"
 	dailyquizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dailyquiz"
+	dailyquizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dailyquizreport"
 	dropdownrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dropdown"
 	imagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/image"
+	leaderboardrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/leaderboard"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
 	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/logreport"
 	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/question"
 	quizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz"
+	quizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quizreport"
+	userrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
-	// subjectrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subject"
 )
 
 // Handlers berisi semua handler aplikasi.
 // Setiap ada fitur baru, tambahkan field-nya di sini.
 type Handlers struct {
-	Login     *loginhandler.LoginHandler
-	Subject   *subjecthandler.SubjectHandler
-	LogReport *logreporthandler.LogReportHandler
-	Question  *questionhandler.QuestionHandler
-	Image     *imagehandler.ImageHandler
-	Dropdown  *dropdownhandler.DropdownHandler
-	Quiz      *quizhandler.QuizHandler
-	DailyQuiz *dailyquizhandler.DailyQuizHandler
+	Login           *loginhandler.LoginHandler
+	LogReport       *logreporthandler.LogReportHandler
+	Question        *questionhandler.QuestionHandler
+	Image           *imagehandler.ImageHandler
+	Dropdown        *dropdownhandler.DropdownHandler
+	Quiz            *quizhandler.QuizHandler
+	DailyQuiz       *dailyquizhandler.DailyQuizHandler
+	Leaderboard     *leaderboardhandler.LeaderboardHandler
+	Coin            *coinhandler.CoinHandler
+	User            *userhandler.UserHandler
+	QuizReport      *quizreporthandler.QuizReportHandler
+	DailyQuizReport *dailyquizreporthandler.DailyQuizReportHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
@@ -106,7 +118,11 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	dropdownrouter.Register(private, h.Dropdown)
 	quizrouter.Register(private, h.Quiz)
 	dailyquizrouter.Register(private, h.DailyQuiz)
-	// subjectrouter.Register(private, h.Subject)
+	leaderboardrouter.Register(private, h.Leaderboard)
+	coinrouter.Register(private, h.Coin)
+	userrouter.Register(private, h.User)
+	quizreportrouter.Register(private, h.QuizReport)
+	dailyquizreportrouter.Register(private, h.DailyQuizReport)
 
 	return r
 }
