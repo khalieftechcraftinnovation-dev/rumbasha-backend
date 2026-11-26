@@ -1,0 +1,11 @@
+# File biner disimpan apa adanya (tanpa konversi akhir baris LF/CRLF) supaya tidak rusak
+# saat di-clone di device lain. PDF dummy berisi teks, jadi wajib ditandai biner.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.svg binary
+*.xlsx binary
+*.exe binary
