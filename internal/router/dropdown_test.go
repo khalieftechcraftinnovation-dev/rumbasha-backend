@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 type dropdownItem struct {

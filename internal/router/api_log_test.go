@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 // logEntry adalah isi satu baris file log (hanya field yang dicek di test).

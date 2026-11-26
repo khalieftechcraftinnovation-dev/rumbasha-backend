@@ -1,7 +1,7 @@
 // Package dto (Data Transfer Object) berisi bentuk request dan response JSON.
 //
 // File di folder ini (root) dipakai BERSAMA oleh semua fitur, misalnya pagination.
-// DTO khusus satu fitur ada di subfolder fiturnya: dto/login, dto/subject, ...
+// DTO khusus satu fitur ada di subfolder domain/fiturnya: dto/auth/login, dto/quiz/dailyquiz, ...
 package dto
 
 // PaginationQuery adalah query string ?page=1&per_page=20 untuk endpoint list.

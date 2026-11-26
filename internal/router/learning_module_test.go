@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 // samplePDF adalah isi PDF minimal (cukup untuk dikenali sebagai PDF dari isinya).

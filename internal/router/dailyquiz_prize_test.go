@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
-	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
-	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
-	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquiz"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
+	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/dailyquiz"
+	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/question"
+	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/dailyquiz"
 )
 
 type dailySettings struct {

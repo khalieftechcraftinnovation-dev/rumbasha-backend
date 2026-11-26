@@ -59,6 +59,10 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	// (jenjang & kelas) yang tidak dibuat ulang.
 	err = db.Exec(`
 		TRUNCATE
+			announcement_reads,
+			announcement_grades,
+			announcements,
+			admin_tasks,
 			branches,
 			users,
 			refresh_tokens,
@@ -85,6 +89,10 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			quiz_questions,
 			quizzes,
 			questions,
+			trial_quiz_attempts,
+			trial_quiz_questions,
+			landing_changes,
+			landing_publish_logs,
 			media_assets
 		RESTART IDENTITY`).Error
 	if err != nil {

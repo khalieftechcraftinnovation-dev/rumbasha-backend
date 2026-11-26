@@ -83,22 +83,23 @@ cmd/
   seed/                   Program + file SQL data dummy.
 migrations/               File SQL pembuat tabel (*.up.sql & *.down.sql).
 internal/
-  router/                 ROUTE       Daftar URL → handler.
+  router/                 ROUTE       Daftar URL → handler, dikelompokkan per domain/fitur.
     router.go               Pintu utama: Gin, middleware global, /health, memanggil route tiap fitur.
-    login/                  login_routes.go
-    quiz/                   quiz_routes.go   (dan folder lain: satu folder per fitur)
-    *_test.go               Test endpoint dari ujung ke ujung (semua fitur).
+    auth/login/  quiz/question/  quiz/quiz/  ...  *_routes.go
+    *_test.go               Test endpoint dari ujung ke ujung.
   handler/                HANDLER     Baca request, panggil service, kirim response.
-    login/  quiz/  dailyquiz/  user/  coin/  ...
   service/                SERVICE     Aturan bisnis.
-    login/  quiz/  dailyquiz/  user/  coin/  subscription/  ...
   repository/             REPOSITORY  Query database (GORM atau native SQL).
-    login/  quiz/  dailyquiz/  user/  coin/  subscription/  ...
   model/                  Struct yang mewakili tabel + daftar error.
-    login/  quiz/  dailyquiz/  user/  coin/  subscription/  ...
-  dto/                    Bentuk request & response JSON.
-    pagination.go           Dipakai bersama semua fitur.
-    login/  quiz/  dailyquiz/  user/  coin/  ...
+  dto/                    Bentuk request & response JSON; pagination.go dipakai bersama.
+    auth/{login,passwordreset}/
+    billing/{coin,subscription}/
+    learning/learningmodule/
+    master/{dropdown,image,masterdata}/
+    quiz/{dailyquiz,leaderboard,question,quiz,trialquiz}/
+    report/{dailyquizreport,logreport,quizreport}/
+    site/landingpage/
+    user/{profile,user}/
 
   middleware/             Log API (APILog), cek login (RequireAuth) dan role (RequireRole).
   apilog/                 Menulis log API ke file .txt harian + hapus file lama.
@@ -111,10 +112,10 @@ internal/
   testutil/               Helper untuk test (database DB_NAME, tabel data dikosongkan).
 ```
 
-Setiap layer dikelompokkan per fitur: `<layer>/<fitur>/<fitur>_<layer>.go`, misalnya `service/login/login_service.go`.
-File di root folder layer (misalnya `dto/pagination.go`) dipakai bersama oleh semua fitur.
+Setiap layer memakai path domain/fitur yang sama, misalnya `service/quiz/question/question_service.go` dan `repository/quiz/question/question_repository.go`.
+Fitur yang digunakan lintas domain tetap berbagi package infrastructure di `internal/` (misalnya middleware, database, response, storage, dan scoring).
 
-Contoh fitur: **login** (`/auth/...`), **quiz** (`/quizzes/...`), dan **subscription** (paket akses siswa; belum punya endpoint sendiri, dipakai oleh `/auth/me`). Fitur yang tidak punya endpoint sendiri tidak perlu folder di `handler/` dan `router/`.
+Contoh domain: **auth/login** (`/auth/...`), **quiz/quiz** (`/quizzes/...`), serta **billing/subscription** (paket akses dan subscription siswa).
 
 ### Import dengan alias
 
@@ -122,12 +123,12 @@ Di Go, nama package = nama folder terakhir. Karena `service/login`, `model/login
 
 ```go
 import (
-    loginmodel   ".../internal/model/login"
-    logindto     ".../internal/dto/login"
-    loginrepo    ".../internal/repository/login"
-    loginservice ".../internal/service/login"
-    loginhandler ".../internal/handler/login"
-    loginrouter  ".../internal/router/login"
+    loginmodel   ".../internal/model/auth/login"
+    logindto     ".../internal/dto/auth/login"
+    loginrepo    ".../internal/repository/auth/login"
+    loginservice ".../internal/service/auth/login"
+    loginhandler ".../internal/handler/auth/login"
+    loginrouter  ".../internal/router/auth/login"
 )
 
 loginService := loginservice.NewLoginService(...)   // jelas: service milik fitur login
@@ -180,7 +181,7 @@ Keputusan pemilik produk: **tanpa email / OTP**. Admin menghubungi user lalu mer
 - Reset lewat **ubah user** (`PUT /users/:id` dengan `password`) dan **ubah kata sandi sendiri** juga menyelesaikan permintaan yang menunggu.
 - Tabel `password_reset_requests` (migration 000041), index unik 1 permintaan menunggu per akun.
 
-Grup `public` (tanpa login) dan `private` (wajib login) dibuat di [router.go](internal/router/router.go), lalu diteruskan ke route tiap fitur. Contoh di [quiz_routes.go](internal/router/quiz/quiz_routes.go):
+Grup `public` (tanpa login) dan `private` (wajib login) dibuat di [router.go](internal/router/router.go), lalu diteruskan ke route tiap fitur. Contoh di [quiz_routes.go](internal/router/quiz/quiz/quiz_routes.go):
 
 ```go
 private.GET("/student/quiz-announcements", studentOnly, h.Announcements) // wajib login + role siswa
@@ -193,10 +194,10 @@ Di handler, ID dan role user yang login dibaca dengan `middleware.GetUserID(c)` 
 
 ```text
 GET /api/v1/quizzes/:id
-  → router      router/quiz/quiz_routes.go          mencari handler untuk URL ini
-  → handler     handler/quiz/quiz_handler.go        QuizHandler.GetDetail
-  → service     service/quiz/quiz_service.go        QuizService.GetDetail
-  → repository  repository/quiz/quiz_repository.go  QuizRepository.FindDetailByID → PostgreSQL
+  → router      router/quiz/quiz/quiz_routes.go                  mencari handler untuk URL ini
+  → handler     handler/quiz/quiz/quiz_handler.go                QuizHandler.GetDetail
+  → service     service/quiz/quiz/quiz_service.go                QuizService.GetDetail
+  → repository  repository/quiz/quiz/quiz_repository.go          QuizRepository.FindDetailByID → PostgreSQL
 ```
 
 Saat debug, ikuti alur di atas: Ctrl+klik nama fungsinya di VS Code untuk langsung melompat ke layer berikutnya.
@@ -206,7 +207,7 @@ Dengan `DB_DEBUG=true` di `.env`, setiap query SQL ikut tercetak di terminal.
 
 ### Kapan pakai GORM, kapan native SQL
 
-Contoh keduanya ada di [subject_repository.go](internal/repository/subject/subject_repository.go).
+Contoh keduanya ada di [masterdata_repository.go](internal/repository/master/masterdata/masterdata_repository.go).
 
 | Kebutuhan                                      | Pakai                                          |
 |------------------------------------------------|------------------------------------------------|
@@ -214,7 +215,7 @@ Contoh keduanya ada di [subject_repository.go](internal/repository/subject/subje
 | List dengan filter, JOIN 1–2 tabel             | GORM atau native SQL, mana yang lebih jelas    |
 | **JOIN lebih dari 2 tabel**, agregasi, laporan | **Wajib native SQL**: `db.Raw(...).Scan(...)`  |
 
-Tabel yang di-JOIN lebih dari sekali tetap dihitung per JOIN. Contoh: `users` + `master_data_items` (jenjang) + `master_data_items` (kelas) = 3 tabel, jadi wajib native SQL (lihat [user_repository.go](internal/repository/login/user_repository.go)).
+Tabel yang di-JOIN lebih dari sekali tetap dihitung per JOIN. Contoh: `users` + `master_data_items` (jenjang) + `master_data_items` (kelas) = 3 tabel, jadi wajib native SQL (lihat [user_repository.go](internal/repository/auth/login/user_repository.go)).
 
 Di native SQL, selalu pakai `?` untuk nilai dari user, jangan sambung string:
 
@@ -290,18 +291,18 @@ Kalau migration gagal di tengah jalan (status `dirty`), perbaiki tabelnya, lalu 
 1. **Arah panggilan hanya ke bawah:** handler → service → repository. Handler tidak boleh memanggil repository langsung.
 2. **Aturan bisnis hanya di service.** Handler cukup baca request dan kirim response.
 3. **Semua layer disusun di `main.go`.** Setiap layer menerima layer di bawahnya lewat parameter `New...()`.
-4. **Satu fitur = satu subfolder per layer**, misalnya `handler/quiz/`, `service/quiz/`, `repository/quiz/`.
+4. **Satu fitur = satu subfolder domain/fitur per layer**, misalnya `handler/quiz/question/`, `service/quiz/question/`, dan `repository/quiz/question/`.
 5. **Service fitur A tidak boleh memakai repository fitur B.** Kalau butuh data fitur lain, panggil service-nya (contoh: `LoginHandler` memakai `SubscriptionService` untuk `/auth/me`). Ini yang membuat project mudah dipecah jadi microservice nanti.
 
-## Menambah fitur baru (contoh: `material`)
+## Menambah fitur baru (contoh: `learning/material`)
 
 1. `migrations/00000N_create_materials_table.up.sql` + `.down.sql`, lalu `make migrate-up`.
-2. `internal/model/material/material_model.go`: struct `Material` + `TableName()` + error-nya.
-3. `internal/dto/material/material_dto.go`: struct request & response.
-4. `internal/repository/material/material_repository.go`: query database.
-5. `internal/service/material/material_service.go`: logika bisnis.
-6. `internal/handler/material/material_handler.go`: handler + `handleError`.
-7. `internal/router/material/material_routes.go`: fungsi `Register(...)` berisi route-nya.
+2. `internal/model/learning/material/material_model.go`: struct `Material` + `TableName()` + error-nya.
+3. `internal/dto/learning/material/material_dto.go`: struct request & response.
+4. `internal/repository/learning/material/material_repository.go`: query database.
+5. `internal/service/learning/material/material_service.go`: logika bisnis.
+6. `internal/handler/learning/material/material_handler.go`: handler + `handleError`.
+7. `internal/router/learning/material/material_routes.go`: fungsi `Register(...)` berisi route-nya.
 8. `internal/router/router.go`: tambah field di `Handlers` dan panggil `materialrouter.Register(...)`.
 9. `cmd/api/main.go`: susun repository → service → handler.
 
@@ -579,7 +580,7 @@ Khusus admin & super admin karena berisi **kunci jawaban** (`answer`) dan **pemb
 }
 ```
 
-- 1 query native SQL (`questions` + 7× `master_data_items` + `users`, semua JOIN lewat primary key). SQL-nya ada di `questionDetailQuery` ([question_repository.go](internal/repository/question/question_repository.go)), bisa dicoba di DBeaver.
+- 1 query native SQL (`questions` + 7× `master_data_items` + `users`, semua JOIN lewat primary key). SQL-nya ada di `questionDetailQuery` ([question_repository.go](internal/repository/quiz/question/question_repository.go)), bisa dicoba di DBeaver.
 - ID tidak ada, bukan UUID, atau soal sudah dihapus → 404 `Soal tidak ditemukan`.
 
 ### Ubah soal (`PUT /api/v1/questions/:id`)

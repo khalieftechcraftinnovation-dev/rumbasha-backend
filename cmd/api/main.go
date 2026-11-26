@@ -18,62 +18,75 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scheduler"
 
-	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
-	masterdatahandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/masterdata"
-	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/passwordreset"
-	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/profile"
-	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
-	masterdatarepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/masterdata"
-	passwordresetrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/passwordreset"
-	profilerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/profile"
-	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
-	masterdataservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/masterdata"
-	passwordresetservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/passwordreset"
-	profileservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/profile"
+	taskhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/task"
+	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/login"
+	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/passwordreset"
+	masterdatahandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/masterdata"
+	announcementhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/notification/announcement"
+	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/profile"
+	taskrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/admin/task"
+	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/auth/login"
+	passwordresetrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/auth/passwordreset"
+	masterdatarepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/master/masterdata"
+	announcementrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/notification/announcement"
+	profilerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user/profile"
+	taskservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/admin/task"
+	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/auth/login"
+	passwordresetservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/auth/passwordreset"
+	masterdataservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/master/masterdata"
+	announcementservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/notification/announcement"
+	profileservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user/profile"
 
-	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
+	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/logreport"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
-	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
+	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/logreport"
 
-	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/coin"
-	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
-	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquizreport"
-	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
-	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
-	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
-	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learningmodule"
-	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
-	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
-	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subscription"
-	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
-	coinrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/coin"
-	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
-	dailyquizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquizreport"
-	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
-	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
-	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/leaderboard"
-	learningmodulerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/learningmodule"
-	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
-	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quizreport"
-	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user"
-	coinservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/coin"
-	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquiz"
-	dailyquizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dailyquizreport"
-	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
-	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
-	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/leaderboard"
-	learningmoduleservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/learningmodule"
-	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
-	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quizreport"
-	userservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user"
+	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/billing/coin"
+	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/billing/subscription"
+	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learning/learningmodule"
+	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/dropdown"
+	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/image"
+	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/dailyquiz"
+	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/leaderboard"
+	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/quiz"
+	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/dailyquizreport"
+	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/quizreport"
+	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/user"
+	coinrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/billing/coin"
+	learningmodulerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/learning/learningmodule"
+	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/master/dropdown"
+	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/master/image"
+	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/dailyquiz"
+	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/leaderboard"
+	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/quiz"
+	dailyquizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/report/dailyquizreport"
+	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/report/quizreport"
+	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user/user"
+	coinservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/billing/coin"
+	learningmoduleservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/learning/learningmodule"
+	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/master/dropdown"
+	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/master/image"
+	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/dailyquiz"
+	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/leaderboard"
+	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/quiz"
+	dailyquizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/dailyquizreport"
+	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/quizreport"
+	userservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 
-	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
-	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
-	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/question"
+	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/question"
+	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/question"
+	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/question"
 
-	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/subscription"
-	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
+	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/billing/subscription"
+	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/billing/subscription"
+
+	trialquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/trialquiz"
+	landingpagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/site/landingpage"
+	trialquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/trialquiz"
+	landingpagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/site/landingpage"
+	trialquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/trialquiz"
+	landingpageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/site/landingpage"
 )
 
 func main() {
@@ -117,10 +130,9 @@ func main() {
 	logReportService := logreportservice.NewLogReportService(emailSender, cfg.LogDir, cfg.LogReportEmail, cfg.AppEnv)
 	logReportHandler := logreporthandler.NewLogReportHandler(logReportService, loginService)
 
-	// Fitur: bank soal
-	questionHandler := questionhandler.NewQuestionHandler(
-		questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db)),
-	)
+	// Fitur: bank soal. Service-nya juga dipakai Quiz Trial (validasi isi soal yang sama).
+	questionService := questionservice.NewQuestionService(questionrepo.NewQuestionRepository(db))
+	questionHandler := questionhandler.NewQuestionHandler(questionService)
 
 	// Fitur: Image Library (upload & hapus gambar). File disimpan di STORAGE_DIR/images/...
 	// File upload (gambar publik di /storage/images; PDF modul hanya lewat API wajib login).
@@ -154,6 +166,8 @@ func main() {
 	defer apiLog.Close() // menulis sisa log di antrean sebelum aplikasi berhenti
 
 	r := router.New(router.Handlers{
+		Announcement:    announcementhandler.NewAnnouncementHandler(announcementservice.NewAnnouncementService(announcementrepo.NewAnnouncementRepository(db))),
+		Task:            taskhandler.NewTaskHandler(taskservice.NewTaskService(taskrepo.NewTaskRepository(db))),
 		Login:           loginHandler,
 		LogReport:       logReportHandler,
 		Question:        questionHandler,
@@ -171,6 +185,8 @@ func main() {
 		MasterData:      masterdatahandler.NewMasterDataHandler(masterdataservice.NewMasterDataService(masterdatarepo.NewMasterDataRepository(db))),
 		PasswordReset:   passwordresethandler.NewPasswordResetHandler(passwordresetservice.NewPasswordResetService(passwordresetrepo.NewPasswordResetRepository(db))),
 		Profile:         profilehandler.NewProfileHandler(profileservice.NewProfileService(profilerepo.NewProfileRepository(db), subscriptionService, store)),
+		LandingPage:     landingpagehandler.NewLandingPageHandler(landingpageservice.NewLandingPageService(landingpagerepo.NewLandingPageRepository(db))),
+		TrialQuiz:       trialquizhandler.NewTrialQuizHandler(trialquizservice.NewTrialQuizService(trialquizrepo.NewTrialQuizRepository(db), questionService)),
 	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

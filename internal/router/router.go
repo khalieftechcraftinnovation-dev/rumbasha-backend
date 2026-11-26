@@ -3,10 +3,14 @@
 // File ini adalah pintu utamanya: membuat Gin, memasang middleware global,
 // lalu memanggil route setiap fitur. Daftar URL per fitur ada di subfolder:
 //
-//	router/login/login_routes.go      → /auth/...
-//	router/quiz/quiz_routes.go        → /quizzes/...
-//	router/question/question_routes.go → /questions/...
-//	router/image/image_routes.go       → /images/...
+//	router/auth/login/...               → /auth/...
+//	router/quiz/quiz/...                → /quizzes/...
+//	router/quiz/question/...            → /questions/...
+//	router/master/image/...             → /images/...
+//	router/site/landingpage/...         → /landing-pages/..., /public/landing-pages/...
+//	router/quiz/trialquiz/...            → /trial-quiz/..., /public/trial-quiz/...
+//	router/notification/announcement/... → /announcements/..., /student/notifications/...
+//	router/admin/task/...               → /tasks/...
 package router
 
 import (
@@ -17,48 +21,58 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
-	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/coin"
-	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquiz"
-	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dailyquizreport"
-	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
-	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
-	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
-	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learningmodule"
-	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
-	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
-	masterdatahandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/masterdata"
-	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/passwordreset"
-	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/profile"
-	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
-	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
-	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
-	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subscription"
-	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
+	taskhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/task"
+	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/login"
+	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/passwordreset"
+	coinhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/billing/coin"
+	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/billing/subscription"
+	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learning/learningmodule"
+	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/dropdown"
+	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/image"
+	masterdatahandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/masterdata"
+	announcementhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/notification/announcement"
+	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/dailyquiz"
+	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/leaderboard"
+	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/question"
+	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/quiz"
+	trialquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/trialquiz"
+	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/dailyquizreport"
+	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/logreport"
+	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/quizreport"
+	landingpagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/site/landingpage"
+	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/profile"
+	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
-	coinrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/coin"
-	dailyquizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dailyquiz"
-	dailyquizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dailyquizreport"
-	dropdownrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dropdown"
-	imagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/image"
-	leaderboardrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/leaderboard"
-	learningmodulerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/learningmodule"
-	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
-	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/logreport"
-	masterdatarouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/masterdata"
-	passwordresetrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/passwordreset"
-	profilerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/profile"
-	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/question"
-	quizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz"
-	quizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quizreport"
-	subscriptionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subscription"
-	userrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/user"
+	taskrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/admin/task"
+	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/auth/login"
+	passwordresetrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/auth/passwordreset"
+	coinrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/billing/coin"
+	subscriptionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/billing/subscription"
+	learningmodulerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/learning/learningmodule"
+	dropdownrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/master/dropdown"
+	imagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/master/image"
+	masterdatarouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/master/masterdata"
+	announcementrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/notification/announcement"
+	dailyquizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/dailyquiz"
+	leaderboardrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/leaderboard"
+	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/question"
+	quizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/quiz"
+	trialquizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/trialquiz"
+	dailyquizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/report/dailyquizreport"
+	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/report/logreport"
+	quizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/report/quizreport"
+	landingpagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/site/landingpage"
+	profilerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/user/profile"
+	userrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/user/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 )
 
 // Handlers berisi semua handler aplikasi.
 // Setiap ada fitur baru, tambahkan field-nya di sini.
 type Handlers struct {
+	Announcement    *announcementhandler.AnnouncementHandler
+	Task            *taskhandler.TaskHandler
 	Login           *loginhandler.LoginHandler
 	LogReport       *logreporthandler.LogReportHandler
 	Question        *questionhandler.QuestionHandler
@@ -76,6 +90,8 @@ type Handlers struct {
 	MasterData      *masterdatahandler.MasterDataHandler
 	PasswordReset   *passwordresethandler.PasswordResetHandler
 	Profile         *profilehandler.ProfileHandler
+	LandingPage     *landingpagehandler.LandingPageHandler
+	TrialQuiz       *trialquizhandler.TrialQuizHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
@@ -126,6 +142,8 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	private := r.Group("/api/v1", middleware.RequireAuth(jwtSecret))
 
 	// Daftarkan route setiap fitur. Tambahkan baris baru setiap ada fitur baru.
+	announcementrouter.Register(private, h.Announcement)
+	taskrouter.Register(private, h.Task)
 	loginrouter.Register(public, private, h.Login)
 	logreportrouter.Register(private, h.LogReport)
 	questionrouter.Register(private, h.Question)
@@ -143,6 +161,8 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	masterdatarouter.Register(private, h.MasterData)
 	passwordresetrouter.Register(public, private, h.PasswordReset)
 	profilerouter.Register(private, h.Profile)
+	landingpagerouter.Register(public, private, h.LandingPage)
+	trialquizrouter.Register(public, private, h.TrialQuiz)
 
 	return r
 }

@@ -18,11 +18,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
-	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
-	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
-	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
-	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
+	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz/quiz"
+	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/question"
+	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/quiz"
+	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/quiz"
 )
 
 var accessCodeFormat = regexp.MustCompile(`^[A-Z0-9]{6}$`)

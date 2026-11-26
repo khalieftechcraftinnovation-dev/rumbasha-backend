@@ -17,7 +17,7 @@ import (
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 const importCheckURL = "/api/v1/questions/import/check"

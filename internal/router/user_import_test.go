@@ -16,7 +16,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 const userImportURL = "/api/v1/users/import/check"

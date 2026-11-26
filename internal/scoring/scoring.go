@@ -16,7 +16,7 @@ import (
 	"math"
 	"time"
 
-	questionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/question"
+	questionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz/question"
 )
 
 // MaxScore adalah nilai total semua quiz.

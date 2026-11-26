@@ -10,7 +10,7 @@ import (
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 const logReportBody = `{"description":"Siswa tidak bisa login, muncul error 500","request_id":"abc-123"}`

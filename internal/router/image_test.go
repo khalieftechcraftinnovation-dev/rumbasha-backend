@@ -19,7 +19,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 // uploadFile adalah 1 file untuk dikirim di field "files".

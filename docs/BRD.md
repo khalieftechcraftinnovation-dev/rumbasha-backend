@@ -4,8 +4,8 @@
 
 **Project:** Rumbasha E-Learning Platform  
 **Client:** PT Rumbasha Menggapai Asa  
-**Document Version:** 1.3  
-**Date:** 24 November 2026  
+**Document Version:** 1.6
+**Date:** 26 November 2026
 **Backend:** Go (Gin Framework)  
 **Frontend:** React  
 **Database:** PostgreSQL  
@@ -19,7 +19,10 @@
 | 1.0       | 1 November 2026 | Draf awal BRD.                                                                                                                                                                                                                                                        |
 | 1.1       | 9 November 2026 | Penyesuaian dengan desain UI: login, beranda siswa, modul, Daily Quiz, isi quiz, Uji Kom & Tryout, RUMATH, peringkat, paket & coin, notifikasi, profil, dan beranda admin. Fitur admin lainnya menyusul.                                                              |
 | 1.2       | 9 November 2026 | Penyesuaian dengan desain panel admin: Materi, Bank Soal, Image, Master Data, Quiz, RUMATH, Leaderboard, Report Quiz, Report RUMATH, User, Coin & Akses, Paket, Landing Page, dan Task. Ditambahkan Bagian 3.16-3.20, BR-024 sampai BR-028, dan BD-025 sampai BD-033. |
-| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text"; Image Library: upload banyak gambar dengan kategori & hierarki mapel, hapus permanen banyak gambar (FR-IMG-005 sampai FR-IMG-008). Daftar Bank Soal: cari kode/teks soal, filter tipe, level, dan setiap tingkat hierarki, kolom pembuat & pengubah terakhir. Master Data: Tipe soal, Tipe quiz, dan Level (disimpan sebagai kode) serta data dropdown (FR-MST-009, FR-MST-010). Buat quiz Uji Kom/Tryout: info quiz, total soal harus sama dengan soal dipilih, syarat soal, penanda soal yang sudah dipakai quiz (FR-TRY-024, FR-TRY-025, FR-TRY-029); waktu mulai quiz (WIB), Uji Kom hanya Kelas 6/9/12, bundle soal (FR-TRY-030), kode akses acak 6 karakter yang diganti setiap jam (FR-TRY-026, FR-TRY-031); jendela event mulai-selesai (bisa lebih dari 1 hari), larangan jadwal beririsan untuk mapel & kelas sama (FR-TRY-032), list quiz dengan status jadwal, ubah, detail, dan hapus quiz (FR-TRY-022, FR-TRY-027); tombol Simpan draf / Publish dan pengumuman quiz di dashboard student (FR-TRY-024, FR-TRY-033); Daily Quiz di-generate student dari soal acak, level = tingkat kesulitan soal, kelas sesuai jenjang (SD: 1-3 & 4-6), total 5/10/15, tanpa kode akses & timer (FR-QUIZ-012 sampai FR-QUIZ-014); buka quiz: Daily Quiz dengan kuota gratis 2x/hari lalu potong coin (FR-QUIZ-021), Uji Kom/Tryout dengan kode akses (FR-TRY-034), kode akses untuk tutor/admin (FR-TRY-035), soal dibuka beserta kunci jawaban tanpa pembahasan; submit jawaban dinilai FE dengan nilai total 100 dan review berisi pembahasan (FR-QUIZ-041, FR-QUIZ-042); waktu pengerjaan per soal & total, quiz yang sudah dikerjakan langsung ke review (FR-QUIZ-043); point (easy 10 / medium 15 / hard 20, bukan nilai) dan leaderboard: Daily Quiz per bulan dengan filter jenjang & kelas, Uji Kom & Tryout per quiz, urut point lalu waktu tersingkat (FR-RNK-014 sampai FR-RNK-017); tabel leaderboard tersendiri + riwayat point (FR-RNK-018); point per level soal Uji Kom & Tryout dapat diatur admin per quiz dan hadiah coin juara 1-3 per quiz dibagikan otomatis jam 23:59 WIB setelah event selesai (FR-TRY-036 sampai FR-TRY-039); point per level Daily Quiz dapat diatur admin secara global, serta hadiah coin juara 1-3 bulanan Daily Quiz per kelas dibagikan otomatis hari terakhir bulan jam 23:59 WIB (FR-RNK-019 sampai FR-RNK-022); kuota gratis harian dan biaya coin Daily Quiz pindah dari konfigurasi server ke pengaturan global Daily Quiz yang dapat diubah admin (FR-TOK-008, FR-TOK-009); paket isi coin dikelola admin (CRUD), admin menambah coin banyak siswa sekaligus per paket yang dicatat sebagai pembelian tunai, serta riwayat coin untuk siswa dan admin (FR-TOK-007, FR-TOK-015, FR-TOK-018 sampai FR-TOK-020); menu User: list dengan filter & pencarian, detail, ubah, dan hapus (soft delete), admin hanya mengelola tutor & siswa (FR-STU-019 sampai FR-STU-022; BD-026 diputuskan soft delete); tambah user satu atau banyak sekaligus maksimal 100 akun per proses (FR-STU-023); tanggal bergabung (wajib) & tanggal berakhir akun yang memblokir login setelah lewat, serta import user dari Excel yang hanya mengecek lalu disimpan lewat tambah user (FR-STU-024 sampai FR-STU-026); report quiz Uji Kom & Tryout per event, detail peserta per event, dan soal yang paling sering salah (FR-TRY-040 sampai FR-TRY-042); report Daily Quiz per siswa dengan filter periode, mapel, jenjang, kelas dan rincian per mapel (FR-RNK-023 sampai FR-RNK-025); API contoh /subjects dan tabel subjects lama dihapus karena mapel dikelola di master data; modul pembelajaran PDF (unggah, ubah, hapus, daftar) dengan paket akses per modul dan file yang tidak publik (FR-LMS-025 sampai FR-LMS-030); modul untuk siswa sesuai jenjang dan paket akses (modul di luar paket tampil terkunci), buka modul dengan riwayat buka, dan folder file PDF mengikuti hierarki mapel (FR-LMS-031 sampai FR-LMS-034); paket akses dikelola admin (CRUD) dengan aturan hapus (soft delete, ditolak jika masih dipakai siswa atau satu-satunya paket modul), beri paket ke banyak siswa sekaligus dengan perpanjangan otomatis dan bonus coin bulan pertama, batal paket, akses khusus per fitur, serta kolom akses dan filter paket di menu User (FR-SUB-017 sampai FR-SUB-021, FR-TOK-021, FR-TOK-022); kartu ringkasan, grafik tren mingguan dan sebaran nilai report quiz per tab Daily Quiz, Uji Kom, dan Tryout, serta pengaturan ambang soal sering salah dan rentang laporan bawaan (FR-RPT-008 sampai FR-RPT-010); CRUD Master Data (mapel, bidang materi, bab, subbab, topik, kelas, sekolah) dan Cabang dengan kolom Isi, aturan hapus (soft delete, ditolak jika masih dipakai atau data bawaan sistem), dan dropdown sekolah & cabang (FR-MST-011 sampai FR-MST-014); galeri Image Library dengan pencarian, filter kategori & hierarki, urutan, jumlah per kategori, detail, dan soal yang memakai gambar (FR-IMG-009); "Ingat saya" 30 hari, ubah kata sandi sendiri untuk semua role, dan lupa kata sandi yang diselesaikan admin tanpa email/OTP (FR-AUTH-015 sampai FR-AUTH-017); Profil siswa: data diri yang boleh diubah sendiri, foto profil, no HP orang tua tersamar, dan ringkasan paket, coin, peringkat, point, quiz bulan ini (FR-STU-027 sampai FR-STU-029; BD-014 dijawab); halaman Uji Kom & Tryout student (Akan datang, Sudah dikerjakan dengan peringkat, statistik) dan riwayat serta statistik Daily Quiz student (FR-TRY-043, FR-QUIZ-044). Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-022, FR-QUIZ-023, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. |
+| 1.3       | 24 November 2026 | Keputusan pemilik produk: (1) hierarki mapel: mapel sama untuk semua jenjang, Bidang Materi ke bawah terhubung ke jenjang dan kelas, Subbab dan Topik tetap dipakai; (2) bank soal: 4 tipe soal (single choice, multiple choice, true/false, free text), letak soal wajib sampai Bab, isi soal dapat memuat rumus, gambar, dan tabel; banyak soal satu tipe dapat dibuat sekaligus; ubah soal satu per satu; hapus soal (soft delete) bisa banyak sekaligus; upload Excel hanya mengecek data; gambar boleh link luar; isian teks memakai input_type "text"; Image Library: upload banyak gambar dengan kategori & hierarki mapel, hapus permanen banyak gambar (FR-IMG-005 sampai FR-IMG-008). Daftar Bank Soal: cari kode/teks soal, filter tipe, level, dan setiap tingkat hierarki, kolom pembuat & pengubah terakhir. Master Data: Tipe soal, Tipe quiz, dan Level (disimpan sebagai kode) serta data dropdown (FR-MST-009, FR-MST-010). Buat quiz Uji Kom/Tryout: info quiz, total soal harus sama dengan soal dipilih, syarat soal, penanda soal yang sudah dipakai quiz (FR-TRY-024, FR-TRY-025, FR-TRY-029); waktu mulai quiz (WIB), Uji Kom hanya Kelas 6/9/12, bundle soal (FR-TRY-030), kode akses acak 6 karakter yang diganti setiap jam (FR-TRY-026, FR-TRY-031); jendela event mulai-selesai (bisa lebih dari 1 hari), larangan jadwal beririsan untuk mapel & kelas sama (FR-TRY-032), list quiz dengan status jadwal, ubah, detail, dan hapus quiz (FR-TRY-022, FR-TRY-027); tombol Simpan draf / Publish dan pengumuman quiz di dashboard student (FR-TRY-024, FR-TRY-033); Daily Quiz di-generate student dari soal acak, level = tingkat kesulitan soal, kelas sesuai jenjang (SD: 1-3 & 4-6), total 5/10/15, tanpa kode akses & timer (FR-QUIZ-012 sampai FR-QUIZ-014); buka quiz: Daily Quiz dengan kuota gratis 2x/hari lalu potong coin (FR-QUIZ-021), Uji Kom/Tryout dengan kode akses (FR-TRY-034), kode akses untuk tutor/admin (FR-TRY-035), soal dibuka beserta kunci jawaban tanpa pembahasan; submit jawaban dinilai FE dengan nilai total 100 dan review berisi pembahasan (FR-QUIZ-041, FR-QUIZ-042); waktu pengerjaan per soal & total, quiz yang sudah dikerjakan langsung ke review (FR-QUIZ-043); point (easy 10 / medium 15 / hard 20, bukan nilai) dan leaderboard: Daily Quiz per bulan dengan filter jenjang & kelas, Uji Kom & Tryout per quiz, urut point lalu waktu tersingkat (FR-RNK-014 sampai FR-RNK-017); tabel leaderboard tersendiri + riwayat point (FR-RNK-018); point per level soal Uji Kom & Tryout dapat diatur admin per quiz dan hadiah coin juara 1-3 per quiz dibagikan otomatis jam 23:59 WIB setelah event selesai (FR-TRY-036 sampai FR-TRY-039); point per level Daily Quiz dapat diatur admin secara global, serta hadiah coin juara 1-3 bulanan Daily Quiz per kelas dibagikan otomatis hari terakhir bulan jam 23:59 WIB (FR-RNK-019 sampai FR-RNK-022); kuota gratis harian dan biaya coin Daily Quiz pindah dari konfigurasi server ke pengaturan global Daily Quiz yang dapat diubah admin (FR-TOK-008, FR-TOK-009); paket isi coin dikelola admin (CRUD), admin menambah coin banyak siswa sekaligus per paket yang dicatat sebagai pembelian tunai, serta riwayat coin untuk siswa dan admin (FR-TOK-007, FR-TOK-015, FR-TOK-018 sampai FR-TOK-020); menu User: list dengan filter & pencarian, detail, ubah, dan hapus (soft delete), admin hanya mengelola tutor & siswa (FR-STU-019 sampai FR-STU-022; BD-026 diputuskan soft delete); tambah user satu atau banyak sekaligus maksimal 100 akun per proses (FR-STU-023); tanggal bergabung (wajib) & tanggal berakhir akun yang memblokir login setelah lewat, serta import user dari Excel yang hanya mengecek lalu disimpan lewat tambah user (FR-STU-024 sampai FR-STU-026); report quiz Uji Kom & Tryout per event, detail peserta per event, dan soal yang paling sering salah (FR-TRY-040 sampai FR-TRY-042); report Daily Quiz per siswa dengan filter periode, mapel, jenjang, kelas dan rincian per mapel (FR-RNK-023 sampai FR-RNK-025); API contoh /subjects dan tabel subjects lama dihapus karena mapel dikelola di master data; modul pembelajaran PDF (unggah, ubah, hapus, daftar) dengan paket akses per modul dan file yang tidak publik (FR-LMS-025 sampai FR-LMS-030); modul untuk siswa sesuai jenjang dan paket akses (modul di luar paket tampil terkunci), buka modul dengan riwayat buka, dan folder file PDF mengikuti hierarki mapel (FR-LMS-031 sampai FR-LMS-034); paket akses dikelola admin (CRUD) dengan aturan hapus (soft delete, ditolak jika masih dipakai siswa atau satu-satunya paket modul), beri paket ke banyak siswa sekaligus dengan perpanjangan otomatis dan bonus coin bulan pertama, batal paket, akses khusus per fitur, serta kolom akses dan filter paket di menu User (FR-SUB-017 sampai FR-SUB-021, FR-TOK-021, FR-TOK-022); kartu ringkasan, grafik tren mingguan dan sebaran nilai report quiz per tab Daily Quiz, Uji Kom, dan Tryout, serta pengaturan ambang soal sering salah dan rentang laporan bawaan (FR-RPT-008 sampai FR-RPT-010); CRUD Master Data (mapel, bidang materi, bab, subbab, topik, kelas, sekolah) dan Cabang dengan kolom Isi, aturan hapus (soft delete, ditolak jika masih dipakai atau data bawaan sistem), dan dropdown sekolah & cabang (FR-MST-011 sampai FR-MST-014); galeri Image Library dengan pencarian, filter kategori & hierarki, urutan, jumlah per kategori, detail, dan soal yang memakai gambar (FR-IMG-009); "Ingat saya" 30 hari, ubah kata sandi sendiri untuk semua role, dan lupa kata sandi yang diselesaikan admin tanpa email/OTP (FR-AUTH-015 sampai FR-AUTH-017); Profil siswa: data diri yang boleh diubah sendiri, foto profil, no HP orang tua tersamar, dan ringkasan paket, coin, peringkat, point, quiz bulan ini (FR-STU-027 sampai FR-STU-029; BD-014 dijawab); halaman Uji Kom & Tryout student (Akan datang, Sudah dikerjakan dengan peringkat, statistik) dan riwayat serta statistik Daily Quiz student (FR-TRY-043, FR-QUIZ-044). Diperbarui: 3.4.1, FR-LMS-006, FR-LMS-022, FR-MST-008, FR-QUIZ-022, FR-QUIZ-023, FR-QUIZ-025, FR-QUIZ-026, FR-QUIZ-030, FR-QUIZ-031, FR-QUIZ-033 sampai FR-QUIZ-040, BR-029, 8.12, dan BD-031. Ditambahkan (26 November 2026): Landing Page draft & publish dengan halaman publik dari snapshot (FR-LDP-004, FR-LDP-005, FR-LDP-008, FR-LDP-009) dan Quiz Trial publik dengan tabel soal tersendiri, 5 golongan (Pra SD, SD 1-3, SD 4-6, SMP, SMA), maks 10 soal per golongan, data peserta wajib (nama, jenjang & kelas, no WhatsApp), nilai disimpan untuk report admin (FR-LDP-010 sampai FR-LDP-016). |
+| 1.4       | 26 November 2026 | Menyelaraskan struktur layer backend per domain/fitur, mencatat cakupan endpoint yang sudah ada dan daftar fitur BRD yang belum memiliki route/modul backend. |
+| 1.5       | 26 November 2026 | Memperbarui Task Management sesuai implementasi: satu task bersama untuk semua Admin, status global, dan audit pengubah serta waktu perubahan status. |
+| 1.6       | 26 November 2026 | Menetapkan Notifikasi sebagai pengumuman teks web untuk siswa, dengan target kelas, status baca per siswa, serta draft/publikasi terjadwal; bukan push notification Firebase. |
 
 Catatan v1.2: perubahan v1.2 ditandai sebagai tracked changes (perubahan v1.1 sudah diterima). Hal yang diambil dari desain tetapi belum pasti dicatat di Bagian 15 (Business Decisions Pending).
 
@@ -167,7 +170,7 @@ Hak akses:
 
 <!-- -->
 
-- Membuat dan mengubah task untuk Admin (menu Task, lihat 3.20).
+- Membuat task bersama dan memantau status serta pembaruan terakhir oleh Admin (menu Task, lihat 3.20).
 
 - Melihat data semua cabang dan mengelola akun Admin dan Super Admin.
 
@@ -1370,23 +1373,23 @@ Catatan: peringkat menampilkan nama dan sekolah siswa lain. Karena pengguna adal
 
 ### 3.13 Notifikasi & Pengumuman
 
-Notifikasi memberi tahu student tentang kejadian penting di akunnya. Pengumuman dan promo tampil sebagai banner di Beranda dan sebagai notifikasi.
+Notifikasi in-app adalah pengumuman teks yang dikelola Admin dan Super Admin. Pengumuman ditampilkan kepada siswa yang kelasnya dipilih; tidak ada layanan push Firebase. Pengumuman quiz tetap menggunakan endpoint pengumuman quiz yang sudah ada dan terpisah dari pengumuman umum.
 
 Functional requirements:
 
-- FR-NTF-001: Student dapat melihat daftar notifikasi yang dikelompokkan "Minggu ini" dan "Lebih lama", berisi judul, isi singkat, dan waktu.
+- FR-NTF-001: Siswa dapat melihat daftar pengumuman yang ditujukan untuk kelasnya, berisi judul, isi, waktu publikasi, dan status sudah/belum dibaca. Daftar dapat dikelompokkan "Minggu ini" dan "Lebih lama".
 
-- FR-NTF-002: Notifikasi yang belum dibaca ditandai titik, dan jumlahnya tampil sebagai badge pada menu Notifikasi dan ikon lonceng.
+- FR-NTF-002: Status baca disimpan per siswa. Jumlah pengumuman yang belum dibaca tersedia untuk badge menu Notifikasi/ikon lonceng.
 
-- FR-NTF-003: Student dapat menandai notifikasi sebagai dibaca ("Tandai dibaca").
+- FR-NTF-003: Siswa dapat menandai satu pengumuman atau semua pengumuman yang tampil untuknya sebagai sudah dibaca.
 
-- FR-NTF-004: Jenis notifikasi pada desain: hasil Uji Kom atau Tryout keluar, Uji Kom dibuka, paket aktif atau diperpanjang, perubahan peringkat, materi baru, dan promo.
+- FR-NTF-004: Pengumuman berupa judul wajib (maksimal 200 karakter) dan isi teks wajib (maksimal 20.000 karakter), serta ditujukan ke satu atau beberapa kelas siswa (maksimal 100 kelas). Gambar/banner bukan bagian dari fitur ini.
 
-- FR-NTF-005: Sistem membuat notifikasi otomatis untuk kejadian terkait (hasil ujian, paket, peringkat, materi baru).
+- FR-NTF-005: Admin dan Super Admin dapat membuat, melihat, mengubah, dan menghapus pengumuman. Penghapusan bersifat soft delete. Pengumuman baru berstatus Draft dan dapat dipublikasikan langsung atau pada waktu terjadwal.
 
-- FR-NTF-006: Pengumuman dan promo dikelola dari panel admin. Pada desain admin belum ada menu Pengumuman; banner promo berupa gambar kategori Banner (3.17) dan section Promo di Landing Page (3.19). Tempat membuat pengumuman dikonfirmasi (lihat BD-027).
+- FR-NTF-006: Hanya pengumuman berstatus Published yang waktu publikasinya sudah tiba yang tampil kepada siswa. Feed dan status baca dimuat dari backend web; sistem tidak mengirim push Firebase. Notifikasi otomatis untuk event hasil quiz, paket, peringkat, dan materi baru tidak termasuk dalam fitur ini.
 
-Notifikasi lewat WhatsApp atau email belum termasuk dan masih menunggu keputusan (lihat BD-012).
+WhatsApp atau email tidak dikirim oleh fitur ini dan tetap menjadi keputusan terpisah (lihat BD-012).
 
 ### 3.14 Profil, Pencarian, dan Bantuan Student
 
@@ -1406,7 +1409,7 @@ Functional requirements:
 
 ### 3.15 Panel Admin (Ringkasan dari Desain)
 
-Panel admin terdiri dari menu berikut. Setiap menu dirinci pada bagian yang dirujuk. Sidebar admin dapat di-scroll, sehingga daftar ini mungkin belum lengkap; menu Pengumuman tidak terlihat (lihat BD-027).
+Panel admin terdiri dari menu berikut. Setiap menu dirinci pada bagian yang dirujuk. Sidebar admin dapat di-scroll, sehingga daftar ini mungkin belum lengkap; desain menu Pengumuman belum tersedia.
 
 | **Grup**     | **Menu**           | **Keterangan / Referensi**                                       |
 |--------------|--------------------|------------------------------------------------------------------|
@@ -1524,29 +1527,77 @@ Functional requirements:
 
 - FR-LDP-003: Setiap section dapat ditampilkan atau disembunyikan (saklar "Tampil") dan dipindah urutannya dengan geser.
 
-- FR-LDP-004: Admin dapat mengubah isi section lewat tombol Edit. Form edit belum tersedia pada desain; gambar diambil dari Image library (3.17).
+- FR-LDP-004: Admin dapat mengubah isi section lewat tombol Edit. Form edit belum tersedia pada desain; gambar diambil dari Image library (3.17). (v1.3) Isi section disimpan sebagai object JSON bebas (maks 200 KB) yang bentuknya ditentukan FE per section; gambar ditulis sebagai link Image Library. Isi yang sama persis tidak dicatat sebagai perubahan.
 
-- FR-LDP-005: Perubahan tidak langsung tampil di situs publik. Panel "Belum dipublish" mencantumkan perubahan yang menunggu (contoh "Hero · judul diubah", "Promo · disembunyikan", "Urutan section diubah") serta waktu dan pelaku publish terakhir. Perubahan tayang setelah tombol "Publish" ditekan.
+- FR-LDP-005: Perubahan tidak langsung tampil di situs publik. Panel "Belum dipublish" mencantumkan perubahan yang menunggu (contoh "Hero · judul diubah", "Promo · disembunyikan", "Urutan section diubah") serta waktu dan pelaku publish terakhir. Perubahan tayang setelah tombol "Publish" ditekan. (v1.3) Teks perubahan dibuat otomatis: "<Section> · isi diubah", "<Section> · disembunyikan / ditampilkan", "Urutan section diubah". Publish tanpa perubahan baru ditolak (kecuali publish pertama). Setiap publish dicatat di riwayat publish. Untuk sementara Admin dan Super Admin sama-sama boleh publish (BD-026 masih terbuka).
 
 - FR-LDP-006: Tombol "Lihat halaman" membuka halaman publik.
 
-- FR-LDP-007: Isi tab Paket & Biaya, Siswa Berprestasi, dan Quiz Trial belum terlihat pada desain. Sumber data tab Paket & Biaya (manual atau dari menu Paket) dikonfirmasi (lihat BD-027).
+- FR-LDP-007: Isi tab Paket & Biaya, Siswa Berprestasi, dan Quiz Trial belum terlihat pada desain. Sumber data tab Paket & Biaya (manual atau dari menu Paket) dikonfirmasi (lihat BD-034). (v1.3) Sementara tab Paket & Biaya dan Siswa Berprestasi masing-masing berisi 1 section dengan isi bebas (seperti FR-LDP-004).
+
+- FR-LDP-008 (baru v1.3): Halaman publik (tanpa login) hanya menampilkan section yang tampil saat Publish terakhir, urut tampil. Halaman yang belum pernah dipublish tampil kosong. Isi publik disimpan sebagai satu snapshot per halaman supaya ringan dibaca.
+
+- FR-LDP-009 (baru v1.3): Kode halaman tetap: home (Beranda), pricing (Paket & Biaya), achievers (Siswa Berprestasi). Kode section Beranda: hero, video_profile, achievements, programs, facilities, testimonials, promo, faq. Section baru ditambah lewat pengembangan (migration).
+
+**Quiz Trial publik** (tombol "Coba quiz gratis", FR-AUTH-012):
+
+- FR-LDP-010 (baru v1.3): Soal Quiz Trial disimpan di tabel tersendiri (bukan Bank Soal) supaya API publik ringan. Struktur dan aturan isi soal sama persis dengan Bank Soal (4 tipe soal, rumus, gambar, tabel, urutan tampil, pembahasan wajib); soal trial tidak memakai letak soal (Bab dst.) dan peruntukan, cukup golongan dan mapel. Kode soal otomatis TQ-1, TQ-2, dst.
+
+- FR-LDP-011 (baru v1.3): Quiz Trial dibagi 5 golongan: Pra SD (Nol Kecil, Nol Besar), SD Kelas 1-3, SD Kelas 4-6, SMP (Kelas 7-9), SMA (Kelas 10-12). Soal satu golongan bercampur mapel (contoh Matematika, IPA, IPS, Bahasa Inggris) dan tipe soal, maksimal 10 soal per golongan, urut sesuai nomor urut yang diatur admin.
+
+- FR-LDP-012 (baru v1.3): Tab Quiz Trial di menu Landing Page: admin menambah, mengubah (termasuk pindah golongan jika golongan tujuan belum penuh), melihat detail, dan menghapus (soft delete) soal trial, serta melihat jumlah soal setiap golongan. Perubahan soal langsung berlaku di Quiz Trial publik (tanpa Publish).
+
+- FR-LDP-013 (baru v1.3): Sebelum mengerjakan, pengunjung wajib memilih jenjang dan kelas; golongan ditentukan dari kelas tersebut. Soal golongan dikirim sekaligus beserta kunci jawaban dan pembahasan; benar/salah dinilai FE.
+
+- FR-LDP-014 (baru v1.3): Setelah selesai, pengunjung wajib mengisi nama dan no WhatsApp. Data peserta (nama, jenjang, kelas, no WhatsApp yang dirapikan menjadi format 62xxx), jawaban, benar/salah per soal, lama mengerjakan, dan nilai disimpan. Nilai dihitung server dari jumlah benar (total 100, sama dengan quiz lain); tidak ada point/leaderboard dan tidak perlu akun.
+
+- FR-LDP-015 (baru v1.3): Report Quiz Trial untuk admin: daftar peserta (terbaru dulu) dengan filter periode, golongan, dan pencarian nama / no WhatsApp; ringkasan jumlah peserta, rata-rata nilai total dan per golongan, serta 10 soal yang paling sering dijawab salah.
+
+- FR-LDP-016 (baru v1.3): Pengiriman hasil Quiz Trial dibatasi 10 kali per menit per alamat IP untuk mencegah spam. Mapel dan gambar yang dipakai soal trial ikut dihitung sebagai "dipakai" (tidak bisa dihapus dari Master Data / Image Library).
 
 ### 3.20 Task Management
 
-Task adalah penugasan dari Super Admin kepada Admin. Menu ini diberi label "Super" pada sidebar admin.
+Task adalah catatan teks yang dibuat Super Admin dan terlihat oleh semua Admin. Task tidak ditautkan langsung ke fitur tertentu dan hanya memiliki satu status bersama untuk semua Admin.
 
 Functional requirements:
 
-- FR-TSK-001: Super Admin dapat membuat dan mengubah task untuk Admin dengan judul, Kategori (contoh User, Bank soal, Pengumuman, Quiz), penerima (Untuk), Tenggat, dan Prioritas (contoh Tinggi dan Sedang). Form pembuatan task belum tersedia pada desain.
+- FR-TSK-001: Hanya Super Admin yang dapat membuat task berupa teks. Task tidak memiliki relasi langsung ke fitur, kategori, penerima individual, tenggat, atau prioritas.
 
-- FR-TSK-002: Halaman Task memiliki tab "Task saya" dan "Semua task". Kolom: Selesai (kotak centang), Task, Kategori, Untuk, Tenggat, Prioritas, dan pengirim (contoh "dari Hendrawan").
+- FR-TSK-002: Semua Admin dapat melihat daftar dan detail task yang sama, termasuk status task, pembuat, serta informasi pengubah status terakhir dan waktu pembaruannya.
 
-- FR-TSK-003: Penerima task menandai task selesai dengan kotak centang. Task selesai tampil dicoret, dan judul halaman menampilkan jumlah task yang belum selesai (contoh "2 belum selesai").
+- FR-TSK-003: Admin dapat mengubah status task secara manual antara "Menunggu" (`pending`) dan "Selesai" (`completed`). Status bersifat global dan perubahan oleh satu Admin terlihat oleh seluruh Admin.
 
-- FR-TSK-004: Hanya Super Admin yang dapat membuat dan mengubah task (BR-026). Ringkasan task aktif tampil di Beranda admin (3.11).
+- FR-TSK-004: Setiap perubahan status mencatat Admin terakhir yang mengubah dan waktu perubahan. Hanya Admin yang dapat mengubah status; Super Admin hanya membuat dan memantau task.
 
-- FR-TSK-005: Contoh task pada desain: "Import 120 akun siswa baru", "Upload 40 soal Daily Quiz SMP - Pecahan", "Buat pengumuman Tryout Bersama", dan "Kode akses Uji Kom IPA 30 Okt".
+- FR-TSK-005: Teks task wajib diisi dan maksimal 5.000 karakter. Task dapat memuat instruksi bebas, misalnya "Import 120 akun siswa baru", tanpa tautan teknis ke fitur yang disebut.
+
+### 3.21 Backend Implementation Status (26 November 2026)
+
+Status di bawah menunjukkan fitur yang sudah memiliki route dan layer backend; ini bukan klaim bahwa seluruh acceptance criteria pada setiap FR telah selesai.
+
+| **Feature** | **Implemented backend scope / route group** |
+|-------------|----------------------------------------------|
+| Authentication & password reset | Login, refresh, logout, current user, change password, forgot password, and admin password-reset request handling (`/auth/*`, `/password-reset-requests`). |
+| User & student profile | Admin user listing, create, import validation, detail, update, delete; student profile, parent contact, and profile photo (`/users/*`, `/student/profile/*`). |
+| Learning modules | Admin module CRUD and protected PDF access; student module list, open tracking, and protected file access (`/learning-modules/*`, `/student/learning-modules/*`). |
+| Master data & Image Library | Master data and branch CRUD, dropdowns, and image gallery/upload/delete (`/master-data/*`, `/branches/*`, `/dropdowns/*`, `/images/*`). |
+| Question bank | Question create/list/detail/update/bulk delete and Excel validation (`/questions/*`). |
+| Quiz | Daily Quiz generation/open/submit/review/history/settings/prizes; Uji Kom and Tryout management/student flows/access codes; Quiz Trial admin/public flows (`/daily-quizzes/*`, `/quizzes/*`, `/trial-quiz/*`, `/public/trial-quiz/*`). |
+| Leaderboard | Daily Quiz and per-quiz leaderboard (`/leaderboards/*`). |
+| Subscription & coin | Subscription plans, student access/overrides, coin packages/top-ups, and student/admin transaction history (`/subscription-plans/*`, `/student-subscriptions/*`, `/coin-packages/*`, `/coin-topups`, `/student/coin-transactions`, `/students/:id/coin-transactions`). |
+| Reports | Quiz reports and overview/settings, Daily Quiz reports, and email submission of API logs (`/quiz-reports/*`, `/daily-quiz-reports/*`, `/log-reports`). |
+| Landing Page | Admin draft, section editing/ordering/visibility, publish, and public published-page snapshot (`/landing-pages/*`, `/public/landing-pages/:page`). |
+| Notifications & announcements | Admin/Super Admin text announcement management, grade targeting, scheduled publication, student feed, and per-student read state (`/announcements/*`, `/student/notifications/*`). No Firebase push. |
+| Task Management | Super Admin task creation; shared task listing/detail for Admins and Super Admin; shared status updates by Admin with last-updater/time audit (`/tasks/*`). |
+
+Features below remain in this BRD and do not yet have a dedicated backend route/module in the current code:
+
+- **RUMATH** (3.7 and RUMATH reporting in 3.18): automatic exercises, question/video management, student progress, and reporting.
+- **Learning Progress** (3.10): progress dashboard, streak/target, recommendations, tutor/admin progress views, and learning-history PDF export. Learning-module open tracking exists, but does not implement this whole feature.
+- **Dashboard** (3.11 and 3.15): consolidated student/admin home dashboards beyond the quiz announcement, upcoming quiz, and quiz-statistics endpoints.
+- **Search & help** (FR-SRC-001, FR-SRC-002, FR-HLP-001, 3.14): global/local learning search and student help/feedback or tutor-contact workflow.
+
+This status is based on registered routes and their feature packages; detailed FR-by-FR acceptance, including incomplete behavior inside implemented feature groups, must still be verified separately.
 
 ## 4. BUSINESS RULES
 
@@ -1579,7 +1630,7 @@ Bagian ini berisi aturan bisnis yang wajib menjadi acuan seluruh implementasi.
 | BR-023 | Student hanya melihat data miliknya sendiri, kecuali data peringkat (nama, sekolah, poin).                       |
 | BR-024 | Admin dan Tutor bekerja dalam lingkup cabang pada akunnya; Super Admin melihat semua cabang (menunggu BD-025).   |
 | BR-025 | Materi, quiz, dan konten Landing Page berstatus Draft tidak tampil kepada student atau publik sampai di-publish. |
-| BR-026 | Hanya Super Admin yang dapat membuat dan mengubah task; penerima task dapat menandai task selesai.               |
+| BR-026 | Super Admin membuat task bersama; semua Admin dapat melihat task dan memperbarui status global secara manual. Perubahan mencatat Admin dan waktu terakhir. |
 | BR-027 | Soal hanya dapat dipilih untuk jenis quiz yang ditandai pada kolom "Dipakai untuk" soal tersebut.                |
 | BR-028 | Perubahan Landing Page baru tampil di situs publik setelah tombol Publish ditekan.                               |
 | BR-029 | Mapel berlaku untuk semua jenjang. Bidang Materi, Bab, Subbab, dan Topik terikat pada satu jenjang dan satu kelas yang sama dengan induknya. |
@@ -1763,9 +1814,9 @@ Rekomendasi:
 
 - Hindari mencampurkan akses database secara sembarangan di seluruh layer aplikasi.
 
-## 7. RECOMMENDED BACKEND PROJECT STRUCTURE
+## 7. BACKEND PROJECT STRUCTURE
 
-Struktur direktori yang direkomendasikan:
+Source code saat ini menggunakan struktur modular berbasis domain/fitur. Setiap layer memiliki folder domain dan fitur yang konsisten; router hanya mendaftarkan endpoint, sedangkan wiring dependency dilakukan dari `cmd/api/main.go`.
 
 ```text
 backend/
@@ -1775,68 +1826,24 @@ backend/
 │       └── main.go
 │
 ├── internal/
-│   │
-│   ├── platform/
-│   │   ├── database/
-│   │   ├── logger/
-│   │   ├── config/
-│   │   ├── middleware/
-│   │   ├── storage/
-│   │   └── response/
-│   │
-│   ├── modules/
-│   │   │
-│   │   ├── auth/
-│   │   │   ├── handler/
-│   │   │   ├── service/
-│   │   │   ├── repository/
-│   │   │   ├── model/
-│   │   │   └── dto/
-│   │   │
-│   │   ├── student/
-│   │   ├── tutor/
-│   │   ├── learning/
-│   │   ├── material/
-│   │   ├── quiz/
-│   │   ├── tryout/
-│   │   ├── rumath/
-│   │   ├── subscription/
-│   │   ├── coin/
-│   │   ├── progress/
-│   │   ├── leaderboard/
-│   │   ├── notification/
-│   │   ├── masterdata/
-│   │   ├── media/
-│   │   ├── landingpage/
-│   │   ├── task/
-│   │   ├── report/
-│   │   └── dashboard/
-│   │
-│   └── shared/
-│       ├── errors/
-│       ├── constants/
-│       └── utils/
+│   ├── router/<domain>/<feature>/
+│   ├── handler/<domain>/<feature>/
+│   ├── service/<domain>/<feature>/
+│   ├── repository/<domain>/<feature>/
+│   ├── model/<domain>/<feature>/
+│   ├── dto/<domain>/<feature>/
+│   ├── apilog/ clock/ config/ database/ mailer/
+│   ├── middleware/ response/ scheduler/ storage/
+│   ├── scoring/ token/ validation/
+│   └── accesscode/ testutil/
 │
 ├── migrations/
-│
 ├── docs/
-│   ├── architecture/
-│   ├── api/
-│   └── database/
-│
-├── tests/
-│
-├── deployments/
-│   └── docker/
-│
-├── .env.example
-├── Dockerfile
-├── docker-compose.yml
 ├── go.mod
 └── README.md
 ```
 
-Catatan: Struktur di atas merupakan rekomendasi awal. Claude Code dapat menyesuaikan detail implementasi tanpa menghilangkan pemisahan domain.
+Set domain/fitur saat ini adalah `auth/{login,passwordreset}`, `billing/{coin,subscription}`, `learning/learningmodule`, `master/{dropdown,image,masterdata}`, `quiz/{dailyquiz,leaderboard,question,quiz,trialquiz}`, `report/{dailyquizreport,logreport,quizreport}`, `site/landingpage`, dan `user/{profile,user}`. Set ini diulang konsisten pada setiap layer. Contohnya, bank soal berada di `internal/{router,handler,service,repository,model,dto}/quiz/question`. Package infrastruktur yang digunakan lintas fitur tetap langsung berada di `internal/`.
 
 ## 8. DATABASE DESIGN REQUIREMENTS
 
@@ -1998,11 +2005,11 @@ Berikut rancangan awal domain database.
 
 ### 8.11 Notifikasi & Pengumuman
 
-- notifications
+- announcements (judul, isi teks, status draft/published, jadwal publikasi, pembuat)
 
-- user_notifications
+- announcement_grades (target kelas)
 
-- announcements
+- announcement_reads (status baca per siswa)
 
 ### 8.12 Admin: Master Data, Media, dan Landing Page
 
@@ -2010,11 +2017,17 @@ Berikut rancangan awal domain database.
 
 - media_assets (Image library)
 
-- landing_pages
+- landing_pages (termasuk snapshot isi publik terakhir)
 
-- landing_sections
+- landing_sections (versi draft)
+
+- landing_changes (perubahan yang belum dipublish)
 
 - landing_publish_logs
+
+- trial_quiz_questions (soal Quiz Trial publik, maks 10 per golongan)
+
+- trial_quiz_attempts (hasil Quiz Trial + data peserta)
 
 - admin_tasks
 
@@ -2094,8 +2107,15 @@ POST   /api/v1/daily-quizzes
 GET    /api/v1/daily-quizzes
 POST   /api/v1/exams/access-codes/verify
 GET    /api/v1/leaderboards
-GET    /api/v1/notifications
-POST   /api/v1/notifications/read-all
+GET    /api/v1/announcements
+GET    /api/v1/announcements/:id
+POST   /api/v1/announcements
+PUT    /api/v1/announcements/:id
+DELETE /api/v1/announcements/:id
+GET    /api/v1/student/notifications
+GET    /api/v1/student/notifications/unread-count
+POST   /api/v1/student/notifications/:id/read
+POST   /api/v1/student/notifications/read-all
 GET    /api/v1/subscription-plans
 GET    /api/v1/coin-packages
 POST   /api/v1/coin-purchases
@@ -2131,9 +2151,23 @@ POST   /api/v1/admin/plans
 GET    /api/v1/admin/students/coin-access
 PUT    /api/v1/admin/students/:id/coin-access
 POST   /api/v1/admin/students/coin-access/bulk
-GET    /api/v1/admin/landing-pages/:page/sections
-PUT    /api/v1/admin/landing-pages/:page/sections
-POST   /api/v1/admin/landing-pages/:page/publish
+GET    /api/v1/landing-pages
+GET    /api/v1/landing-pages/:page
+PUT    /api/v1/landing-pages/:page/sections/:key
+PATCH  /api/v1/landing-pages/:page/sections/:key/visibility
+PUT    /api/v1/landing-pages/:page/sections/order
+POST   /api/v1/landing-pages/:page/publish
+GET    /api/v1/public/landing-pages/:page          (tanpa login)
+GET    /api/v1/trial-quiz/questions
+POST   /api/v1/trial-quiz/questions
+GET    /api/v1/trial-quiz/questions/:id
+PUT    /api/v1/trial-quiz/questions/:id
+DELETE /api/v1/trial-quiz/questions/:id
+GET    /api/v1/trial-quiz/attempts
+GET    /api/v1/trial-quiz/attempts/summary
+GET    /api/v1/public/trial-quiz/grades            (tanpa login)
+GET    /api/v1/public/trial-quiz/questions         (tanpa login)
+POST   /api/v1/public/trial-quiz/submit            (tanpa login)
 GET    /api/v1/admin/tasks
 POST   /api/v1/admin/tasks
 PATCH  /api/v1/admin/tasks/:id/complete
@@ -2651,7 +2685,7 @@ Contoh:
 
 - Perubahan Landing Page baru tampil di situs publik setelah Publish.
 
-- Task hanya dapat dibuat dan diubah Super Admin; Admin dapat menandai task selesai.
+- Task hanya dapat dibuat Super Admin; status globalnya hanya dapat diperbarui Admin dan setiap perubahan mencatat pengubah serta waktunya.
 
 - Report Quiz dan Report RUMATH sesuai filter tanggal dan dapat diekspor ke Excel.
 
@@ -2713,13 +2747,14 @@ Hal-hal berikut perlu dikonfirmasi kepada pihak bisnis sebelum implementasi fina
 | BD-024 | Bagaimana mekanisme promo (banner "Diskon 30%" dan harga coret paket) dan siapa yang mengelolanya? (Desain admin: banner promo berupa gambar kategori Banner di Image dan section Promo di Landing Page; field harga coret belum terlihat karena form Tambah paket belum ada.)                                                                                                                  | TBD                              |
 | BD-025 | Apakah Admin dan Tutor hanya melihat dan mengelola data cabangnya (siswa, soal, laporan, peringkat, paket), dan apakah Super Admin selalu melihat semua cabang? (Desain: akun memiliki cabang; Super Admin tercatat "Semua cabang".)                                                                                                                                                            | TBD                              |
 | BD-026 | Apa beda kewenangan Admin dan Super Admin (kelola akun Admin dan Super Admin, publish Landing Page, hapus data)? Apakah "hapus" berarti nonaktif atau hapus permanen, dan bagaimana untuk soal, materi, paket, atau master data yang sudah dipakai?                                                                                                                                             | TBD                              |
-| BD-027 | Di mana admin membuat pengumuman, banner promo, dan notifikasi manual? Sidebar admin tidak memiliki menu Pengumuman, padahal ada task "Buat pengumuman Tryout Bersama". Apa sumber data tab Paket & Biaya di Landing Page?                                                                                                                                                                      | TBD                              |
+| BD-027 | Di mana admin membuat pengumuman dan notifikasi manual, siapa penerimanya, serta apakah dijadwalkan atau langsung tampil? **Jawaban v1.6:** dikelola Admin dan Super Admin; berupa teks, ditargetkan ke satu atau beberapa kelas siswa, dan dapat dipublikasikan langsung atau terjadwal sebagai notifikasi web in-app (tanpa Firebase). | Dijawab pemilik produk (v1.6) |
 | BD-028 | Leaderboard: apakah papan RUMATH tampil di aplikasi siswa (kini hanya 3 tab)? Bagaimana hadiah (coin, sertifikat digital, konsultasi gratis) diberikan dan siapa yang memproses? Apa yang diedit pada tombol Edit tiap baris peringkat?                                                                                                                                                         | TBD                              |
 | BD-029 | Apakah soal RUMATH dibuat admin dan disimpan di Bank Soal (desain: 130 soal isian bertanda RUMATH), atau dihasilkan otomatis oleh sistem (FR-MATH-002)?                                                                                                                                                                                                                                         | TBD                              |
 | BD-030 | Dari mana video RUMATH berasal (unggah ke storage atau tautan platform video)? Apakah durasi diisi otomatis atau manual?                                                                                                                                                                                                                                                                        | TBD                              |
 | BD-031 | Apakah Subbab dan Topik masih dipakai? Form admin Materi dan Soal hanya memakai Jenjang, Kelas, Mapel, Bidang materi, dan Bab. **Jawaban v1.3:** Subbab dan Topik tetap dipakai; mapel sama untuk semua jenjang dan Bidang Materi ke bawah terhubung ke jenjang dan kelas (lihat 3.4.1). Form soal wajib sampai Bab, Subbab dan Topik opsional; untuk form materi masih perlu dikonfirmasi.                                  | Dijawab pemilik produk (v1.3)    |
 | BD-032 | Buat quiz: bagaimana langkah 2 (pilih soal manual atau acak) dan langkah 3 (jadwal, kode akses otomatis atau manual, masa berlaku)? Apa arti entri Daily Quiz di menu Quiz admin, padahal Daily Quiz dibuat otomatis oleh siswa?                                                                                                                                                                | TBD                              |
 | BD-033 | Skala nilai Tryout: BR-018 menyebut 0-100, sedangkan Leaderboard admin menyebut skor Tryout 0-1.000. Mana yang berlaku, dan bagaimana konversinya ke poin?                                                                                                                                                                                                                                      | TBD                              |
+| BD-034 | Apa sumber data tab Paket & Biaya di Landing Page?                                                                                                                                                                                                                                                                                                                                               | TBD                              |
 
 Keputusan yang belum dikonfirmasi tidak boleh dianggap sebagai kebutuhan bisnis final.
 

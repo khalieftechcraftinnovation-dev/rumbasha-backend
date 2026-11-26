@@ -1,0 +1,54 @@
+// Package subscription (service) berisi logika paket akses siswa.
+//
+// Di package lain, import dengan alias subscriptionservice:
+//
+//	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/billing/subscription"
+package subscription
+
+import (
+	"context"
+	"time"
+
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
+	subscriptionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/billing/subscription"
+	subscriptionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/billing/subscription"
+)
+
+// SubscriptionService berisi logika paket akses siswa.
+type SubscriptionService struct {
+	repo *subscriptionrepo.SubscriptionRepository
+}
+
+// NewSubscriptionService membuat SubscriptionService. Dipanggil sekali di main.go.
+func NewSubscriptionService(repo *subscriptionrepo.SubscriptionRepository) *SubscriptionService {
+	return &SubscriptionService{repo: repo}
+}
+
+// StudentAccess adalah akses siswa pada hari ini.
+type StudentAccess struct {
+	Subscription *subscriptionmodel.ActiveSubscription // nil = tidak ada paket aktif hari ini
+	Features     map[string]bool                       // contoh: {"module": true, "rumath": false}
+}
+
+// GetTodayAccess mengecek paket siswa yang aktif HARI INI (tanggal WIB) dan
+// menghitung fitur apa saja yang terbuka.
+//
+// Pengecekan selalu memakai tanggal hari ini, jadi paket online yang habis
+// tanggal 15 otomatis tidak terhitung mulai tanggal 16, tanpa perlu login ulang
+// dan tanpa job pengubah status.
+func (s *SubscriptionService) GetTodayAccess(ctx context.Context, studentID string) (StudentAccess, error) {
+	subscription, err := s.repo.FindActive(ctx, studentID, clock.TodayInJakarta(time.Now()))
+	if err != nil {
+		return StudentAccess{}, err
+	}
+
+	overrides, err := s.repo.FindOverrides(ctx, studentID)
+	if err != nil {
+		return StudentAccess{}, err
+	}
+
+	return StudentAccess{
+		Subscription: subscription,
+		Features:     subscriptionmodel.ResolveFeatures(subscription, overrides),
+	}, nil
+}

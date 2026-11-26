@@ -21,7 +21,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	learningmodulemodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/learningmodule"
+	learningmodulemodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/learning/learningmodule"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 )
 

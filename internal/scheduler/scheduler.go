@@ -16,8 +16,8 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	dailyquizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/dailyquiz"
-	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz"
+	dailyquizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz/dailyquiz"
+	quizmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quiz/quiz"
 )
 
 // QuizJobs adalah pekerjaan terjadwal quiz (dipenuhi oleh quizservice.QuizService).

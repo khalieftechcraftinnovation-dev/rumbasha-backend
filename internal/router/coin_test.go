@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 type coinPackage struct {

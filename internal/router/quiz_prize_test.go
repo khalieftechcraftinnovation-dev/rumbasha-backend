@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
-	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
-	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
+	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/question"
+	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/quiz"
+	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/quiz"
 )
 
 type quizPointsPrizes struct {

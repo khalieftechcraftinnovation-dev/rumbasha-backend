@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 func TestUsers_TambahBanyakSekaligus(t *testing.T) {

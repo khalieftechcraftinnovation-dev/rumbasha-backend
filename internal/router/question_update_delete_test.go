@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 // updateBody membuat body PUT: 1 soal + "type" wajib.

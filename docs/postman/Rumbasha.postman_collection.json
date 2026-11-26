@@ -72,7 +72,12 @@
     { "key": "pa_request_id", "value": "" },
     { "key": "pa_subscription_id", "value": "" },
     { "key": "pa_subscription2_id", "value": "" },
-    { "key": "daily_answers_json", "value": "{\"answers\":[]}" }
+    { "key": "daily_answers_json", "value": "{\"answers\":[]}" },
+    { "key": "tq_subject_id", "value": "" },
+    { "key": "tq_grade_id", "value": "" },
+    { "key": "tq_q1_id", "value": "" },
+    { "key": "tq_q2_id", "value": "" },
+    { "key": "tq_answers_json", "value": "[]" }
   ],
   "item": [
     {
@@ -4898,6 +4903,612 @@
                   "});"
                 ]
               }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Landing Page (admin & publik)",
+      "description": "Menu Landing Page (BRD 3.19). Halaman (`:page`): `home` (Beranda), `pricing` (Paket & Biaya), `achievers` (Siswa Berprestasi).\n\nPerubahan admin (isi section, saklar Tampil, urutan) = DRAFT dan tercatat di panel \"Belum dipublish\". Baru tayang di `GET /public/landing-pages/:page` setelah **Publish**.\n\nFolder ini mengubah isi Hero, menyembunyikan Promo, memindah FAQ ke atas, publish, lalu mengembalikan Promo & urutan dan publish lagi.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Daftar tab",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/landing-pages",
+            "description": "Semua tab: code, name, published_at (WIB, null = belum pernah publish), published_by {id, name}, pending_count (jumlah perubahan belum dipublish). Tab Quiz Trial memakai folder Quiz Trial."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('3 tab', () => pm.expect(pm.response.json().data.map(p => p.code)).to.eql(['home', 'pricing', 'achievers']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Panel Beranda (draft)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/landing-pages/home",
+            "description": "data: page (info tab), sections (draft: key, name, content, is_visible, sort_order, updated_by, updated_at), pending_changes (section_key, description, changed_by, changed_at)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('8 section Beranda', () => pm.expect(pm.response.json().data.sections.length).to.eql(8));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah isi Hero",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": {\n    \"title\": \"Belajar seru, nilai melesat bersama Rumbasha\",\n    \"subtitle\": \"Bimbel SD, SMP, SMA dengan tutor berpengalaman\",\n    \"button_text\": \"Coba quiz gratis\",\n    \"image_url\": \"{{base_url}}/storage/images/landing/hero.png\"\n  }\n}" },
+            "url": "{{base_url}}/api/v1/landing-pages/home/sections/hero",
+            "description": "`content` = object JSON bebas (bentuk ditentukan FE per section, maks 200 KB). Gambar ditulis sebagai link dari Image Library. Isi yang sama persis tidak dicatat sebagai perubahan. Response = panel draft terbaru."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const hero = pm.response.json().data.sections.find(s => s.key === 'hero');",
+                  "pm.test('isi hero tersimpan', () => pm.expect(hero.content.button_text).to.eql('Coba quiz gratis'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sembunyikan Promo",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"is_visible\": false\n}" },
+            "url": "{{base_url}}/api/v1/landing-pages/home/sections/promo/visibility",
+            "description": "Saklar \"Tampil\". Tercatat \"Promo · disembunyikan\"."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('tercatat di Belum dipublish', () => pm.expect(d.pending_changes.map(c => c.description)).to.include('Promo · disembunyikan'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah urutan section (FAQ ke atas)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"keys\": [\"faq\", \"hero\", \"video_profile\", \"achievements\", \"programs\", \"facilities\", \"testimonials\", \"promo\"]\n}" },
+            "url": "{{base_url}}/api/v1/landing-pages/home/sections/order",
+            "description": "`keys` wajib berisi SEMUA section halaman, masing-masing 1 kali, urut baru (hasil geser). Tercatat \"Urutan section diubah\"."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('FAQ paling atas', () => pm.expect(pm.response.json().data.sections[0].key).to.eql('faq'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publish Beranda",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/landing-pages/home/publish",
+            "description": "Tayangkan draft: section yang tampil disalin ke halaman publik. data: published_at (WIB), changes (perubahan yang ikut dipublish). 409 kalau sudah pernah publish dan tidak ada perubahan baru."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ada perubahan yang dipublish', () => pm.expect(pm.response.json().data.changes.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Halaman publik Beranda (tanpa login)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/public/landing-pages/home",
+            "description": "Untuk situs publik. data: code, name, sections [{key, name, content}] (hanya yang tampil, urut tampil; kosong kalau belum pernah publish), published_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const keys = pm.response.json().data.sections.map(s => s.key);",
+                  "pm.test('FAQ di atas, Promo tidak tampil', () => {",
+                  "  pm.expect(keys[0]).to.eql('faq');",
+                  "  pm.expect(keys).to.not.include('promo');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kembalikan Promo (tampil)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"is_visible\": true\n}" },
+            "url": "{{base_url}}/api/v1/landing-pages/home/sections/promo/visibility"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Kembalikan urutan section",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"keys\": [\"hero\", \"video_profile\", \"achievements\", \"programs\", \"facilities\", \"testimonials\", \"promo\", \"faq\"]\n}" },
+            "url": "{{base_url}}/api/v1/landing-pages/home/sections/order"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Publish lagi",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/landing-pages/home/publish"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Publish tanpa perubahan (409)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/landing-pages/home/publish"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 409', () => pm.response.to.have.status(409));"] }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quiz Trial (admin & publik)",
+      "description": "Quiz Trial publik (tombol \"Coba quiz gratis\"). Soal di tabel sendiri, struktur isi SAMA PERSIS dengan Bank soal (tanpa placement & used_for). 5 golongan: `pra_sd`, `sd_1_3`, `sd_4_6`, `smp`, `sma`; maks 10 soal per golongan.\n\nAlur publik (tanpa login): pilih jenjang & kelas (`/public/trial-quiz/grades`) → ambil soal (`/public/trial-quiz/questions?grade_id=`, berisi kunci & pembahasan, FE menilai) → kirim hasil + nama + no WhatsApp (`/public/trial-quiz/submit`, maks 10x/menit per IP).\n\nFolder ini membuat 1 mapel uji + 2 soal trial SD 1-3, mengerjakan sebagai pengunjung, melihat report, lalu menghapus soal & mapelnya lagi.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah mapel uji",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"subject\",\n  \"name\": \"Mapel Trial {{$timestamp}}\",\n  \"status\": \"active\"\n}" },
+            "url": "{{base_url}}/api/v1/master-data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('tq_subject_id', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah soal trial (pilihan ganda)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"grade_group\": \"sd_1_3\",\n  \"subject_id\": \"{{tq_subject_id}}\",\n  \"sort_order\": 1,\n  \"type\": \"single_choice\",\n  \"question\": \"Hasil dari 7 + 5 adalah ...\",\n  \"explanation\": \"7 + 5 = 12\",\n  \"difficulty\": \"easy\",\n  \"answer\": {\n    \"options\": [\n      {\"key\": \"A\", \"content\": \"11\"},\n      {\"key\": \"B\", \"content\": \"12\"},\n      {\"key\": \"C\", \"content\": \"13\"}\n    ],\n    \"correct_key\": \"B\"\n  }\n}" },
+            "url": "{{base_url}}/api/v1/trial-quiz/questions",
+            "description": "Body: `grade_group` (pra_sd, sd_1_3, sd_4_6, smp, sma), `subject_id` (mapel master data), `sort_order` (opsional, kecil dulu), lalu isi soal sama dengan 1 soal Bank soal: `type`, `question`, `formula`, `image_id` / `image_url`, `table`, `explanation` (wajib), `display_order`, `difficulty`, `answer`.\n\n422 `grade_group` kalau golongan sudah berisi 10 soal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('kode TQ-', () => pm.expect(d.code).to.match(/^TQ-/));",
+                  "pm.collectionVariables.set('tq_q1_id', d.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah soal trial (isian angka)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"grade_group\": \"sd_1_3\",\n  \"subject_id\": \"{{tq_subject_id}}\",\n  \"sort_order\": 2,\n  \"type\": \"free_text\",\n  \"question\": \"Setengah dari 10 adalah ...\",\n  \"explanation\": \"10 : 2 = 5\",\n  \"difficulty\": \"medium\",\n  \"answer\": {\"input_type\": \"number\", \"accepted_answers\": [\"5\"]}\n}" },
+            "url": "{{base_url}}/api/v1/trial-quiz/questions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('tq_q2_id', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah soal trial salah (422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"grade_group\": \"sd_1_3\",\n  \"subject_id\": \"{{tq_subject_id}}\",\n  \"type\": \"single_choice\",\n  \"question\": \"Soal dengan kunci salah\",\n  \"explanation\": \"-\",\n  \"difficulty\": \"easy\",\n  \"answer\": {\"options\": [{\"key\": \"A\", \"content\": \"1\"}, {\"key\": \"B\", \"content\": \"2\"}], \"correct_key\": \"Z\"}\n}" },
+            "url": "{{base_url}}/api/v1/trial-quiz/questions",
+            "description": "Validasi isi soal sama dengan Bank soal: error per field, contoh `answer.correct_key`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error di answer.correct_key', () => pm.expect(pm.response.json().errors.map(e => e.field)).to.include('answer.correct_key'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List soal trial SD 1-3",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/trial-quiz/questions?grade_group=sd_1_3",
+            "description": "Query `grade_group` (kosong = semua golongan). data: max_per_group (10), group_counts [{grade_group, name, total}] (semua golongan), questions (lengkap dengan kunci & pembahasan, urut golongan lalu sort_order). Tanpa pagination (maks 50 soal)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('max 10, 5 golongan', () => {",
+                  "  pm.expect(d.max_per_group).to.eql(10);",
+                  "  pm.expect(d.group_counts.length).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah soal trial",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"grade_group\": \"sd_1_3\",\n  \"subject_id\": \"{{tq_subject_id}}\",\n  \"sort_order\": 1,\n  \"type\": \"single_choice\",\n  \"question\": \"Hasil dari 8 + 5 adalah ...\",\n  \"explanation\": \"8 + 5 = 13\",\n  \"difficulty\": \"easy\",\n  \"answer\": {\n    \"options\": [\n      {\"key\": \"A\", \"content\": \"12\"},\n      {\"key\": \"B\", \"content\": \"13\"},\n      {\"key\": \"C\", \"content\": \"14\"}\n    ],\n    \"correct_key\": \"B\"\n  }\n}" },
+            "url": "{{base_url}}/api/v1/trial-quiz/questions/{{tq_q1_id}}",
+            "description": "Ganti seluruh isi soal (body sama dengan tambah). Boleh pindah golongan kalau golongan tujuan belum penuh."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('soal berubah', () => pm.expect(pm.response.json().data.question).to.eql('Hasil dari 8 + 5 adalah ...'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail soal trial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/trial-quiz/questions/{{tq_q1_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Publik: jenjang & kelas",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/public/trial-quiz/grades",
+            "description": "Tanpa login. data: [{id, name, grades: [{id, name, grade_group, grade_group_name}]}] per jenjang (Pra SD, SD, SMP, SMA). Pengunjung WAJIB memilih kelas sebelum trial."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const sd = pm.response.json().data.find(l => l.name === 'SD');",
+                  "const kelas2 = sd.grades.find(g => g.grade_group === 'sd_1_3');",
+                  "pm.test('SD punya golongan sd_1_3', () => pm.expect(kelas2).to.be.ok);",
+                  "pm.collectionVariables.set('tq_grade_id', kelas2.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publik: soal trial untuk kelas",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/public/trial-quiz/questions?grade_id={{tq_grade_id}}",
+            "description": "Tanpa login. data: education_level, grade, grade_group, total_questions, score_per_question, questions [{no, id, code, type, subject, question, formula, image_url, table, display_order, difficulty, answer (opsi + KUNCI), explanation}]. FE menilai sendiri.\n\n404 kalau golongan belum punya soal; 422 `grade_id` kalau kelas tidak dikenal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('golongan SD 1-3 + kunci & pembahasan', () => {",
+                  "  pm.expect(d.grade_group).to.eql('sd_1_3');",
+                  "  pm.expect(d.questions[0].answer).to.be.an('object');",
+                  "  pm.expect(d.questions[0].explanation).to.be.a('string');",
+                  "});",
+                  "// Contoh jawaban FE: soal 1 dinilai benar, sisanya salah.",
+                  "const answers = d.questions.map((q, i) => ({ question_id: q.id, answer: null, is_correct: i === 0 }));",
+                  "pm.collectionVariables.set('tq_answers_json', JSON.stringify(answers));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publik: kirim hasil trial",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Pengunjung Uji\",\n  \"whatsapp\": \"0812-3456-7890\",\n  \"grade_id\": \"{{tq_grade_id}}\",\n  \"duration_seconds\": 240,\n  \"answers\": {{tq_answers_json}}\n}" },
+            "url": "{{base_url}}/api/v1/public/trial-quiz/submit",
+            "description": "Tanpa login, maks 10x/menit per IP (429). Wajib: `name`, `whatsapp` (dirapikan jadi 62xxx), `grade_id`. `answers` = [{question_id, answer, is_correct, time_spent_seconds?}] (benar/salah dari FE); soal yang tidak dikirim dianggap salah. `duration_seconds` opsional.\n\ndata: id, score (0-100, dihitung BE), correct_count, total_questions, score_per_question, submitted_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('1 benar', () => pm.expect(pm.response.json().data.correct_count).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publik: no WhatsApp salah (422)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Pengunjung Uji\",\n  \"whatsapp\": \"12345\",\n  \"grade_id\": \"{{tq_grade_id}}\",\n  \"answers\": []\n}" },
+            "url": "{{base_url}}/api/v1/public/trial-quiz/submit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error whatsapp', () => pm.expect(pm.response.json().errors.map(e => e.field)).to.include('whatsapp'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report: peserta trial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/trial-quiz/attempts?grade_group=sd_1_3&search=Pengunjung&page=1&per_page=20",
+            "description": "Query: `date_from`, `date_to` (WIB, YYYY-MM-DD, inklusif), `grade_group`, `search` (nama / no WhatsApp), `page`, `per_page`. Urut terbaru. Setiap baris: id, name, whatsapp, education_level, grade, grade_group, score, correct_count, total_questions, duration_seconds, submitted_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('WhatsApp dirapikan', () => pm.expect(pm.response.json().data[0].whatsapp).to.eql('6281234567890'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report: ringkasan trial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/trial-quiz/attempts/summary",
+            "description": "Query: `date_from`, `date_to`, `grade_group`. data: participants, average_score, by_group [{grade_group, name, participants, average_score}] (5 golongan), most_wrong [{question_id, code, question, subject, grade_group, answered, wrong, wrong_rate}] (maks 10)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('5 golongan', () => pm.expect(pm.response.json().data.by_group.length).to.eql(5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus soal trial 1",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/api/v1/trial-quiz/questions/{{tq_q1_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Hapus soal trial 2",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/api/v1/trial-quiz/questions/{{tq_q2_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Hapus mapel uji",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{tq_subject_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/master-data",
+            "description": "Bisa dihapus karena soal trial yang memakainya sudah dihapus."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
             }
           ]
         }

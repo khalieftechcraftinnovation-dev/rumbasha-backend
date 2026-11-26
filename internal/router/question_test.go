@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/token"
 )
 
@@ -69,6 +69,8 @@ func seedPlacementInGrade(t *testing.T, db *gorm.DB, gradeCode string) testPlace
 		db.Exec(`DELETE FROM quizzes`)          // quiz_questions ikut terhapus (ON DELETE CASCADE)
 		db.Exec(`DELETE FROM learning_modules`) // learning_module_plans ikut terhapus (ON DELETE CASCADE)
 		db.Exec(`DELETE FROM questions`)
+		db.Exec(`DELETE FROM trial_quiz_attempts`)
+		db.Exec(`DELETE FROM trial_quiz_questions`) // menunjuk mapel & gambar
 		db.Exec(`DELETE FROM media_assets`)
 		db.Exec(`DELETE FROM master_data_items WHERE id IN ?`, []string{p.TopicID, p.SubchapterID, p.ChapterID})
 		db.Exec(`DELETE FROM master_data_items WHERE id = ?`, p.FieldID)

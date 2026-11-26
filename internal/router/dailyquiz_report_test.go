@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
-	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/auth/login"
 )
 
 // submittedDailyQuiz menyimpan 1 Daily Quiz yang sudah di-submit langsung ke daily_quizzes.
