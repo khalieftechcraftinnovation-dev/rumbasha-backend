@@ -1,5 +1,6 @@
 -- ============================================================================
--- DATA DUMMY hierarki mapel: Matematika SD (Kelas 1-6). JANGAN dijalankan di production.
+-- DATA DUMMY hierarki mapel: Matematika SD (Kelas 1-6) + contoh kecil SMP (Kelas 7-9).
+-- JANGAN dijalankan di production.
 --
 --   Matematika (mapel, sama untuk semua jenjang)
 --     → Bidang Materi (+ jenjang & kelas) → Bab → Sub Bab → Topik
@@ -89,7 +90,14 @@ INSERT INTO tmp_math_sd VALUES
     ('GRADE_6', 'Analisis Data dan Peluang', 3, 'Pengolahan Data', 1, 'Penyajian Data', 1,          'Diagram batang', 2),
     ('GRADE_6', 'Analisis Data dan Peluang', 3, 'Pengolahan Data', 1, 'Penyajian Data', 1,          'Diagram lingkaran', 3),
     ('GRADE_6', 'Analisis Data dan Peluang', 3, 'Pengolahan Data', 1, 'Ukuran Pemusatan Data', 2,   'Rata-rata (mean)', 1),
-    ('GRADE_6', 'Analisis Data dan Peluang', 3, 'Pengolahan Data', 1, 'Ukuran Pemusatan Data', 2,   'Modus dan median', 2);
+    ('GRADE_6', 'Analisis Data dan Peluang', 3, 'Pengolahan Data', 1, 'Ukuran Pemusatan Data', 2,   'Modus dan median', 2),
+
+    -- SMP (contoh kecil, untuk mencoba batas jenjang di modul & soal)
+    ('GRADE_7', 'Bilangan', 1,      'Bilangan Bulat', 1,          'Operasi Bilangan Bulat', 1,      'Penjumlahan dan pengurangan bilangan bulat', 1),
+    ('GRADE_7', 'Bilangan', 1,      'Bilangan Bulat', 1,          'Operasi Bilangan Bulat', 1,      'Perkalian dan pembagian bilangan bulat', 2),
+    ('GRADE_7', 'Aljabar', 2,       'Bentuk Aljabar', 1,          'Operasi Bentuk Aljabar', 1,      'Suku sejenis', 1),
+    ('GRADE_8', 'Geometri', 1,      'Teorema Pythagoras', 1,      'Tripel Pythagoras', 1,           'Menentukan sisi segitiga siku-siku', 1),
+    ('GRADE_9', 'Aljabar', 1,       'Persamaan Kuadrat', 1,       'Akar Persamaan Kuadrat', 1,      'Pemfaktoran', 1);
 
 
 -- ----------------------------------------------------------------------------

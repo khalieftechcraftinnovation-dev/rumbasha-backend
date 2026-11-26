@@ -55,6 +55,26 @@ func listWhere(f usermodel.ListFilter, withRole bool) (string, []any) {
 		conds = append(conds, "(u.real_name ILIKE ? OR u.username ILIKE ? OR u.email ILIKE ?)")
 		args = append(args, like, like, like)
 	}
+
+	// Filter paket akses: EXISTS ke paket siswa yang aktif hari ini
+	// (index student_subscriptions_student_id_end_date_idx), hanya akun siswa.
+	activeSub := `SELECT 1 FROM student_subscriptions ss
+		WHERE ss.student_id = u.id AND ss.cancelled_at IS NULL AND ?::date BETWEEN ss.start_date AND ss.end_date`
+	if f.PlanID != "" {
+		conds = append(conds, "u.role = 'student' AND EXISTS ("+activeSub+" AND ss.plan_id = ?)")
+		args = append(args, f.Today, f.PlanID)
+	}
+	switch f.Subscription {
+	case usermodel.SubscriptionActive:
+		conds = append(conds, "u.role = 'student' AND EXISTS ("+activeSub+")")
+		args = append(args, f.Today)
+	case usermodel.SubscriptionExpiring:
+		conds = append(conds, "u.role = 'student' AND EXISTS ("+activeSub+" AND ss.end_date <= ?::date)")
+		args = append(args, f.Today, f.ExpiringUntil)
+	case usermodel.SubscriptionNone:
+		conds = append(conds, "u.role = 'student' AND NOT EXISTS ("+activeSub+")")
+		args = append(args, f.Today)
+	}
 	return strings.Join(conds, " AND "), args
 }
 

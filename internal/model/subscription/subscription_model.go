@@ -20,6 +20,23 @@ const (
 // AllFeatures berisi semua fitur, urut sesuai tampilan.
 var AllFeatures = []string{FeatureModule, FeatureDailyQuiz, FeatureUjiKom, FeatureTryout, FeatureRumath}
 
+// FeatureLabels = nama fitur untuk ditampilkan (kolom "Akses"), contoh "Modul, Daily Quiz".
+var FeatureLabels = map[string]string{
+	FeatureModule: "Modul", FeatureDailyQuiz: "Daily Quiz", FeatureUjiKom: "Uji Kom",
+	FeatureTryout: "Tryout", FeatureRumath: "RUMATH",
+}
+
+// EnabledLabels mengembalikan nama fitur yang terbuka, urut sesuai AllFeatures.
+func EnabledLabels(features map[string]bool) []string {
+	labels := []string{}
+	for _, f := range AllFeatures {
+		if features[f] {
+			labels = append(labels, FeatureLabels[f])
+		}
+	}
+	return labels
+}
+
 // ActiveSubscription adalah paket siswa yang aktif di tanggal tertentu,
 // lengkap dengan info paket dan akses fiturnya (hasil JOIN, bukan satu tabel).
 type ActiveSubscription struct {

@@ -77,3 +77,29 @@ func (s *Local) fullPath(relPath string) (string, error) {
 	}
 	return filepath.Join(s.Dir, filepath.FromSlash(clean)), nil
 }
+
+// FilePath mengembalikan lokasi file di disk untuk relPath (contoh untuk dikirim lewat API yang
+// wajib login, bukan lewat URL publik). Path yang keluar dari Dir ditolak.
+func (s *Local) FilePath(relPath string) (string, error) {
+	return s.fullPath(relPath)
+}
+
+// Move memindahkan file dari oldPath ke newPath (keduanya relatif di Dir). Folder tujuan dibuat
+// otomatis. Dipakai saat letak modul berubah (folder mengikuti hierarki).
+func (s *Local) Move(oldPath, newPath string) error {
+	from, err := s.fullPath(oldPath)
+	if err != nil {
+		return err
+	}
+	to, err := s.fullPath(newPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return fmt.Errorf("gagal membuat folder %s: %w", filepath.Dir(to), err)
+	}
+	if err := os.Rename(from, to); err != nil {
+		return fmt.Errorf("gagal memindahkan file %s ke %s: %w", oldPath, newPath, err)
+	}
+	return nil
+}

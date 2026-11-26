@@ -24,16 +24,42 @@ import (
 	usermodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/user"
 	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
+	subscriptionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/subscription"
 )
 
 // UserService berisi logika menu User.
 type UserService struct {
-	repo *userrepo.UserRepository
+	repo          *userrepo.UserRepository
+	subscriptions *subscriptionservice.SubscriptionService // akses siswa (kolom Paket, Akses, Berlaku s/d)
 }
 
 // NewUserService membuat UserService. Dipanggil sekali di main.go.
-func NewUserService(repo *userrepo.UserRepository) *UserService {
-	return &UserService{repo: repo}
+func NewUserService(repo *userrepo.UserRepository, subscriptions *subscriptionservice.SubscriptionService) *UserService {
+	return &UserService{repo: repo, subscriptions: subscriptions}
+}
+
+// attachAccess mengisi akses hari ini untuk setiap siswa di items (2 query untuk semua siswa,
+// bukan per baris). Role lain tetap nil.
+func (s *UserService) attachAccess(ctx context.Context, items []usermodel.ListItem) error {
+	var studentIDs []string
+	for _, u := range items {
+		if u.Role == loginmodel.RoleStudent {
+			studentIDs = append(studentIDs, u.ID)
+		}
+	}
+	if len(studentIDs) == 0 {
+		return nil
+	}
+	access, err := s.subscriptions.AccessMany(ctx, studentIDs)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if a, ok := access[items[i].ID]; ok {
+			items[i].Access = &a
+		}
+	}
+	return nil
 }
 
 // usernameFormat sama dengan constraint users_username_format di database.
@@ -49,9 +75,12 @@ var roleNames = map[string]string{
 
 // filterFrom menyusun filter list dari query (default halaman 1, 20 per halaman).
 func filterFrom(q userdto.ListQuery) usermodel.ListFilter {
+	now := time.Now()
 	f := usermodel.ListFilter{
 		Role: q.Role, EducationLevelID: q.EducationLevelID, GradeID: q.GradeID, BranchID: q.BranchID,
 		Status: q.Status, Search: strings.TrimSpace(q.Search), Page: q.Page, PerPage: q.PerPage,
+		PlanID: q.PlanID, Subscription: q.Subscription,
+		Today: clock.TodayInJakarta(now), ExpiringUntil: clock.TodayInJakarta(now.AddDate(0, 0, 6)),
 	}
 	if f.Page == 0 {
 		f.Page = 1
@@ -66,7 +95,10 @@ func filterFrom(q userdto.ListQuery) usermodel.ListFilter {
 func (s *UserService) List(ctx context.Context, q userdto.ListQuery) ([]usermodel.ListItem, usermodel.ListFilter, int, error) {
 	f := filterFrom(q)
 	items, total, err := s.repo.List(ctx, f)
-	return items, f, total, err
+	if err != nil {
+		return nil, f, 0, err
+	}
+	return items, f, total, s.attachAccess(ctx, items)
 }
 
 // RoleCounts menghitung user per role dengan filter yang sama seperti list (role diabaikan).
@@ -79,7 +111,16 @@ func (s *UserService) GetDetail(ctx context.Context, id string) (usermodel.Detai
 	if uuid.Validate(id) != nil {
 		return usermodel.Detail{}, usermodel.ErrUserNotFound
 	}
-	return s.repo.FindDetail(ctx, id)
+	d, err := s.repo.FindDetail(ctx, id)
+	if err != nil {
+		return usermodel.Detail{}, err
+	}
+	items := []usermodel.ListItem{d.ListItem}
+	if err := s.attachAccess(ctx, items); err != nil {
+		return usermodel.Detail{}, err
+	}
+	d.ListItem = items[0]
+	return d, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +335,11 @@ func (s *UserService) Create(ctx context.Context, req userdto.CreateRequest, act
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.FindByIDs(ctx, ids)
+	items, err := s.repo.FindByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return items, s.attachAccess(ctx, items)
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +412,7 @@ func (s *UserService) Update(ctx context.Context, id string, req userdto.UpdateR
 	if err != nil {
 		return usermodel.Detail{}, err
 	}
-	return s.repo.FindDetail(ctx, id)
+	return s.GetDetail(ctx, id)
 }
 
 // ---------------------------------------------------------------------------

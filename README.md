@@ -47,14 +47,16 @@ curl http://localhost:8080/health
 
 ## Akun dummy
 
-Setelah `make seed`, semua akun memakai password **`password123`**. Total 158 user: 150 siswa, 4 tutor, 3 admin, 1 super admin. Ditambah ±730 soal Matematika SD di Bank Soal.
+Setelah `make seed`, semua akun memakai password **`password123`**. Total 162 user: 154 siswa, 4 tutor, 3 admin, 1 super admin. Ditambah ±910 soal Matematika di Bank Soal, paket akses Basic/Pro/Ultra, dan 57 modul pembelajaran (PDF dummy).
 
 - [cmd/seed/dummy_data.sql](cmd/seed/dummy_data.sql): cabang, akun utama di bawah, paket, dan coin (dijalankan sekali).
-- [cmd/seed/dummy_subjects.sql](cmd/seed/dummy_subjects.sql): 5 mapel (Matematika, IPA, B. Indonesia, B. Inggris, IPS) + hierarki lengkap **Matematika SD Kelas 1-6**: 15 bidang materi, 18 bab, 24 sub bab, 47 topik (aman dijalankan ulang).
+- [cmd/seed/dummy_subjects.sql](cmd/seed/dummy_subjects.sql): 5 mapel (Matematika, IPA, B. Indonesia, B. Inggris, IPS) + hierarki lengkap **Matematika SD Kelas 1-6** (15 bidang materi, 18 bab, 24 sub bab, 47 topik) + contoh kecil **SMP Kelas 7-9** (4 bidang materi, 5 topik) (aman dijalankan ulang).
 - [cmd/seed/dummy_users.sql](cmd/seed/dummy_users.sql): 2 admin, 3 tutor, dan 43 siswa tambahan yang tersebar di semua cabang dan jenjang (aman dijalankan ulang). Siswa tambahan memakai username `siswa.<nama depan>`, contoh `siswa.adit`. Lalu 103 siswa lagi (total 150 siswa) dengan username `siswa.<nama depan>.<nama keluarga>`, contoh `siswa.arif.wijaya`, tersebar di semua kelas (SD & SMP lebih banyak). Siswa tambahan belum punya paket.
-- [cmd/seed/dummy_questions.sql](cmd/seed/dummy_questions.sql): ±730 soal **Matematika SD Kelas 1-6** di semua 47 topik, 4 tipe bergiliran (single choice, multiple choice, benar/salah, isian angka), 3 level (243 soal per level). Setiap bidang materi punya **minimal 15 soal per level**, jadi Daily Quiz 5/10/15 soal selalu bisa di-generate. Peruntukan Daily Quiz & Tryout (Kelas 6 juga Uji Kom). Aman dijalankan ulang (soal dengan topik & teks sama dilewati).
+- [cmd/seed/dummy_questions.sql](cmd/seed/dummy_questions.sql): ±910 soal **Matematika SD Kelas 1-6 + SMP Kelas 7-9** di semua topik, 4 tipe bergiliran (single choice, multiple choice, benar/salah, isian angka), 3 level. Setiap bidang materi punya **minimal 15 soal per level**, jadi Daily Quiz 5/10/15 soal selalu bisa di-generate. Peruntukan Daily Quiz & Tryout (Kelas 6 & 9 juga Uji Kom). Aman dijalankan ulang (soal dengan topik & teks sama dilewati).
 - [cmd/seed/dummy_quiz_reports.sql](cmd/seed/dummy_quiz_reports.sql): 1 event **"Tryout Demo Matematika Kelas 6"** (publish, 10 soal, 7 hari lalu 08:00-10:00 WIB) yang sudah dikerjakan semua siswa aktif Kelas 6, beserta nilai, point, dan leaderboard-nya, untuk mencoba report & leaderboard quiz. Aman dijalankan ulang.
 - [cmd/seed/dummy_daily_quizzes.sql](cmd/seed/dummy_daily_quizzes.sql): 2-6 **Daily Quiz bulan berjalan** per siswa aktif SD (soal dari bidang materi kelasnya, level bergiliran), lengkap dengan jawaban, nilai, point, dan leaderboard bulanan, untuk mencoba report & leaderboard Daily Quiz. Aman dijalankan ulang (ID dari hash siswa + bulan).
+- [cmd/seed/dummy_access_plans.sql](cmd/seed/dummy_access_plans.sql): paket akses **Basic, Pro, Ultra** (semua jenjang; akses modul tetap dibatasi jenjang akun) + akun skenario modul di tabel bawah, masing-masing dengan paket aktif (10 hari lalu s/d 20 hari lagi). Aman dijalankan ulang.
+- [cmd/seed/learning_modules.go](cmd/seed/learning_modules.go): untuk setiap bidang materi Matematika (SD & SMP), 3 modul di bab pertamanya + **file PDF dummy** (bisa dibuka) yang disimpan di `STORAGE_DIR/modules/...` mengikuti hierarki mapel: *Ringkasan Materi* (Basic, Pro, Ultra), *Latihan Soal* (Pro, Ultra), *Pembahasan Lengkap* (Ultra). Total 57 modul (45 SD, 12 SMP). File PDF lama yang tidak punya data lagi (contoh setelah `make test`) dihapus otomatis. Aman dijalankan ulang.
 
 Akun utama untuk dicoba:
 
@@ -67,6 +69,10 @@ Akun utama untuk dicoba:
 | `siswa.citra`    | student     | SD Kelas 5, paket **online** Reguler SD aktif + akses khusus RUMATH     |
 | `siswa.dimas`    | student     | SMA Kelas 10, paket online **sudah expired** kemarin                    |
 | `siswa.eka`      | student     | PraSD Nol Besar, akun **nonaktif** (login ditolak)                      |
+| `siswa.basic`    | student     | SD Kelas 5, paket **Basic**: 15 dari 45 modul SD terbuka                |
+| `siswa.pro`      | student     | SD Kelas 5, paket **Pro**: 30 dari 45 modul SD terbuka                  |
+| `siswa.ultra`    | student     | SD Kelas 5, paket **Ultra**: semua 45 modul SD terbuka                  |
+| `siswa.ultra.smp`| student     | SMP Kelas 7, paket **Ultra**: hanya 12 modul SMP (modul SD tidak terlihat) |
 
 ## Struktur folder
 
@@ -326,9 +332,27 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | GET    | `/api/v1/quiz-reports/:id/questions` | Admin, Super Admin, Tutor | Soal urut dari yang paling sering salah |
 | GET    | `/api/v1/daily-quiz-reports` | Admin, Super Admin, Tutor | Report Daily Quiz per siswa (peringkat + rekap, filter periode/mapel/kelas) |
 | GET    | `/api/v1/daily-quiz-reports/students/:id` | Admin, Super Admin, Tutor | Report Daily Quiz 1 siswa: total + rincian per mapel |
+| POST   | `/api/v1/learning-modules` | Admin, Super Admin | Upload modul pembelajaran (1 PDF + data, multipart) |
+| GET    | `/api/v1/learning-modules` | Admin, Super Admin | List modul (filter letak/paket/status, cari) |
+| GET    | `/api/v1/learning-modules/:id` | Admin, Super Admin | Detail modul |
+| GET    | `/api/v1/learning-modules/:id/file` | Admin, Super Admin | Unduh / lihat PDF modul (wajib login) |
+| PUT    | `/api/v1/learning-modules/:id` | Admin, Super Admin | Ubah modul (ganti penuh, PDF opsional) |
+| DELETE | `/api/v1/learning-modules` | Admin, Super Admin | Hapus banyak modul (soft delete) |
+| GET    | `/api/v1/student/learning-modules` | Siswa | Modul di jenjang siswa (di luar paket tampil terkunci) |
+| POST   | `/api/v1/student/learning-modules/:id/open` | Siswa | Buka modul (cek jenjang & paket, catat riwayat buka) |
+| GET    | `/api/v1/student/learning-modules/:id/file` | Siswa | Baca / unduh PDF modul (akses dicek) |
 | GET    | `/api/v1/users/:id` | Admin, Super Admin | Detail user |
 | PUT    | `/api/v1/users/:id` | Admin, Super Admin | Ubah user (admin: hanya tutor & siswa) |
 | DELETE | `/api/v1/users` | Admin, Super Admin | Hapus banyak user (soft delete) |
+| GET    | `/api/v1/subscription-plans` | Admin, Super Admin, Siswa | Paket akses (siswa: akses hari ini + paket aktif jenjangnya) |
+| GET    | `/api/v1/subscription-plans/:id` | Admin, Super Admin | Detail paket akses |
+| POST   | `/api/v1/subscription-plans` | Admin, Super Admin | Buat paket akses |
+| PUT    | `/api/v1/subscription-plans/:id` | Admin, Super Admin | Ubah paket akses (ganti penuh) |
+| DELETE | `/api/v1/subscription-plans` | Admin, Super Admin | Hapus banyak paket akses (soft delete) |
+| GET    | `/api/v1/students/:id/access` | Admin, Super Admin | Akses 1 siswa: hari ini, rincian fitur, riwayat paket |
+| POST   | `/api/v1/student-subscriptions` | Admin, Super Admin | Beri 1 paket ke 1-100 siswa (offline, perpanjangan otomatis) |
+| POST   | `/api/v1/student-subscriptions/:id/cancel` | Admin, Super Admin | Batalkan 1 paket siswa |
+| PUT    | `/api/v1/student-access-overrides` | Admin, Super Admin | Akses khusus per fitur 1-100 siswa |
 | GET    | `/api/v1/quiz-bundles` | Admin        | Daftar bundle (quiz lama) untuk dipakai ulang   |
 | GET    | `/api/v1/questions/:id`| Admin        | Detail soal + kunci jawaban & pembahasan        |
 | PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
@@ -1062,9 +1086,13 @@ Semua endpoint `/api/v1/users` khusus **admin & super admin**. Melihat: semua ak
 | `branch_id` | Cabang |
 | `status` | `active` / `inactive` |
 | `search` | Nama, username, atau email (tidak peka huruf besar/kecil) |
+| `plan_id` | Siswa yang paket **aktif hari ini** = paket ini |
+| `subscription` | `active` (punya paket aktif), `expiring` (paket aktif berakhir ≤ 7 hari lagi), `none` (tanpa paket aktif). Hasil hanya siswa |
 | `page`, `per_page` | Default 1 & 20, maks 100 |
 
-List urut terbaru dulu. Setiap baris: `id, username, name, email, phone, role, branch` (null untuk super admin = semua cabang), `education_level, grade, student_code, coin_balance` (siswa), `status, join_date, end_date, ended` (true = end_date sudah lewat, tidak bisa login), `last_login_at, created_at`. User yang sudah dihapus tidak tampil.
+List urut terbaru dulu. Setiap baris: `id, username, name, email, phone, role, branch` (null untuk super admin = semua cabang), `education_level, grade, student_code, coin_balance` (siswa), `status, join_date, end_date, ended` (true = end_date sudah lewat, tidak bisa login), `last_login_at, created_at`, dan `access` (siswa; null untuk role lain) = kolom **Paket, Akses, Berlaku s/d**: `{plan, subscription_id, start_date, end_date, days_left, features, feature_labels, overrides}` (lihat [Paket akses](#paket-akses--akses-siswa)). User yang sudah dihapus tidak tampil.
+
+Akses siswa di 1 halaman diambil dengan 2 query untuk semua siswa sekaligus (paket aktif + akses khusus), bukan per baris. Filter paket memakai `EXISTS` ke `student_subscriptions` (index `student_subscriptions_student_id_end_date_idx`).
 
 `role-counts` = angka tab `{all, super_admin, admin, tutor, student}` dengan filter yang sama (role diabaikan), 1 query `GROUP BY`.
 
@@ -1153,6 +1181,55 @@ Ada error (422) → **semua data ditolak**, semua error dikembalikan sekaligus d
 
 Body `{"ids": [...]}` (1-100). **Soft delete**: `deleted_at` & `deleted_by` diisi, baris & riwayat (nilai, coin, leaderboard) tetap ada, username tetap terpakai, sesi login diakhiri, tidak bisa login lagi. Semua atau tidak sama sekali: ID tidak ada, akun sendiri, atau akun yang tidak boleh dihapus → 422 per `ids[i]`.
 
+## Paket akses & akses siswa
+
+Paket akses (tabel `subscription_plans`) menentukan fitur yang terbuka bagi siswa: `module, daily_quiz, uji_kom, tryout, rumath`. Akses siswa **hari ini** (WIB) = fitur paket yang aktif hari ini, lalu ditimpa **akses khusus** dari admin (`student_feature_overrides`). Status paket siswa dihitung dari tanggal, tanpa job: `active`, `upcoming` (belum mulai), `expired`, `cancelled`.
+
+### CRUD paket (`/api/v1/subscription-plans`)
+
+| Method | Isi |
+| ------ | --- |
+| `GET /subscription-plans` | Admin: semua paket + `sort_order, status, active_students` (kolom Pengguna = siswa yang paketnya aktif hari ini), `module_count, created_by, updated_by`; query `status`, `education_level_id` (paket jenjang itu + paket semua jenjang), `search`. **Siswa**: `{current: akses hari ini, plans: paket aktif jenjangnya + semua jenjang}` tanpa data admin (halaman Paket & Coin). Urut `sort_order`, nama. Tanpa pagination |
+| `GET /subscription-plans/:id` | Detail (admin). Tidak ada / dihapus → 404 |
+| `POST /subscription-plans` | Buat (admin), 201 |
+| `PUT /subscription-plans/:id` | Ubah, ganti penuh. Fitur baru **langsung berlaku** untuk siswa yang paketnya aktif; harga baru hanya untuk pemberian berikutnya (`price_paid` tersimpan di paket siswa). Sasaran jenjang tidak bisa diganti kalau masih dipakai siswa jenjang lain (422) |
+| `DELETE /subscription-plans` | Hapus 1-100 paket (soft delete), semua atau tidak sama sekali. Ditolak 422 per `ids[i]` kalau paket masih dipakai siswa (aktif / belum mulai) atau menjadi **satu-satunya paket** sebuah modul pembelajaran. Riwayat paket siswa tetap utuh; hubungan paket ke modul ikut dihapus |
+
+```json
+{
+  "name": "Pro", "description": "Ringkasan materi + latihan soal",
+  "highlights": ["Modul ringkasan + latihan soal", "Daily Quiz & Uji Kom"],
+  "education_level_id": null, "monthly_coin": 50, "is_featured": true,
+  "price_monthly": 199000, "price_semester": 1080000, "price_yearly": 2040000, "strike_price_monthly": 249000,
+  "features": {"module": true, "daily_quiz": true, "uji_kom": true, "tryout": false, "rumath": false},
+  "sort_order": 2, "status": "active"
+}
+```
+
+`name` wajib & unik (tanpa peduli huruf besar/kecil), `features` wajib (minimal 1 fitur), minimal 1 harga periode (null = periode tidak dijual), `strike_price_monthly` harus lebih mahal dari `price_monthly`, `education_level_id` null = semua jenjang, `status` `inactive` = tidak dijual / tidak bisa diberikan lagi (siswa yang sudah punya tetap bisa memakai). Semua kesalahan dikembalikan sekaligus. Kolom audit `created_by/updated_by/deleted_by` (migration 000037).
+
+### Akses siswa di menu User
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /students/:id/access` | `student` (+ saldo coin), `access` (akses hari ini), `features[]` per fitur `{feature, label, from_plan, override, enabled}` untuk form edit akses, `subscriptions[]` riwayat paket terbaru dulu (status, harga dibayar, pencatat, pembatal, catatan) |
+| `POST /student-subscriptions` | Beri 1 paket **aktif** ke **1-100 siswa** sekaligus, dicatat sebagai pembayaran **offline** oleh admin (lihat di bawah) |
+| `POST /student-subscriptions/:id/cancel` | Batalkan 1 paket siswa yang aktif / belum mulai, body opsional `{"reason": "..."}` (masuk catatan). Sudah dibatalkan → 409, sudah berakhir → 422. Akses langsung mengikuti; coin bonus tidak ditarik |
+| `PUT /student-access-overrides` | Akses khusus 1-100 siswa: `{"student_ids": [...], "features": {"rumath": true, "uji_kom": false, "module": null}}`. `true` dibuka walau tidak ada di paket, `false` ditutup walau ada di paket, `null` hapus (ikut paket lagi); fitur yang tidak dikirim tidak berubah. Respons = akses terbaru tiap siswa |
+
+```json
+{"plan_id": "...", "student_ids": ["...", "..."], "period": "monthly", "start_date": null,
+ "price_paid": null, "notes": "Bayar tunai", "request_id": "<uuid baru tiap klik simpan>"}
+```
+
+- `start_date` null = **otomatis**: hari ini, atau **sehari setelah paket terakhir siswa berakhir** (perpanjangan, FR-SUB-011). Diisi tapi bertumpuk dengan paket yang ada → 422 (kosongkan untuk perpanjangan, atau batalkan dulu paket itu). Tanggal berakhir = mulai + 1/6/12 bulan - 1 hari (31 Jan + 1 bulan → berakhir 27 Feb).
+- `price_paid` null = harga paket periode itu (periode tidak dijual → 422); diisi untuk harga khusus.
+- Paket dengan sasaran jenjang hanya bisa diberikan ke siswa jenjang itu.
+- `monthly_coin` > 0 → bonus coin **bulan pertama** langsung masuk (`coin_transactions` `type = plan_grant`, referensi paket siswa). Bonus bulan berikutnya untuk paket semester / tahunan belum otomatis.
+- Semua atau tidak sama sekali; `request_id` sama terkirim 2x → 409 (index unik `student_subscriptions_idempotency_key_unique`). Tanggal bertumpuk dijaga juga oleh constraint `student_subscriptions_no_overlap`.
+
+Performa: beri paket = 1 `INSERT ... VALUES (...), (...)` untuk semua siswa + 1 query CTE untuk bonus coin, dalam 1 transaksi; cek siswa & paket terakhirnya 1 query.
+
 ## Coin
 
 Saldo ada di `students.coin_balance` (tidak boleh negatif); setiap perubahan saldo selalu dicatat 1 baris `coin_transactions` di transaksi database yang sama (BR-010, BR-012).
@@ -1230,6 +1307,7 @@ Pilihan dropdown dari `master_data_items`. Semua role yang login boleh (siswa ju
 | `question_type` | Tipe soal | - |
 | `quiz_type` | Tipe quiz (Dipakai untuk) | - |
 | `difficulty` | Level | - |
+| `subscription_plan` | Paket akses aktif (tabel `subscription_plans`, untuk pilihan paket di modul pembelajaran). `value` = id paket, `parent_id` = jenjang sasaran (null = semua jenjang) | - |
 
 ```http
 GET /api/v1/dropdowns/difficulty
@@ -1251,6 +1329,70 @@ GET /api/v1/dropdowns/subject_field?subject_id=...&grade_id=...
 - Filter yang tidak berlaku untuk type tersebut diabaikan. Induk wajib belum diisi → 422 (contoh `subject_id: wajib diisi`); format bukan UUID → 422; type tidak dikenal → 404 berisi daftar type.
 - 1 query 1 tabel, memakai index `master_data_items_dropdown_idx (type, parent_id, sort_order)`.
 - Kelas tanpa filter → 14 kelas (urut Nol Kecil s/d Kelas 12), `parent_id` = id jenjangnya (bisa dipakai FE untuk mengelompokkan).
+
+## Modul pembelajaran (PDF)
+
+Materi belajar dalam file PDF (menu Materi di panel admin). Semua endpoint `/api/v1/learning-modules` khusus **admin & super admin**. Tabel `learning_modules` + `learning_module_plans` (paket akses), migration 000035.
+
+**File PDF tidak publik** (berbeda dengan gambar di `/storage/images`): disimpan di folder **mengikuti hierarki mapel** `STORAGE_DIR/modules/<mapel>/<jenjang>-<kelas>/<bidang materi>[/<bab>[/<sub bab>[/<topik>]]]/<uuid>.pdf` (contoh `modules/matematika/sd-kelas-5/bilangan/pecahan/<uuid>.pdf`; nama folder = nama huruf kecil, spasi jadi `-`). Kalau letak modul diubah tanpa ganti PDF, file ikut **dipindah** ke folder letak baru. File hanya bisa diunduh lewat `GET /api/v1/learning-modules/:id/file` (admin) atau `/student/learning-modules/:id/file` (siswa) yang wajib login (`file.url` di respons). FE mengambilnya dengan header `Authorization` lalu menampilkannya sebagai blob.
+
+### Buat (`POST /api/v1/learning-modules`) & ubah (`PUT /api/v1/learning-modules/:id`)
+
+`multipart/form-data`. Ubah = ganti penuh dengan field yang sama; `file` opsional (diisi = PDF diganti, file lama dihapus setelah berhasil).
+
+| Field | Aturan |
+| ----- | ------ |
+| `file` | **Wajib saat buat**: 1 file PDF, maks 20 MB. Jenis dibaca dari **isi** file (bukan nama), jadi file lain yang diganti namanya menjadi `.pdf` ditolak |
+| `name` | Wajib, maks 200 (judul PDF, juga untuk pencarian) |
+| `description` | Opsional, maks 5000 |
+| `subject_id`, `subject_field_id` | **Wajib**. Bidang materi harus milik mapel; **jenjang & kelas otomatis diambil dari bidang materi** |
+| `chapter_id`, `subchapter_id`, `topic_id` | Opsional, berurutan (sub bab butuh bab, topik butuh sub bab), masing-masing milik tingkat di atasnya |
+| `plan_ids` | **Wajib minimal 1** (maks 20): paket akses (`subscription_plans` aktif) yang membuka modul ini. Kirim berulang: `plan_ids=<id1>&plan_ids=<id2>`. Pilihan dari `GET /api/v1/dropdowns/subscription_plan` |
+| `page_count` | Opsional (1-10000): jumlah halaman. Tidak diisi → dihitung otomatis dari isi PDF (`null` kalau tidak terbaca, contoh PDF yang objeknya dikompres). Ubah tanpa PDF & tanpa `page_count` → tetap |
+| `status` | Opsional: `published` (tampil di Modul siswa) / `draft` (Simpan sebagai draf). Default `published` |
+
+Semua kesalahan dikembalikan sekaligus (422); upload yang gagal tidak meninggalkan file di disk.
+
+Respons (201 buat, 200 ubah/detail):
+
+```json
+{
+  "id": "...", "name": "Modul KPK dan FPB", "description": "...",
+  "placement": { "education_level": {...}, "grade": {...}, "subject": {...}, "subject_field": {...}, "chapter": {...}, "subchapter": null, "topic": null },
+  "file": { "name": "kpk.pdf", "mime_type": "application/pdf", "size_bytes": 182340, "page_count": 12,
+            "url": "http://localhost:8080/api/v1/learning-modules/<id>/file" },
+  "plans": [{ "id": "...", "name": "Reguler SD" }],
+  "status": "published", "created_by": {...}, "updated_by": null, "created_at": "...", "updated_at": "..."
+}
+```
+
+### List, detail, unduh, hapus
+
+- `GET /api/v1/learning-modules` — terbaru dulu. Query: `search` (nama), `education_level_id`, `grade_id`, `subject_id`, `subject_field_id`, `chapter_id`, `plan_id` (modul yang tersedia di paket itu), `status`, `page`, `per_page` (maks 100). Halaman diambil dulu (CTE), paket akses semua modul di halaman 1 query.
+- `GET /api/v1/learning-modules/:id` — detail.
+- `GET /api/v1/learning-modules/:id/file` — kirim PDF (`Content-Type: application/pdf`, `Content-Disposition: inline`).
+- `DELETE /api/v1/learning-modules` — body `{"ids": [...]}` (1-100), **soft delete** (file PDF tetap disimpan). Ada ID yang tidak ada → 422 per `ids[i]`, tidak ada yang terhapus.
+
+Contoh file untuk mencoba: [docs/Template Upload/contoh_modul.pdf](docs/Template%20Upload/contoh_modul.pdf) (1 halaman).
+
+### Modul untuk siswa (`/api/v1/student/learning-modules`)
+
+**Aturan akses** (dicek setiap request, memakai paket aktif **hari ini** WIB — aturan sama dengan `GET /auth/me`):
+
+1. Siswa hanya melihat modul **publish** di **jenjang akun**-nya (siswa SD tidak melihat modul SMP, dst.). Jenjang belum diisi → daftar kosong.
+2. Modul **bisa dibuka** kalau fitur modul terbuka dan modul tersedia di **paket aktif** siswa (`learning_module_plans`).
+3. Fitur modul dibuka admin lewat **akses khusus** (`student_feature_overrides`, feature `module`) tanpa paket yang punya fitur modul → **semua** modul di jenjangnya terbuka. Akses khusus `false` atau paket tanpa fitur modul → semua terkunci.
+4. Modul lain di jenjangnya tetap **tampil terkunci** (`locked: true`, `file.url: null`, `plans` = paket yang membukanya, untuk ajakan upgrade).
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /student/learning-modules` | `data.access` = `{education_level, plan, module_feature, all_modules}`; `data.modules[]` = `{id, name, description, placement, file: {size_bytes, page_count, url}, locked, plans, opened: {first_opened_at, last_opened_at, open_count}}`. Urut kurikulum (kelas → mapel → bidang materi → bab → nama). Query: `search`, `grade_id`, `subject_id`, `subject_field_id`, `chapter_id`, `access` (`unlocked`/`locked`), `page`, `per_page` |
+| `POST /student/learning-modules/:id/open` | Buka modul: cek jenjang & paket, catat riwayat buka (tabel `learning_module_opens`: pertama & terakhir dibuka, jumlah buka; migration 000036), kembalikan modul + `file.url`. Jenjang lain / draf / tidak ada → **404**; di luar paket → **403** dengan pesan (contoh `Modul ini tidak termasuk paket Basic. Modul ini tersedia di paket Pro, Ultra`) dan `data.plans` |
+| `GET /student/learning-modules/:id/file` | Kirim PDF (`application/pdf`, inline), akses dicek sama dengan buka modul |
+
+Skenario dari seed (lihat Akun dummy): `siswa.basic` 15/45 modul SD terbuka, `siswa.pro` 30/45, `siswa.ultra` 45/45, `siswa.ultra.smp` 12/12 modul SMP (modul SD 404), `siswa.citra` (Reguler SD, paket tidak terhubung ke modul dummy) 0/45.
+
+Performa: list = 1 query halaman (subquery berurut + index `learning_modules_student_idx`), paket akses semua modul di halaman 1 query, riwayat buka di-JOIN lewat primary key `learning_module_opens`.
 
 ## Image Library (gambar)
 

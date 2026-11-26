@@ -13,6 +13,7 @@ import (
 	"time"
 
 	loginmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/login"
+	subscriptionmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/subscription"
 )
 
 // ListFilter adalah filter list user. Field kosong ("") = tidak difilter.
@@ -23,8 +24,22 @@ type ListFilter struct {
 	BranchID         string
 	Status           string
 	Search           string // nama, username, atau email
-	Page, PerPage    int
+	// Filter paket akses (hanya siswa yang cocok): PlanID = paket aktif hari ini;
+	// Subscription = active (punya paket aktif), expiring (aktif & berakhir ≤ 7 hari lagi),
+	// none (tidak punya paket aktif).
+	PlanID        string
+	Subscription  string
+	Today         string // tanggal WIB "2026-11-26", diisi service
+	ExpiringUntil string // Today + 6 hari (berakhir dalam 7 hari termasuk hari ini), diisi service
+	Page, PerPage int
 }
+
+// Filter paket akses untuk ListFilter.Subscription.
+const (
+	SubscriptionActive   = "active"
+	SubscriptionExpiring = "expiring"
+	SubscriptionNone     = "none"
+)
 
 // Ref adalah pasangan id + nama.
 type Ref struct {
@@ -49,6 +64,8 @@ type ListItem struct {
 	EndDate        *time.Time // tanggal berakhir (inklusif); lewat = tidak bisa login
 	LastLoginAt    *time.Time
 	CreatedAt      time.Time
+	// Akses hari ini (paket aktif + akses khusus); hanya siswa, nil untuk role lain.
+	Access *subscriptionmodel.Access
 }
 
 // RoleCounts adalah jumlah user per role (angka di tab menu User).

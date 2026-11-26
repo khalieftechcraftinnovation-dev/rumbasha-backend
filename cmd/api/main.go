@@ -32,8 +32,10 @@ import (
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
+	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learningmodule"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
 	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
+	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subscription"
 	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
 	coinrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/coin"
 	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dailyquiz"
@@ -41,6 +43,7 @@ import (
 	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
 	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/leaderboard"
+	learningmodulerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/learningmodule"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
 	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quizreport"
 	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user"
@@ -50,6 +53,7 @@ import (
 	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
 	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/leaderboard"
+	learningmoduleservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/learningmodule"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz"
 	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quizreport"
 	userservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user"
@@ -110,8 +114,10 @@ func main() {
 	)
 
 	// Fitur: Image Library (upload & hapus gambar). File disimpan di STORAGE_DIR/images/...
+	// File upload (gambar publik di /storage/images; PDF modul hanya lewat API wajib login).
+	store := storage.NewLocal(cfg.StorageDir, cfg.AppURL)
 	imageHandler := imagehandler.NewImageHandler(
-		imageservice.NewImageService(imagerepo.NewImageRepository(db), storage.NewLocal(cfg.StorageDir, cfg.AppURL)),
+		imageservice.NewImageService(imagerepo.NewImageRepository(db), store),
 	)
 
 	// Fitur: Quiz (Uji Kom & Tryout). Service juga dipakai scheduler (kode akses tiap jam, hadiah juara 23:59).
@@ -148,9 +154,11 @@ func main() {
 		DailyQuiz:       dailyquizhandler.NewDailyQuizHandler(dailyQuizService),
 		Leaderboard:     leaderboardhandler.NewLeaderboardHandler(leaderboardservice.NewLeaderboardService(leaderboardrepo.NewLeaderboardRepository(db))),
 		Coin:            coinhandler.NewCoinHandler(coinservice.NewCoinService(coinrepo.NewCoinRepository(db))),
-		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db))),
+		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db), subscriptionService)),
 		QuizReport:      quizreporthandler.NewQuizReportHandler(quizreportservice.NewQuizReportService(quizreportrepo.NewQuizReportRepository(db))),
 		DailyQuizReport: dailyquizreporthandler.NewDailyQuizReportHandler(dailyquizreportservice.NewDailyQuizReportService(dailyquizreportrepo.NewDailyQuizReportRepository(db))),
+		LearningModule:  learningmodulehandler.NewLearningModuleHandler(learningmoduleservice.NewLearningModuleService(learningmodulerepo.NewLearningModuleRepository(db), store, subscriptionService)),
+		Subscription:    subscriptionhandler.NewSubscriptionHandler(subscriptionService),
 	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

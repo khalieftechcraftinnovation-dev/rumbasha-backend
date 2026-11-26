@@ -49,29 +49,6 @@ func (s *SubscriptionService) GetTodayAccess(ctx context.Context, studentID stri
 
 	return StudentAccess{
 		Subscription: subscription,
-		Features:     resolveFeatures(subscription, overrides),
+		Features:     subscriptionmodel.ResolveFeatures(subscription, overrides),
 	}, nil
-}
-
-// resolveFeatures menghitung akses akhir:
-//  1. mulai dari fitur paket aktif (semua false kalau tidak ada paket aktif),
-//  2. lalu ditimpa akses khusus dari admin (student_feature_overrides).
-func resolveFeatures(subscription *subscriptionmodel.ActiveSubscription, overrides []subscriptionmodel.FeatureOverride) map[string]bool {
-	features := map[string]bool{}
-	for _, feature := range subscriptionmodel.AllFeatures {
-		features[feature] = false
-	}
-
-	if subscription != nil {
-		features[subscriptionmodel.FeatureModule] = subscription.HasModule
-		features[subscriptionmodel.FeatureDailyQuiz] = subscription.HasDailyQuiz
-		features[subscriptionmodel.FeatureUjiKom] = subscription.HasUjiKom
-		features[subscriptionmodel.FeatureTryout] = subscription.HasTryout
-		features[subscriptionmodel.FeatureRumath] = subscription.HasRumath
-	}
-
-	for _, override := range overrides {
-		features[override.Feature] = override.IsEnabled
-	}
-	return features
 }

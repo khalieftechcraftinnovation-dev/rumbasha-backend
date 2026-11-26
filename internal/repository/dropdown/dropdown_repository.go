@@ -54,3 +54,15 @@ func (r *DropdownRepository) FindOptions(ctx context.Context, f dropdownmodel.Fi
 		Scan(&options).Error
 	return options, err
 }
+
+// FindPlanOptions mengambil paket akses aktif (subscription_plans, belum dihapus), urut sort_order
+// lalu nama. parent_id = jenjang sasaran paket (NULL = semua jenjang). [Native SQL, 1 tabel]
+func (r *DropdownRepository) FindPlanOptions(ctx context.Context) ([]dropdownmodel.Option, error) {
+	options := []dropdownmodel.Option{}
+	err := r.db.WithContext(ctx).
+		Raw(`SELECT id, NULL AS code, name, education_level_id AS parent_id FROM subscription_plans
+			WHERE deleted_at IS NULL AND status = 'active'
+			ORDER BY sort_order, name`).
+		Scan(&options).Error
+	return options, err
+}

@@ -23,11 +23,13 @@ import (
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
+	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learningmodule"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
 	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
+	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subscription"
 	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
@@ -37,11 +39,13 @@ import (
 	dropdownrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/dropdown"
 	imagerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/image"
 	leaderboardrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/leaderboard"
+	learningmodulerouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/learningmodule"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/login"
 	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/logreport"
 	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/question"
 	quizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz"
 	quizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quizreport"
+	subscriptionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/subscription"
 	userrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 )
@@ -61,6 +65,8 @@ type Handlers struct {
 	User            *userhandler.UserHandler
 	QuizReport      *quizreporthandler.QuizReportHandler
 	DailyQuizReport *dailyquizreporthandler.DailyQuizReportHandler
+	LearningModule  *learningmodulehandler.LearningModuleHandler
+	Subscription    *subscriptionhandler.SubscriptionHandler
 }
 
 // New membuat router Gin lengkap dengan semua route.
@@ -123,6 +129,8 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	userrouter.Register(private, h.User)
 	quizreportrouter.Register(private, h.QuizReport)
 	dailyquizreportrouter.Register(private, h.DailyQuizReport)
+	learningmodulerouter.Register(private, h.LearningModule)
+	subscriptionrouter.Register(private, h.Subscription)
 
 	return r
 }

@@ -22,6 +22,8 @@ const (
 	TypeQuestionType   = "question_type"   // tipe soal
 	TypeQuizType       = "quiz_type"       // tipe quiz (peruntukan soal)
 	TypeDifficulty     = "difficulty"      // level
+	// Bukan master data: paket akses (tabel subscription_plans). parent_id = jenjang sasaran paket (null = semua).
+	TypeSubscriptionPlan = "subscription_plan"
 )
 
 // Option adalah 1 pilihan dropdown.

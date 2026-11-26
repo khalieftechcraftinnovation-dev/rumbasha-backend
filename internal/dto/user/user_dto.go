@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/clock"
+	subscriptiondto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/subscription"
 	usermodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/user"
 )
 
@@ -25,6 +26,10 @@ type ListQuery struct {
 	BranchID         string `form:"branch_id" binding:"omitempty,uuid"`          // cabang
 	Status           string `form:"status" binding:"omitempty,oneof=active inactive"`
 	Search           string `form:"search" binding:"omitempty,max=100"` // nama, username, atau email
+	// Filter paket akses (hasilnya hanya siswa): paket aktif hari ini = plan_id.
+	PlanID string `form:"plan_id" binding:"omitempty,uuid"`
+	// active = punya paket aktif, expiring = paket aktif berakhir ≤ 7 hari lagi, none = tanpa paket aktif.
+	Subscription string `form:"subscription" binding:"omitempty,oneof=active expiring none"`
 }
 
 // RefResponse adalah pasangan id + nama.
@@ -60,6 +65,8 @@ type UserResponse struct {
 	Ended       bool       `json:"ended"`
 	LastLoginAt *time.Time `json:"last_login_at"` // WIB
 	CreatedAt   time.Time  `json:"created_at"`    // WIB
+	// Akses hari ini (kolom Paket, Akses, Berlaku s/d); hanya siswa, null untuk role lain.
+	Access *subscriptiondto.AccessResponse `json:"access"`
 }
 
 // ToUserResponse mengubah 1 user menjadi response.
@@ -78,6 +85,10 @@ func ToUserResponse(u usermodel.ListItem) UserResponse {
 	if u.LastLoginAt != nil {
 		t := u.LastLoginAt.In(clock.Jakarta)
 		r.LastLoginAt = &t
+	}
+	if u.Access != nil {
+		a := subscriptiondto.ToAccessResponse(*u.Access)
+		r.Access = &a
 	}
 	return r
 }

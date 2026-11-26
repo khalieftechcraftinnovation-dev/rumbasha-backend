@@ -11,6 +11,8 @@
 //  4. dummy_questions.sql → ±730 soal Matematika SD (semua topik, 4 tipe, 3 level) (aman diulang)
 //  5. dummy_quiz_reports.sql → 1 event Tryout Kelas 6 yang sudah selesai + hasil siswa (untuk report & leaderboard)
 //  6. dummy_daily_quizzes.sql → 2-6 Daily Quiz bulan ini per siswa SD + leaderboard bulanan (untuk report & leaderboard)
+//  7. dummy_access_plans.sql → paket Basic / Pro / Ultra + akun siswa skenario akses modul (aman diulang)
+//  8. learning_modules.go → 3 modul + PDF dummy per bidang materi Matematika (folder by hierarki mapel)
 package main
 
 import (
@@ -20,6 +22,7 @@ import (
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/config"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/database"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/storage"
 )
 
 // Isi file SQL dibundel ke dalam program lewat //go:embed.
@@ -41,6 +44,9 @@ var (
 
 	//go:embed dummy_daily_quizzes.sql
 	dummyDailyQuizzesSQL string
+
+	//go:embed dummy_access_plans.sql
+	dummyAccessPlansSQL string
 )
 
 func main() {
@@ -101,6 +107,20 @@ func main() {
 		log.Fatalf("gagal mengisi dummy_daily_quizzes.sql: %v", err)
 	}
 	log.Println("dummy_daily_quizzes.sql berhasil diisi")
+
+	// 7. dummy_access_plans.sql: aman diulang (paket & akun yang sudah ada dilewati).
+	if err := db.Exec(dummyAccessPlansSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_access_plans.sql: %v", err)
+	}
+	log.Println("dummy_access_plans.sql berhasil diisi")
+
+	// 8. Modul pembelajaran + file PDF dummy (disimpan di STORAGE_DIR, folder by hierarki mapel).
+	if removed, err := removeOrphanModuleFiles(db, cfg.StorageDir); err != nil {
+		log.Printf("peringatan: gagal membersihkan file modul lama: %v", err)
+	} else if removed > 0 {
+		log.Printf("modul pembelajaran: %d file PDF lama tanpa data dihapus", removed)
+	}
+	logModuleSeed(seedLearningModules(db, storage.NewLocal(cfg.StorageDir, cfg.AppURL)))
 
 	// Ringkasan jumlah data mapel per tingkat.
 	type typeCount struct {

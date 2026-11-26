@@ -1,5 +1,5 @@
 -- ============================================================================
--- DATA DUMMY soal (Bank Soal) Matematika SD Kelas 1-6. JANGAN dijalankan di production.
+-- DATA DUMMY soal (Bank Soal) Matematika SD Kelas 1-6 + contoh SMP. JANGAN dijalankan di production.
 --
 -- Dijalankan otomatis oleh "make seed" SETELAH dummy_subjects.sql (butuh topik Matematika SD).
 -- Aman dijalankan berkali-kali: soal dengan topik & teks yang sama dilewati.
@@ -11,7 +11,7 @@
 --   - 4 tipe bergiliran: single choice, multiple choice, benar/salah, isian (angka).
 --   - Soal hitungan: easy = penjumlahan, medium = perkalian, hard = perkalian lalu pengurangan.
 --     Angka dibuat dari nomor soal, jadi hasilnya selalu sama setiap seed dijalankan.
---   - Peruntukan: Daily Quiz & Tryout; Kelas 6 juga Uji Kom (Uji Kom hanya Kelas 6, 9, 12).
+--   - Peruntukan: Daily Quiz & Tryout; Kelas 6, 9, 12 juga Uji Kom (Uji Kom hanya kelas itu).
 --   - Dibuat oleh admin.sbytimur, tanggal dibuat tersebar 0-59 hari terakhir.
 -- ============================================================================
 
@@ -112,7 +112,7 @@ INSERT INTO questions (type, question_text, explanation, display_order,
 SELECT b.question_type, b.question_text, b.explanation, '["question"]'::JSONB,
        b.education_level_id, b.grade_id, b.subject_id, b.field_id, b.chapter_id, b.subchapter_id, b.topic_id,
        b.difficulty,
-       CASE WHEN b.grade_code = 'GRADE_6' THEN '["daily_quiz", "uji_kom", "tryout"]'::JSONB
+       CASE WHEN b.grade_code IN ('GRADE_6', 'GRADE_9', 'GRADE_12') THEN '["daily_quiz", "uji_kom", "tryout"]'::JSONB
             ELSE '["daily_quiz", "tryout"]'::JSONB END,
        'active', b.answer,
        (SELECT id FROM users WHERE username = 'admin.sbytimur'),

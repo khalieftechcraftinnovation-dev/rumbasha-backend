@@ -25,16 +25,17 @@ type typeRule struct {
 
 // rules adalah semua type dropdown. Tambah baris di sini kalau ada type master data baru.
 var rules = map[string]typeRule{
-	dropdownmodel.TypeEducationLevel: {},
-	dropdownmodel.TypeGrade:          {parentParam: "education_level_id"},
-	dropdownmodel.TypeSubject:        {},
-	dropdownmodel.TypeSubjectField:   {parentParam: "subject_id", parentRequired: true, gradeFilter: true},
-	dropdownmodel.TypeChapter:        {parentParam: "subject_field_id", parentRequired: true},
-	dropdownmodel.TypeSubchapter:     {parentParam: "chapter_id", parentRequired: true},
-	dropdownmodel.TypeTopic:          {parentParam: "subchapter_id", parentRequired: true},
-	dropdownmodel.TypeQuestionType:   {valueIsCode: true},
-	dropdownmodel.TypeQuizType:       {valueIsCode: true},
-	dropdownmodel.TypeDifficulty:     {valueIsCode: true},
+	dropdownmodel.TypeEducationLevel:   {},
+	dropdownmodel.TypeGrade:            {parentParam: "education_level_id"},
+	dropdownmodel.TypeSubject:          {},
+	dropdownmodel.TypeSubjectField:     {parentParam: "subject_id", parentRequired: true, gradeFilter: true},
+	dropdownmodel.TypeChapter:          {parentParam: "subject_field_id", parentRequired: true},
+	dropdownmodel.TypeSubchapter:       {parentParam: "chapter_id", parentRequired: true},
+	dropdownmodel.TypeTopic:            {parentParam: "subchapter_id", parentRequired: true},
+	dropdownmodel.TypeQuestionType:     {valueIsCode: true},
+	dropdownmodel.TypeQuizType:         {valueIsCode: true},
+	dropdownmodel.TypeDifficulty:       {valueIsCode: true},
+	dropdownmodel.TypeSubscriptionPlan: {}, // dari tabel subscription_plans (lihat List)
 }
 
 // Types mengembalikan semua type dropdown (urut abjad), untuk pesan error.
@@ -63,6 +64,15 @@ func (s *DropdownService) List(ctx context.Context, itemType string, q dropdownd
 	rule, ok := rules[itemType]
 	if !ok {
 		return nil, dropdownmodel.ErrUnknownType
+	}
+
+	// Paket akses bukan master data: dibaca dari subscription_plans (paket aktif).
+	if itemType == dropdownmodel.TypeSubscriptionPlan {
+		options, err := s.repo.FindPlanOptions(ctx)
+		for i := range options {
+			options[i].Value = options[i].ID
+		}
+		return options, err
 	}
 
 	filter := dropdownmodel.Filter{Type: itemType, Root: rule.parentParam == ""}

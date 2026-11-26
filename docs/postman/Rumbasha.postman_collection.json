@@ -49,6 +49,17 @@
     { "key": "new_user_ids_json", "value": "[]" },
     { "key": "report_quiz_id", "value": "" },
     { "key": "report_student_id", "value": "" },
+    { "key": "module_plan_id", "value": "" },
+    { "key": "module_id", "value": "" },
+    { "key": "student_module_id", "value": "" },
+    { "key": "student_locked_module_id", "value": "" },
+    { "key": "pa_plan_id", "value": "" },
+    { "key": "pa_plan_name", "value": "" },
+    { "key": "pa_student_id", "value": "" },
+    { "key": "pa_student2_id", "value": "" },
+    { "key": "pa_request_id", "value": "" },
+    { "key": "pa_subscription_id", "value": "" },
+    { "key": "pa_subscription2_id", "value": "" },
     { "key": "daily_answers_json", "value": "{\"answers\":[]}" }
   ],
   "item": [
@@ -2479,6 +2490,876 @@
                   "  const sum = data.subjects.reduce((n, s) => n + s.total_quizzes, 0);",
                   "  pm.expect(sum).to.eql(data.total.total_quizzes);",
                   "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Modul pembelajaran (PDF)",
+      "description": "Modul pembelajaran = materi belajar dalam file PDF. Admin & super admin. File PDF TIDAK publik: diunduh lewat `GET /learning-modules/:id/file` (wajib login).\n\nLetak: mapel & bidang materi wajib (jenjang & kelas otomatis dari bidang materi), bab/sub bab/topik opsional berurutan. Paket akses dipilih dari dropdown `subscription_plan` (minimal 1).\n\nRequest upload memakai file `docs/Template Upload/contoh_modul.pdf`: jalankan Postman CLI dari folder project.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dropdown paket akses (subscription_plan)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/dropdowns/subscription_plan",
+            "description": "Paket akses aktif untuk pilihan \"available in paket akses\". `value` = id paket (dikirim di `plan_ids`), `parent_id` = jenjang sasaran paket (null = semua jenjang)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('ada paket aktif', () => pm.expect(data.length).to.be.above(0));",
+                  "pm.collectionVariables.set('module_plan_id', data[0].value);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload modul (buat)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "docs/Template Upload/contoh_modul.pdf" },
+                { "key": "name", "value": "Modul KPK dan FPB", "type": "text" },
+                { "key": "description", "value": "Materi KPK dan FPB untuk latihan sebelum Daily Quiz", "type": "text" },
+                { "key": "subject_id", "value": "{{q_subject_id}}", "type": "text" },
+                { "key": "subject_field_id", "value": "{{q_subject_field_id}}", "type": "text" },
+                { "key": "chapter_id", "value": "{{q_chapter_id}}", "type": "text" },
+                { "key": "plan_ids", "value": "{{module_plan_id}}", "type": "text" },
+                { "key": "status", "value": "published", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/learning-modules",
+            "description": "multipart/form-data:\n- `file` wajib: 1 file PDF, maks 20 MB. Jenis dibaca dari ISI file (bukan nama file).\n- `name` wajib (maks 200), `description` opsional (maks 5000).\n- `subject_id` & `subject_field_id` wajib; `chapter_id`, `subchapter_id`, `topic_id` opsional berurutan.\n- `plan_ids` wajib minimal 1 (kirim berulang: plan_ids=<id1>, plan_ids=<id2>).\n- `page_count` opsional (jumlah halaman): tidak diisi = dihitung otomatis dari isi PDF (null kalau tidak terbaca).\n- `status` opsional: `published` (tampil di Modul siswa) / `draft` (Simpan sebagai draf), default published.\n\nRespons 201: modul + letak (dengan nama), file {name, mime_type, size_bytes, page_count, url}, plans."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('module_id', data.id);",
+                  "pm.test('PDF tersimpan & jenjang/kelas dari bidang materi', () => {",
+                  "  pm.expect(data.file.mime_type).to.eql('application/pdf');",
+                  "  pm.expect(data.file.page_count).to.eql(1);",
+                  "  pm.expect(data.file.url).to.include('/api/v1/learning-modules/' + data.id + '/file');",
+                  "  pm.expect(data.placement.grade.id).to.eql(pm.variables.get('q_grade_id'));",
+                  "  pm.expect(data.plans.map(p => p.id)).to.include(pm.collectionVariables.get('module_plan_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List modul",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/learning-modules?page=1&per_page=20",
+            "description": "Terbaru dulu. Query opsional: `search` (nama), `education_level_id`, `grade_id`, `subject_id`, `subject_field_id`, `chapter_id`, `plan_id` (modul yang tersedia di paket itu), `status` (published / draft), `page`, `per_page` (maks 100)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('berisi modul baru', () => pm.expect(pm.response.json().data.map(m => m.id)).to.include(pm.collectionVariables.get('module_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail modul",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/learning-modules/{{module_id}}" },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Unduh / lihat PDF modul",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/learning-modules/{{module_id}}/file",
+            "description": "Mengirim file PDF (Content-Type application/pdf, tampil langsung di browser). Wajib login: FE mengambilnya dengan header Authorization lalu menampilkan sebagai blob."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah modul (tanpa ganti PDF)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Modul KPK dan FPB (revisi)", "type": "text" },
+                { "key": "description", "value": "Materi KPK dan FPB, ditambah contoh soal", "type": "text" },
+                { "key": "subject_id", "value": "{{q_subject_id}}", "type": "text" },
+                { "key": "subject_field_id", "value": "{{q_subject_field_id}}", "type": "text" },
+                { "key": "chapter_id", "value": "{{q_chapter_id}}", "type": "text" },
+                { "key": "plan_ids", "value": "{{module_plan_id}}", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/learning-modules/{{module_id}}",
+            "description": "Body sama dengan upload (ganti penuh: field opsional yang tidak dikirim menjadi kosong). Field `file` opsional: diisi = PDF diganti (file lama dihapus setelah berhasil), tidak diisi = PDF tetap."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('terubah, PDF tetap', () => {",
+                  "  pm.expect(data.name).to.eql('Modul KPK dan FPB (revisi)');",
+                  "  pm.expect(data.file.name).to.eql('contoh_modul.pdf');",
+                  "  pm.expect(data.updated_by.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus modul (soft delete, bisa banyak)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{module_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/learning-modules",
+            "description": "Hapus 1-100 modul (soft delete; file PDF tetap disimpan). Semua ID harus ada, kalau tidak → 422 per `ids[i]` dan tidak ada yang terhapus."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('terhapus', () => pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('module_id')]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Modul pembelajaran (siswa)",
+      "description": "Modul untuk siswa: hanya modul PUBLISH di JENJANG akun siswa; yang di luar paket aktifnya tampil dengan `locked = true` (+ paket yang membukanya), membuka / mengunduhnya ditolak 403.\n\nSkenario dari seed (password `password123`): `siswa.basic` (SD Kelas 5, Basic: 15 dari 45 modul SD terbuka), `siswa.pro` (Pro: 30), `siswa.ultra` (Ultra: semua 45), `siswa.ultra.smp` (SMP Kelas 7, Ultra: hanya 12 modul SMP, modul SD tidak terlihat).",
+      "item": [
+        {
+          "name": "Login siswa.basic",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.basic\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List modul siswa (Basic: sebagian terkunci)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/learning-modules?page=1&per_page=100",
+            "description": "`data.access` = {education_level (jenjang akun), plan (paket aktif hari ini), module_feature, all_modules}. `data.modules[]`: id, name, description, placement, file {size_bytes, page_count, url (null kalau terkunci)}, locked, plans (paket yang membuka modul), opened {first_opened_at, last_opened_at, open_count} (null = belum pernah dibuka).\n\nUrut kurikulum (kelas → mapel → bidang materi → bab → nama). Query opsional: `search`, `grade_id`, `subject_id`, `subject_field_id`, `chapter_id`, `access` (`unlocked` / `locked`), `page`, `per_page` (maks 100)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "const unlocked = data.modules.filter(m => !m.locked);",
+                  "const locked = data.modules.filter(m => m.locked);",
+                  "pm.test('jenjang SD, paket Basic, sebagian terkunci', () => {",
+                  "  pm.expect(data.access.education_level.name).to.eql('SD');",
+                  "  pm.expect(data.access.plan.name).to.eql('Basic');",
+                  "  pm.expect(unlocked.length).to.be.above(0);",
+                  "  pm.expect(locked.length).to.be.above(0);",
+                  "  locked.forEach(m => pm.expect(m.file.url).to.eql(null));",
+                  "});",
+                  "pm.collectionVariables.set('student_module_id', unlocked[0].id);",
+                  "pm.collectionVariables.set('student_locked_module_id', locked[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buka modul (terbuka)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/learning-modules/{{student_module_id}}/open",
+            "description": "Cek jenjang & paket, catat riwayat buka (terakhir dibuka, jumlah buka), lalu kembalikan modul + `file.url` untuk membaca PDF. Jenjang lain / draf / tidak ada → 404; di luar paket → 403 (`data.plans` = paket yang membukanya)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('riwayat buka & link PDF', () => {",
+                  "  pm.expect(data.locked).to.eql(false);",
+                  "  pm.expect(data.opened.open_count).to.be.above(0);",
+                  "  pm.expect(data.file.url).to.include('/api/v1/student/learning-modules/' + data.id + '/file');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Baca PDF modul (siswa)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/student/learning-modules/{{student_module_id}}/file" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buka modul di luar paket (harus 403)",
+          "request": { "method": "POST", "header": [], "url": "{{base_url}}/api/v1/student/learning-modules/{{student_locked_module_id}}/open" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('pesan + paket yang membuka', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.include('tidak termasuk paket Basic');",
+                  "  pm.expect(body.data.plans.map(p => p.name)).to.not.include('Basic');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login siswa.ultra.smp",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.ultra.smp\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List modul siswa (Ultra SMP: semua terbuka, hanya SMP)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/student/learning-modules?per_page=100" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Ultra: semua terbuka, hanya jenjang SMP', () => {",
+                  "  pm.expect(data.access.education_level.name).to.eql('SMP');",
+                  "  pm.expect(data.modules.length).to.be.above(0);",
+                  "  data.modules.forEach(m => { pm.expect(m.locked).to.eql(false); pm.expect(m.placement.education_level.name).to.eql('SMP'); });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Siswa SMP buka modul SD (harus 404)",
+          "request": { "method": "POST", "header": [], "url": "{{base_url}}/api/v1/student/learning-modules/{{student_module_id}}/open" },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('jenjang lain → 404', () => pm.response.to.have.status(404));"] }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Paket akses & akses siswa",
+      "description": "Paket akses (CRUD admin) dan pengaturan akses siswa di menu User: beri paket ke 1-100 siswa sekaligus (pembayaran offline dicatat admin, perpanjangan otomatis), batalkan paket, dan akses khusus per fitur. List & detail user (`GET /users`, `GET /users/:id`) menampilkan `access` untuk siswa (kolom Paket, Akses, Berlaku s/d) dan bisa difilter `plan_id` & `subscription` (active / expiring / none).\n\nFolder ini membuat 1 paket uji, memberikannya ke 2 siswa tanpa paket, lalu membatalkan & menghapusnya lagi (data dummy kembali seperti semula).",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List paket akses (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/subscription-plans",
+            "description": "Semua paket yang belum dihapus, urut `sort_order` lalu nama (tanpa pagination). Query opsional: `status` (active/inactive), `education_level_id` (paket jenjang itu + paket semua jenjang), `search` (nama).\n\nSetiap paket: id, name, description, highlights[], education_level (null = semua jenjang), monthly_coin, is_featured, prices {monthly, semester, yearly, strike_monthly} (null = periode tidak dijual), features {module, daily_quiz, uji_kom, tryout, rumath}, feature_labels, sort_order, status, active_students (kolom Pengguna), module_count, created_by, updated_by, created_at, updated_at.\n\nSiswa yang memanggil URL yang sama mendapat `{current: akses hari ini, plans: paket aktif untuk jenjangnya}` tanpa data admin."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const names = pm.response.json().data.map(p => p.name);",
+                  "pm.test('paket dummy Basic, Pro, Ultra ada', () => {",
+                  "  pm.expect(names).to.include.members(['Basic', 'Pro', 'Ultra']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah paket (validasi gagal)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Paket Salah\",\n  \"price_monthly\": 100000,\n  \"strike_price_monthly\": 90000,\n  \"features\": {}\n}" },
+            "url": "{{base_url}}/api/v1/subscription-plans",
+            "description": "Semua kesalahan dikembalikan sekaligus (422): harga coret harus lebih mahal dari harga bulanan, minimal 1 fitur, minimal 1 harga periode, jenjang harus ada, nama unik."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "const fields = pm.response.json().errors.map(e => e.field);",
+                  "pm.test('error harga coret & fitur', () => pm.expect(fields).to.include.members(['strike_price_monthly', 'features']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah paket",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Paket Uji Postman {{$timestamp}}\",\n  \"description\": \"Paket contoh dari Postman\",\n  \"highlights\": [\"Modul ringkasan\", \"Daily Quiz\"],\n  \"education_level_id\": null,\n  \"monthly_coin\": 0,\n  \"is_featured\": false,\n  \"price_monthly\": 120000,\n  \"price_semester\": 650000,\n  \"price_yearly\": null,\n  \"strike_price_monthly\": 150000,\n  \"features\": {\"module\": true, \"daily_quiz\": true, \"uji_kom\": false, \"tryout\": false, \"rumath\": false},\n  \"sort_order\": 99,\n  \"status\": \"active\"\n}" },
+            "url": "{{base_url}}/api/v1/subscription-plans",
+            "description": "Body:\n- `name` (wajib, unik), `description`, `highlights` (poin fitur, maks 20)\n- `education_level_id`: sasaran jenjang; null = semua jenjang\n- `monthly_coin`: bonus coin tiap bulan (bulan pertama langsung masuk saat paket diberikan admin)\n- `is_featured`: label Unggulan / Paling banyak dipilih\n- `price_monthly`, `price_semester`, `price_yearly`: rupiah, null = tidak dijual (minimal 1 diisi); `strike_price_monthly`: harga coret bulanan\n- `features` (wajib): module, daily_quiz, uji_kom, tryout, rumath\n- `sort_order` (default 0), `status` (active/inactive, default active)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('fitur & harga tersimpan', () => {",
+                  "  pm.expect(data.feature_labels).to.eql(['Modul', 'Daily Quiz']);",
+                  "  pm.expect(data.prices.semester).to.eql(650000);",
+                  "  pm.expect(data.prices.yearly).to.eql(null);",
+                  "});",
+                  "pm.collectionVariables.set('pa_plan_id', data.id);",
+                  "pm.collectionVariables.set('pa_plan_name', data.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail paket",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/subscription-plans/{{pa_plan_id}}" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('belum ada pengguna', () => pm.expect(pm.response.json().data.active_students).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah paket (ganti penuh)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{pa_plan_name}}\",\n  \"description\": \"Paket contoh dari Postman (diubah)\",\n  \"highlights\": [\"Modul ringkasan\", \"Daily Quiz & Uji Kom\"],\n  \"education_level_id\": null,\n  \"monthly_coin\": 0,\n  \"is_featured\": true,\n  \"price_monthly\": 125000,\n  \"price_semester\": 650000,\n  \"price_yearly\": null,\n  \"strike_price_monthly\": 150000,\n  \"features\": {\"module\": true, \"daily_quiz\": true, \"uji_kom\": true, \"tryout\": false, \"rumath\": false},\n  \"sort_order\": 99,\n  \"status\": \"active\"\n}" },
+            "url": "{{base_url}}/api/v1/subscription-plans/{{pa_plan_id}}",
+            "description": "Ganti penuh (body sama dengan tambah). Fitur baru langsung berlaku untuk siswa yang paketnya aktif; harga baru hanya untuk pemberian / pembelian berikutnya. Sasaran jenjang tidak bisa diubah kalau masih dipakai siswa jenjang lain."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('fitur & pengubah tercatat', () => {",
+                  "  pm.expect(data.features.uji_kom).to.eql(true);",
+                  "  pm.expect(data.is_featured).to.eql(true);",
+                  "  pm.expect(data.updated_by).to.not.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List user siswa tanpa paket aktif",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/users?role=student&subscription=none&page=1&per_page=2",
+            "description": "Filter paket akses di list user (hasilnya hanya siswa): `plan_id` (paket aktif hari ini), `subscription` = `active` (punya paket aktif), `expiring` (paket aktif berakhir ≤ 7 hari lagi), `none` (tanpa paket aktif).\n\nSetiap siswa punya `access`: plan (null = tidak ada paket aktif), subscription_id, start_date, end_date (Berlaku s/d), days_left, features (akses akhir), feature_labels (kolom Akses), overrides (akses khusus). Role lain: `access` = null."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('2 siswa tanpa paket aktif', () => {",
+                  "  pm.expect(data.length).to.eql(2);",
+                  "  data.forEach(u => pm.expect(u.access.plan).to.eql(null));",
+                  "});",
+                  "pm.collectionVariables.set('pa_student_id', data[0].id);",
+                  "pm.collectionVariables.set('pa_student2_id', data[1].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Beri paket ke banyak siswa",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plan_id\": \"{{pa_plan_id}}\",\n  \"student_ids\": [\"{{pa_student_id}}\", \"{{pa_student2_id}}\"],\n  \"period\": \"monthly\",\n  \"start_date\": null,\n  \"price_paid\": null,\n  \"notes\": \"Bayar tunai di cabang\",\n  \"request_id\": \"{{pa_request_id}}\"\n}" },
+            "url": "{{base_url}}/api/v1/student-subscriptions",
+            "description": "Beri 1 paket aktif ke 1-100 siswa sekaligus (dicatat sebagai pembayaran offline oleh admin). Semua atau tidak sama sekali: paket nonaktif, periode tidak dijual, siswa tidak ada, atau jenjang siswa tidak cocok dengan sasaran paket → 422 per field.\n\n- `period`: monthly / semester / yearly\n- `start_date` (opsional): null = otomatis hari ini, atau sehari setelah paket terakhir siswa berakhir (perpanjangan). Tanggal berakhir = mulai + 1/6/12 bulan - 1 hari.\n- `price_paid` (opsional): null = harga paket periode itu\n- `request_id` (disarankan): UUID baru setiap klik simpan; request sama terkirim 2x → 409\n\nKalau paket punya `monthly_coin`, bonus coin bulan pertama langsung masuk (riwayat coin: Bonus paket)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.collectionVariables.set('pa_request_id', pm.variables.replaceIn('{{$guid}}'));"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('2 siswa, paket aktif hari ini', () => {",
+                  "  pm.expect(data.students.length).to.eql(2);",
+                  "  pm.expect(data.total_price).to.eql(250000);",
+                  "  data.students.forEach(s => pm.expect(s.status).to.eql('active'));",
+                  "});",
+                  "pm.collectionVariables.set('pa_subscription_id', data.students[0].subscription_id);",
+                  "pm.collectionVariables.set('pa_subscription2_id', data.students[1].subscription_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Beri paket terkirim 2x (harus 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plan_id\": \"{{pa_plan_id}}\",\n  \"student_ids\": [\"{{pa_student_id}}\", \"{{pa_student2_id}}\"],\n  \"period\": \"monthly\",\n  \"request_id\": \"{{pa_request_id}}\"\n}" },
+            "url": "{{base_url}}/api/v1/student-subscriptions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('request_id sama → 409', () => pm.response.to.have.status(409));"] }
+            }
+          ]
+        },
+        {
+          "name": "List user filter paket",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/users?plan_id={{pa_plan_id}}" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('2 siswa dengan kolom akses', () => {",
+                  "  pm.expect(data.length).to.eql(2);",
+                  "  data.forEach(u => {",
+                  "    pm.expect(u.access.plan.id).to.eql(pm.collectionVariables.get('pa_plan_id'));",
+                  "    pm.expect(u.access.feature_labels).to.eql(['Modul', 'Daily Quiz', 'Uji Kom']);",
+                  "    pm.expect(u.access.end_date).to.be.a('string');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Akses khusus (buka RUMATH)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"student_ids\": [\"{{pa_student_id}}\", \"{{pa_student2_id}}\"],\n  \"features\": {\"rumath\": true, \"uji_kom\": false}\n}" },
+            "url": "{{base_url}}/api/v1/student-access-overrides",
+            "description": "Akses khusus 1-100 siswa sekaligus, menimpa aturan paket: `true` = dibuka walau tidak ada di paket, `false` = ditutup walau ada di paket, `null` = hapus akses khusus (kembali ikut paket). Fitur yang tidak dikirim tidak berubah. Fitur: module, daily_quiz, uji_kom, tryout, rumath.\n\nResponse: akses terbaru setiap siswa (urut request)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('RUMATH terbuka, Uji Kom ditutup', () => {",
+                  "  data.forEach(s => {",
+                  "    pm.expect(s.access.features.rumath).to.eql(true);",
+                  "    pm.expect(s.access.features.uji_kom).to.eql(false);",
+                  "    pm.expect(s.access.overrides).to.eql({ rumath: true, uji_kom: false });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail akses siswa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/students/{{pa_student_id}}/access",
+            "description": "Untuk form edit akses di menu User: `student` (id, name, student_code, coin_balance), `access` (akses hari ini), `features[]` per fitur {feature, label, from_plan, override (null = ikut paket), enabled}, `subscriptions[]` riwayat paket terbaru dulu {id, plan, channel, period, price_paid, start_date, end_date, status (active / upcoming / expired / cancelled), cancelled_at, cancelled_by, notes, created_by, created_at}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "const rumath = data.features.find(f => f.feature === 'rumath');",
+                  "pm.test('rincian fitur & riwayat paket', () => {",
+                  "  pm.expect(rumath.from_plan).to.eql(false);",
+                  "  pm.expect(rumath.override).to.eql(true);",
+                  "  pm.expect(rumath.enabled).to.eql(true);",
+                  "  pm.expect(data.subscriptions[0].id).to.eql(pm.collectionVariables.get('pa_subscription_id'));",
+                  "  pm.expect(data.subscriptions[0].status).to.eql('active');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus akses khusus (kembali ikut paket)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"student_ids\": [\"{{pa_student_id}}\", \"{{pa_student2_id}}\"],\n  \"features\": {\"rumath\": null, \"uji_kom\": null}\n}" },
+            "url": "{{base_url}}/api/v1/student-access-overrides"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('tanpa akses khusus', () => pm.response.json().data.forEach(s => pm.expect(s.access.overrides).to.eql({})));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus paket yang masih dipakai (harus 422)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{pa_plan_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/subscription-plans",
+            "description": "Paket tidak bisa dihapus kalau masih dipakai siswa (aktif / belum mulai) atau menjadi satu-satunya paket sebuah modul pembelajaran. Nonaktifkan paket supaya tidak dijual lagi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('pesan masih dipakai', () => pm.expect(pm.response.json().errors[0].message).to.include('masih dipakai 2 siswa'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batalkan paket siswa 1",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Contoh dari Postman\"\n}" },
+            "url": "{{base_url}}/api/v1/student-subscriptions/{{pa_subscription_id}}/cancel",
+            "description": "Batalkan 1 paket siswa yang aktif atau belum mulai (body opsional `reason`, masuk ke catatan). Akses siswa langsung mengikuti. Paket yang sudah lewat tidak bisa dibatalkan (422); sudah dibatalkan → 409. Coin bonus yang sudah masuk tidak ditarik."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('status cancelled', () => {",
+                  "  pm.expect(data.status).to.eql('cancelled');",
+                  "  pm.expect(data.notes).to.include('Dibatalkan admin: Contoh dari Postman');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batalkan paket siswa 2",
+          "request": { "method": "POST", "header": [], "url": "{{base_url}}/api/v1/student-subscriptions/{{pa_subscription2_id}}/cancel" },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Batalkan lagi (harus 409)",
+          "request": { "method": "POST", "header": [], "url": "{{base_url}}/api/v1/student-subscriptions/{{pa_subscription_id}}/cancel" },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('sudah dibatalkan → 409', () => pm.response.to.have.status(409));"] }
+            }
+          ]
+        },
+        {
+          "name": "Hapus paket (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{pa_plan_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/subscription-plans",
+            "description": "Hapus 1-100 paket sekaligus (soft delete, semua atau tidak sama sekali). Riwayat paket siswa tetap utuh; hubungan paket ke modul pembelajaran ikut dihapus."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('terhapus', () => pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('pa_plan_id')]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login siswa.basic",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.basic\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paket akses untuk siswa (Paket & Coin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/subscription-plans",
+            "description": "Siswa: `current` = akses hari ini (paket aktif, berlaku s/d, sisa hari, fitur), `plans` = paket AKTIF untuk jenjangnya + paket semua jenjang, tanpa data admin (status, pengguna, pembuat)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('paket aktif Basic & daftar paket', () => {",
+                  "  pm.expect(data.current.plan.name).to.eql('Basic');",
+                  "  pm.expect(data.current.days_left).to.be.above(0);",
+                  "  pm.expect(data.plans.map(p => p.name)).to.include.members(['Basic', 'Pro', 'Ultra']);",
+                  "  data.plans.forEach(p => pm.expect(p.status).to.eql(undefined));",
+                  "  data.plans.forEach(p => pm.expect(p.education_level === null || p.education_level.name === 'SD').to.eql(true));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin (kembali)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "Kembali memakai akun admin untuk folder berikutnya."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
                 ]
               }
             }

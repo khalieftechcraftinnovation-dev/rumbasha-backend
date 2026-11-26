@@ -27,11 +27,13 @@ import (
 	dropdownhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/dropdown"
 	imagehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/image"
 	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/leaderboard"
+	learningmodulehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/learningmodule"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/question"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz"
 	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quizreport"
+	subscriptionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/subscription"
 	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
 	coinrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/coin"
@@ -40,6 +42,7 @@ import (
 	dropdownrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/dropdown"
 	imagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/image"
 	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/leaderboard"
+	learningmodulerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/learningmodule"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/question"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz"
@@ -52,6 +55,7 @@ import (
 	dropdownservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/dropdown"
 	imageservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/image"
 	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/leaderboard"
+	learningmoduleservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/learningmodule"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/logreport"
 	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/question"
@@ -146,9 +150,11 @@ func setupApp(t *testing.T) testApp {
 		DailyQuiz:       dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db))),
 		Leaderboard:     leaderboardhandler.NewLeaderboardHandler(leaderboardservice.NewLeaderboardService(leaderboardrepo.NewLeaderboardRepository(db))),
 		Coin:            coinhandler.NewCoinHandler(coinservice.NewCoinService(coinrepo.NewCoinRepository(db))),
-		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db))),
+		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db), subscriptionService)),
 		QuizReport:      quizreporthandler.NewQuizReportHandler(quizreportservice.NewQuizReportService(quizreportrepo.NewQuizReportRepository(db))),
 		DailyQuizReport: dailyquizreporthandler.NewDailyQuizReportHandler(dailyquizreportservice.NewDailyQuizReportService(dailyquizreportrepo.NewDailyQuizReportRepository(db))),
+		LearningModule:  learningmodulehandler.NewLearningModuleHandler(learningmoduleservice.NewLearningModuleService(learningmodulerepo.NewLearningModuleRepository(db), store, subscriptionService)),
+		Subscription:    subscriptionhandler.NewSubscriptionHandler(subscriptionService),
 	}, testJWTSecret, apiLog, storageDir)
 
 	return testApp{Router: r, DB: db, APILog: apiLog, LogDir: logDir, Mail: mail, StorageDir: storageDir}
