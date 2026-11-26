@@ -88,6 +88,8 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			quiz_attempts,
 			quiz_questions,
 			quizzes,
+			rumath_questions,
+			rumath_sessions,
 			questions,
 			trial_quiz_attempts,
 			trial_quiz_questions,

@@ -6,11 +6,13 @@
 //	router/auth/login/...               → /auth/...
 //	router/quiz/quiz/...                → /quizzes/...
 //	router/quiz/question/...            → /questions/...
+//	router/quiz/rumath/...              → /rumath/...
 //	router/master/image/...             → /images/...
 //	router/site/landingpage/...         → /landing-pages/..., /public/landing-pages/...
 //	router/quiz/trialquiz/...            → /trial-quiz/..., /public/trial-quiz/...
 //	router/notification/announcement/... → /announcements/..., /student/notifications/...
 //	router/admin/task/...               → /tasks/...
+//	router/admin/dashboard/...           → /admin/dashboard/...
 package router
 
 import (
@@ -21,6 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	dashboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/dashboard"
 	taskhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/task"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/login"
 	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/passwordreset"
@@ -35,6 +38,7 @@ import (
 	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/leaderboard"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/question"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/quiz"
+	rumathhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/rumath"
 	trialquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/trialquiz"
 	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/dailyquizreport"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/logreport"
@@ -44,6 +48,7 @@ import (
 	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
+	dashboardrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/admin/dashboard"
 	taskrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/admin/task"
 	loginrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/auth/login"
 	passwordresetrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/auth/passwordreset"
@@ -58,6 +63,7 @@ import (
 	leaderboardrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/leaderboard"
 	questionrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/question"
 	quizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/quiz"
+	rumathrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/rumath"
 	trialquizrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/quiz/trialquiz"
 	dailyquizreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/report/dailyquizreport"
 	logreportrouter "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router/report/logreport"
@@ -71,6 +77,7 @@ import (
 // Handlers berisi semua handler aplikasi.
 // Setiap ada fitur baru, tambahkan field-nya di sini.
 type Handlers struct {
+	Dashboard       *dashboardhandler.DashboardHandler
 	Announcement    *announcementhandler.AnnouncementHandler
 	Task            *taskhandler.TaskHandler
 	Login           *loginhandler.LoginHandler
@@ -81,6 +88,7 @@ type Handlers struct {
 	Quiz            *quizhandler.QuizHandler
 	DailyQuiz       *dailyquizhandler.DailyQuizHandler
 	Leaderboard     *leaderboardhandler.LeaderboardHandler
+	Rumath          *rumathhandler.RumathHandler
 	Coin            *coinhandler.CoinHandler
 	User            *userhandler.UserHandler
 	QuizReport      *quizreporthandler.QuizReportHandler
@@ -142,6 +150,7 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	private := r.Group("/api/v1", middleware.RequireAuth(jwtSecret))
 
 	// Daftarkan route setiap fitur. Tambahkan baris baru setiap ada fitur baru.
+	dashboardrouter.Register(private, h.Dashboard)
 	announcementrouter.Register(private, h.Announcement)
 	taskrouter.Register(private, h.Task)
 	loginrouter.Register(public, private, h.Login)
@@ -151,6 +160,7 @@ func New(h Handlers, jwtSecret string, apiLog *apilog.Writer, storageDir string)
 	dropdownrouter.Register(private, h.Dropdown)
 	quizrouter.Register(private, h.Quiz)
 	dailyquizrouter.Register(private, h.DailyQuiz)
+	rumathrouter.Register(private, h.Rumath)
 	leaderboardrouter.Register(private, h.Leaderboard)
 	coinrouter.Register(private, h.Coin)
 	userrouter.Register(private, h.User)

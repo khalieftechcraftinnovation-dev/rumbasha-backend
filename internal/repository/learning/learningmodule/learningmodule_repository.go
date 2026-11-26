@@ -67,12 +67,12 @@ func (r *LearningModuleRepository) Create(ctx context.Context, m learningmodulem
 		err := tx.Raw(`
 			INSERT INTO learning_modules (name, description,
 				education_level_id, grade_id, subject_id, subject_field_id, chapter_id, subchapter_id, topic_id,
-				file_name, storage_path, mime_type, size_bytes, page_count, status, created_by)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				file_name, storage_path, mime_type, size_bytes, page_count, status, created_by, published_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'published' THEN NOW() END)
 			RETURNING id`,
 			m.Name, m.Description,
 			m.EducationLevelID, m.GradeID, m.SubjectID, m.SubjectFieldID, m.ChapterID, m.SubchapterID, m.TopicID,
-			m.File.FileName, m.File.StoragePath, m.File.MimeType, m.File.SizeBytes, m.PageCount, m.Status, createdBy).
+			m.File.FileName, m.File.StoragePath, m.File.MimeType, m.File.SizeBytes, m.PageCount, m.Status, createdBy, m.Status).
 			Scan(&id).Error
 		if err != nil {
 			return err
@@ -98,9 +98,14 @@ func (r *LearningModuleRepository) Update(ctx context.Context, m learningmodulem
 
 		sets := `name = ?, description = ?,
 			education_level_id = ?, grade_id = ?, subject_id = ?, subject_field_id = ?,
-			chapter_id = ?, subchapter_id = ?, topic_id = ?, status = ?, updated_by = ?, updated_at = NOW()`
+			chapter_id = ?, subchapter_id = ?, topic_id = ?, status = ?, updated_by = ?, updated_at = NOW(),
+			published_at = CASE
+				WHEN status = 'draft' AND ? = 'published' THEN NOW()
+				WHEN ? = 'draft' THEN NULL
+				ELSE published_at
+			END`
 		args := []any{m.Name, m.Description, m.EducationLevelID, m.GradeID, m.SubjectID, m.SubjectFieldID,
-			m.ChapterID, m.SubchapterID, m.TopicID, m.Status, updatedBy}
+			m.ChapterID, m.SubchapterID, m.TopicID, m.Status, updatedBy, m.Status, m.Status}
 		// page_count: diisi → diganti; kosong + PDF baru → hasil hitung PDF (bisa NULL); kosong tanpa PDF → tetap.
 		if m.PageCount != nil || m.File != nil {
 			sets += `, page_count = ?`

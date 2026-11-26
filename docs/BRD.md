@@ -4,7 +4,7 @@
 
 **Project:** Rumbasha E-Learning Platform  
 **Client:** PT Rumbasha Menggapai Asa  
-**Document Version:** 1.6
+**Document Version:** 1.7
 **Date:** 26 November 2026
 **Backend:** Go (Gin Framework)  
 **Frontend:** React  
@@ -23,6 +23,9 @@
 | 1.4       | 26 November 2026 | Menyelaraskan struktur layer backend per domain/fitur, mencatat cakupan endpoint yang sudah ada dan daftar fitur BRD yang belum memiliki route/modul backend. |
 | 1.5       | 26 November 2026 | Memperbarui Task Management sesuai implementasi: satu task bersama untuk semua Admin, status global, dan audit pengubah serta waktu perubahan status. |
 | 1.6       | 26 November 2026 | Menetapkan Notifikasi sebagai pengumuman teks web untuk siswa, dengan target kelas, status baca per siswa, serta draft/publikasi terjadwal; bukan push notification Firebase. |
+| 1.7       | 26 November 2026 | Menambahkan API ringkasan Admin Dashboard dan tren Daily Quiz, termasuk definisi periode, cakupan completion quiz, statistik konten, dan optimasi indeks database. |
+| 1.8       | 26 November 2026 | Menambahkan API pencarian global Admin Dashboard untuk user, soal, materi, dan quiz, dengan batas hasil dan indeks pencarian. |
+| 1.9       | 26 November 2026 | Menambahkan API pembuatan sesi RUMATH dengan challenge hitung cepat/bersusun, operasi penjumlahan/pengurangan, penyimpanan 10 soal, dan aturan level. |
 
 Catatan v1.2: perubahan v1.2 ditandai sebagai tracked changes (perubahan v1.1 sudah diterima). Hal yang diambil dari desain tetapi belum pasti dicatat di Bagian 15 (Business Decisions Pending).
 
@@ -936,6 +939,13 @@ Tingkat kesulitan:
 
 - Level 3: bilangan 100-1.000 (sebelumnya Hundreds / ratusan).
 
+Implementasi awal API interaktif RUMATH:
+
+- `POST /api/v1/rumath/sessions` hanya untuk siswa yang memiliki akses fitur RUMATH aktif dari paket atau override Admin.
+- Request memilih `challenge_type` (`hitung_cepat` atau `hitung_bersusun`), `operation` (`+` atau `-`), dan `level` (`mudah`, `sedang`, `sulit`).
+- Sistem menyimpan satu sesi dan selalu menghasilkan 10 soal unik. Level menggunakan rentang BRD: 1-10, 10-100, dan 100-1.000; hasil pengurangan tidak negatif.
+- Respons memuat operand dan jawaban setiap soal. Frontend dapat menyusun tampilan mendatar atau bersusun berdasarkan `challenge_type`.
+
 #### 3.7.3 Functional Requirements
 
 - FR-MATH-001: Student dapat membuka fitur RUMATH.
@@ -1302,6 +1312,19 @@ Menampilkan:
 
 - Pintasan "Buat kode akses" dan "Tambah soal", serta pencarian global (user, soal, materi, quiz).
 
+Backend Admin Dashboard:
+
+- `GET /api/v1/admin/dashboard/summary` mengembalikan statistik user, Bank Soal, Materi PDF, penyelesaian quiz, task, aktivitas task terbaru, dan Uji Kom hari ini dalam satu respons.
+- Statistik user menghitung akun yang belum dihapus dengan role Siswa, Tutor, dan Admin (Super Admin tidak masuk total); pertumbuhan bulanan membandingkan akun baru bulan ini dengan bulan sebelumnya.
+- Statistik Bank Soal menghitung semua soal yang belum dihapus, soal baru sejak Senin minggu ini (WIB), dan rincian jenjang SD/SMP.
+- Statistik Materi PDF menghitung semua modul yang belum dihapus, jumlah yang berstatus published, publikasi baru minggu ini, dan rincian jenjang SD/SMP. `published_at` dicatat ketika modul pertama kali dipublish atau dipublish kembali setelah menjadi draft; untuk data lama tanpa timestamp ini, tanggal pembuatan dipakai sebagai perkiraan.
+- Completion quiz untuk 30 hari kalender terakhir dihitung dari pasangan siswa aktif × quiz Uji Kom/Tryout published yang mulai dalam periode dan menargetkan kelas siswa saat ini. Pasangan selesai jika attempt sudah disubmit.
+- Ringkasan task mempertahankan model satu task bersama dengan status global. Aktivitas terbaru menampilkan pembaruan status terakhir per task, bukan riwayat setiap perubahan; kategori, prioritas, dan deadline tidak termasuk dalam model task.
+- Hitungan Uji Kom hari ini memakai quiz published yang jadwalnya bersinggungan dengan tanggal hari ini di WIB.
+- `GET /api/v1/admin/dashboard/daily-quiz-trend?period=12w|30d|7d` mengembalikan rata-rata nilai Daily Quiz per jenjang SD/SMP; bucket 12w per minggu dan 30d/7d per hari. Periode default adalah 12w.
+- `GET /api/v1/admin/dashboard/search?q={query}` mencari user, soal, materi PDF, dan quiz secara bersamaan. Query wajib 3-100 karakter setelah spasi awal/akhir dihapus; hasil dibatasi maksimal 5 per kategori dan hanya mencakup data yang belum dihapus.
+- Statistik dihitung melalui agregasi database dan indeks terarah; daftar task/aktivitas dibatasi masing-masing lima item.
+
 ### 3.12 Peringkat (Leaderboard)
 
 Peringkat menampilkan urutan student berdasarkan poin.
@@ -1594,7 +1617,7 @@ Features below remain in this BRD and do not yet have a dedicated backend route/
 
 - **RUMATH** (3.7 and RUMATH reporting in 3.18): automatic exercises, question/video management, student progress, and reporting.
 - **Learning Progress** (3.10): progress dashboard, streak/target, recommendations, tutor/admin progress views, and learning-history PDF export. Learning-module open tracking exists, but does not implement this whole feature.
-- **Dashboard** (3.11 and 3.15): consolidated student/admin home dashboards beyond the quiz announcement, upcoming quiz, and quiz-statistics endpoints.
+- **Dashboard** (3.11 and 3.15): Admin Dashboard summary and Daily Quiz trend endpoints now exist; the consolidated Student Dashboard and other dashboard capabilities not listed in 3.11 remain incomplete.
 - **Search & help** (FR-SRC-001, FR-SRC-002, FR-HLP-001, 3.14): global/local learning search and student help/feedback or tutor-contact workflow.
 
 This status is based on registered routes and their feature packages; detailed FR-by-FR acceptance, including incomplete behavior inside implemented feature groups, must still be verified separately.

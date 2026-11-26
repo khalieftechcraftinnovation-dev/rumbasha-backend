@@ -1,0 +1,11 @@
+DROP INDEX IF EXISTS admin_tasks_dashboard_activity_idx;
+DROP INDEX IF EXISTS admin_tasks_dashboard_pending_idx;
+DROP INDEX IF EXISTS daily_quizzes_dashboard_trend_idx;
+DROP INDEX IF EXISTS quizzes_name_trgm_idx;
+DROP INDEX IF EXISTS quizzes_dashboard_schedule_idx;
+DROP INDEX IF EXISTS learning_modules_published_dashboard_idx;
+DROP INDEX IF EXISTS learning_modules_dashboard_metrics_idx;
+DROP INDEX IF EXISTS questions_dashboard_metrics_idx;
+DROP INDEX IF EXISTS users_active_student_grade_idx;
+DROP INDEX IF EXISTS users_dashboard_metrics_idx;
+ALTER TABLE learning_modules DROP COLUMN IF EXISTS published_at;

@@ -21,6 +21,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/apilog"
+	dashboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/dashboard"
 	taskhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/task"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/login"
 	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/passwordreset"
@@ -35,6 +36,7 @@ import (
 	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/leaderboard"
 	questionhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/question"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/quiz"
+	rumathhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/rumath"
 	trialquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/trialquiz"
 	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/dailyquizreport"
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/logreport"
@@ -43,6 +45,7 @@ import (
 	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/profile"
 	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/user"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
+	dashboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/admin/dashboard"
 	taskrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/admin/task"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/auth/login"
 	passwordresetrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/auth/passwordreset"
@@ -57,12 +60,14 @@ import (
 	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/leaderboard"
 	questionrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/question"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/quiz"
+	rumathrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/rumath"
 	trialquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/trialquiz"
 	dailyquizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/report/dailyquizreport"
 	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/report/quizreport"
 	landingpagerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/site/landingpage"
 	profilerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user/profile"
 	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user/user"
+	dashboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/admin/dashboard"
 	taskservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/admin/task"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/auth/login"
 	passwordresetservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/auth/passwordreset"
@@ -77,6 +82,7 @@ import (
 	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/leaderboard"
 	questionservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/question"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/quiz"
+	rumathservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/rumath"
 	trialquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/trialquiz"
 	dailyquizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/dailyquizreport"
 	logreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/logreport"
@@ -162,6 +168,7 @@ func setupApp(t *testing.T) testApp {
 	store := storage.NewLocal(storageDir, testAppURL)
 
 	r := New(Handlers{
+		Dashboard:       dashboardhandler.NewDashboardHandler(dashboardservice.NewDashboardService(dashboardrepo.NewDashboardRepository(db))),
 		Announcement:    announcementhandler.NewAnnouncementHandler(announcementservice.NewAnnouncementService(announcementrepo.NewAnnouncementRepository(db))),
 		Task:            taskhandler.NewTaskHandler(taskservice.NewTaskService(taskrepo.NewTaskRepository(db))),
 		Login:           loginhandler.NewLoginHandler(loginService, subscriptionService),
@@ -171,6 +178,7 @@ func setupApp(t *testing.T) testApp {
 		Dropdown:        dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
 		Quiz:            quizhandler.NewQuizHandler(quizservice.NewQuizService(quizrepo.NewQuizRepository(db), questionrepo.NewQuestionRepository(db))),
 		DailyQuiz:       dailyquizhandler.NewDailyQuizHandler(dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db))),
+		Rumath:          rumathhandler.NewRumathHandler(rumathservice.NewRumathService(rumathrepo.NewRumathRepository(db), subscriptionService)),
 		Leaderboard:     leaderboardhandler.NewLeaderboardHandler(leaderboardservice.NewLeaderboardService(leaderboardrepo.NewLeaderboardRepository(db))),
 		Coin:            coinhandler.NewCoinHandler(coinservice.NewCoinService(coinrepo.NewCoinRepository(db))),
 		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db), subscriptionService)),

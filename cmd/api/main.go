@@ -18,18 +18,21 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/router"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scheduler"
 
+	dashboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/dashboard"
 	taskhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/admin/task"
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/login"
 	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/auth/passwordreset"
 	masterdatahandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/master/masterdata"
 	announcementhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/notification/announcement"
 	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/profile"
+	dashboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/admin/dashboard"
 	taskrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/admin/task"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/auth/login"
 	passwordresetrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/auth/passwordreset"
 	masterdatarepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/master/masterdata"
 	announcementrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/notification/announcement"
 	profilerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user/profile"
+	dashboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/admin/dashboard"
 	taskservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/admin/task"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/auth/login"
 	passwordresetservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/auth/passwordreset"
@@ -49,6 +52,7 @@ import (
 	dailyquizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/dailyquiz"
 	leaderboardhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/leaderboard"
 	quizhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/quiz"
+	rumathhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/quiz/rumath"
 	dailyquizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/dailyquizreport"
 	quizreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/report/quizreport"
 	userhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/user/user"
@@ -59,6 +63,7 @@ import (
 	dailyquizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/dailyquiz"
 	leaderboardrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/leaderboard"
 	quizrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/quiz"
+	rumathrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/quiz/rumath"
 	dailyquizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/report/dailyquizreport"
 	quizreportrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/report/quizreport"
 	userrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/user/user"
@@ -69,6 +74,7 @@ import (
 	dailyquizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/dailyquiz"
 	leaderboardservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/leaderboard"
 	quizservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/quiz"
+	rumathservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quiz/rumath"
 	dailyquizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/dailyquizreport"
 	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/report/quizreport"
 	userservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/user/user"
@@ -147,6 +153,9 @@ func main() {
 	// Fitur: Daily Quiz. Service juga dipakai scheduler (hadiah juara bulanan per kelas).
 	dailyQuizService := dailyquizservice.NewDailyQuizService(dailyquizrepo.NewDailyQuizRepository(db), questionrepo.NewQuestionRepository(db))
 
+	// Fitur: RUMATH (sesi hitung cepat dan hitung bersusun).
+	rumathService := rumathservice.NewRumathService(rumathrepo.NewRumathRepository(db), subscriptionService)
+
 	// Scheduler (cron di dalam proses API):
 	//   - ganti kode akses quiz yang belum selesai: ACCESS_CODE_REFRESH_CRON (default setiap jam tepat, WIB)
 	//   - bagi hadiah coin juara quiz yang sudah selesai + juara bulanan Daily Quiz (hari terakhir bulan):
@@ -166,6 +175,7 @@ func main() {
 	defer apiLog.Close() // menulis sisa log di antrean sebelum aplikasi berhenti
 
 	r := router.New(router.Handlers{
+		Dashboard:       dashboardhandler.NewDashboardHandler(dashboardservice.NewDashboardService(dashboardrepo.NewDashboardRepository(db))),
 		Announcement:    announcementhandler.NewAnnouncementHandler(announcementservice.NewAnnouncementService(announcementrepo.NewAnnouncementRepository(db))),
 		Task:            taskhandler.NewTaskHandler(taskservice.NewTaskService(taskrepo.NewTaskRepository(db))),
 		Login:           loginHandler,
@@ -175,6 +185,7 @@ func main() {
 		Dropdown:        dropdownhandler.NewDropdownHandler(dropdownservice.NewDropdownService(dropdownrepo.NewDropdownRepository(db))),
 		Quiz:            quizhandler.NewQuizHandler(quizService),
 		DailyQuiz:       dailyquizhandler.NewDailyQuizHandler(dailyQuizService),
+		Rumath:          rumathhandler.NewRumathHandler(rumathService),
 		Leaderboard:     leaderboardhandler.NewLeaderboardHandler(leaderboardservice.NewLeaderboardService(leaderboardrepo.NewLeaderboardRepository(db))),
 		Coin:            coinhandler.NewCoinHandler(coinservice.NewCoinService(coinrepo.NewCoinRepository(db))),
 		User:            userhandler.NewUserHandler(userservice.NewUserService(userrepo.NewUserRepository(db), subscriptionService)),
