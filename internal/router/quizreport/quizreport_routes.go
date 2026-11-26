@@ -17,6 +17,12 @@ import (
 func Register(private *gin.RouterGroup, h *quizreporthandler.QuizReportHandler) {
 	staff := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin, loginmodel.RoleTutor)
 
+	adminOnly := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin)
+
+	private.GET("/quiz-reports/overview", staff, h.Overview) // kartu ringkasan + grafik per tab (Daily Quiz / Uji Kom / Tryout)
+	private.GET("/quiz-report-settings", staff, h.GetSettings)
+	private.PUT("/quiz-report-settings", adminOnly, h.UpdateSettings) // ambang soal sering salah & rentang default
+
 	private.GET("/quiz-reports", staff, h.List)                    // ringkasan per event
 	private.GET("/quiz-reports/:id", staff, h.Detail)              // peserta urut peringkat
 	private.GET("/quiz-reports/:id/questions", staff, h.Questions) // soal paling sering salah dulu

@@ -87,3 +87,34 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string, at 
 		Where("id = ?", userID).
 		UpdateColumn("last_login_at", at).Error
 }
+
+// FindPasswordHash mengambil hash kata sandi user yang belum dihapus. Tidak ada → ErrUserNotFound.
+func (r *UserRepository) FindPasswordHash(ctx context.Context, userID string) (string, error) {
+	var hashes []string
+	err := r.db.WithContext(ctx).Raw(`SELECT password_hash FROM users WHERE id = ? AND deleted_at IS NULL`, userID).Scan(&hashes).Error
+	if err != nil {
+		return "", err
+	}
+	if len(hashes) == 0 {
+		return "", loginmodel.ErrUserNotFound
+	}
+	return hashes[0], nil
+}
+
+// UpdateOwnPassword mengganti kata sandi user sendiri dan menyelesaikan permintaan lupa kata sandi
+// yang masih menunggu (user ternyata sudah bisa masuk), dalam 1 transaksi. [Native SQL, 2 query]
+func (r *UserRepository) UpdateOwnPassword(ctx context.Context, userID, passwordHash string, now time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Exec(`UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`, passwordHash, now, userID)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return loginmodel.ErrUserNotFound
+		}
+		return tx.Exec(`
+			UPDATE password_reset_requests
+			SET status = 'resolved', resolved_at = ?, resolved_by = ?, resolution_note = 'Kata sandi diubah sendiri oleh user'
+			WHERE user_id = ? AND status = 'pending'`, now, userID, userID).Error
+	})
+}

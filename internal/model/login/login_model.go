@@ -40,6 +40,7 @@ type User struct {
 	Phone            *string
 	ParentPhone      *string
 	SchoolOrigin     *string
+	AvatarURL        *string // foto profil (null = belum ada)
 	EducationLevelID *string
 	GradeID          *string
 	Status           string
@@ -83,19 +84,23 @@ func (u User) IsActive() bool {
 
 // RefreshToken mewakili satu baris di tabel "refresh_tokens" (satu sesi login).
 type RefreshToken struct {
-	ID        string
-	UserID    string
-	TokenHash string
-	UserAgent *string
-	ExpiresAt time.Time
-	RevokedAt *time.Time
-	CreatedAt time.Time
+	ID         string
+	UserID     string
+	TokenHash  string
+	UserAgent  *string
+	ExpiresAt  time.Time
+	RememberMe bool // login dengan "Ingat saya" (30 hari)
+	RevokedAt  *time.Time
+	CreatedAt  time.Time
 }
 
 // TableName memberi tahu GORM nama tabel untuk model ini.
 func (RefreshToken) TableName() string {
 	return "refresh_tokens"
 }
+
+// RememberMeDuration = lama sesi "Ingat saya": 30 hari sejak login, boleh melewati tanggal 1.
+const RememberMeDuration = 30 * 24 * time.Hour
 
 // Daftar error untuk login & sesi.
 var (
@@ -106,6 +111,10 @@ var (
 	ErrAccountEnded       = errors.New("masa aktif akun sudah berakhir")
 	ErrSessionExpired     = errors.New("sesi sudah berakhir")
 	ErrUserNotFound       = errors.New("user tidak ditemukan")
+	// ErrWrongPassword: kata sandi lama salah saat ubah kata sandi sendiri.
+	ErrWrongPassword = errors.New("kata sandi lama salah")
+	// ErrSamePassword: kata sandi baru sama dengan kata sandi lama.
+	ErrSamePassword = errors.New("kata sandi baru sama dengan yang lama")
 )
 
 // IsEnded bernilai true kalau tanggal berakhir akun (end_date) sudah lewat pada waktu now (WIB).

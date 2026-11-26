@@ -119,7 +119,53 @@ func (h *ImageHandler) handleError(c *gin.Context, err error) {
 		response.ErrorWithFields(c, http.StatusUnprocessableEntity, "Validasi gagal", fields)
 		return
 	}
+	if errors.Is(err, imagemodel.ErrImageNotFound) {
+		response.Error(c, http.StatusNotFound, "Gambar tidak ditemukan")
+		return
+	}
 
 	log.Printf("error tidak terduga di %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
 	response.Error(c, http.StatusInternalServerError, "Terjadi kesalahan pada server")
+}
+
+// List menangani GET /api/v1/images: galeri gambar (filter kategori & hierarki mapel, cari nama /
+// nama file, urutan, 15 per halaman).
+func (h *ImageHandler) List(c *gin.Context) {
+	var q imagedto.ListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	items, f, total, err := h.imageService.List(c.Request.Context(), q)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.SuccessWithMeta(c, "Daftar gambar", imagedto.ToImageResponses(items),
+		response.Meta{Page: f.Page, PerPage: f.PerPage, Total: total})
+}
+
+// CategoryCounts menangani GET /api/v1/images/category-counts: jumlah gambar per kategori.
+func (h *ImageHandler) CategoryCounts(c *gin.Context) {
+	var q imagedto.ListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	counts, err := h.imageService.CategoryCounts(c.Request.Context(), q)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Jumlah gambar per kategori", imagedto.ToCategoryCountsResponse(counts))
+}
+
+// Get menangani GET /api/v1/images/:id.
+func (h *ImageHandler) Get(c *gin.Context) {
+	item, err := h.imageService.Get(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Detail gambar", imagedto.ToImageResponse(item))
 }

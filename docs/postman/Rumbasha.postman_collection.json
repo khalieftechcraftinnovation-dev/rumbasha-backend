@@ -53,6 +53,18 @@
     { "key": "module_id", "value": "" },
     { "key": "student_module_id", "value": "" },
     { "key": "student_locked_module_id", "value": "" },
+    { "key": "image_id", "value": "" },
+    { "key": "forgot_message", "value": "" },
+    { "key": "profile_original_json", "value": "{}" },
+    { "key": "profile_restore_body", "value": "{}" },
+    { "key": "parent_restore_body", "value": "{}" },
+    { "key": "reset_request_id", "value": "" },
+    { "key": "md_grade_id", "value": "" },
+    { "key": "md_subject_id", "value": "" },
+    { "key": "md_field_id", "value": "" },
+    { "key": "md_chapter_id", "value": "" },
+    { "key": "md_branch_id", "value": "" },
+    { "key": "md_branch_name", "value": "" },
     { "key": "pa_plan_id", "value": "" },
     { "key": "pa_plan_name", "value": "" },
     { "key": "pa_student_id", "value": "" },
@@ -232,6 +244,252 @@
                   "pm.test('status 401', () => pm.response.to.have.status(401));"
                 ]
               }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kata sandi & Ingat saya",
+      "description": "\"Ingat saya\" (sesi 30 hari), ubah kata sandi sendiri (semua role), dan lupa kata sandi yang diselesaikan admin (tanpa email/OTP).\n\nFolder ini memakai akun dummy `siswa.citra` dan selalu mengembalikan kata sandinya ke `password123` di akhir.",
+      "item": [
+        {
+          "name": "Masuk dengan Ingat saya (30 hari)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.citra\",\n  \"password\": \"password123\",\n  \"remember_me\": true\n}" },
+            "url": "{{base_url}}/api/v1/auth/login",
+            "description": "`remember_me: true` → sesi 30 hari sejak login (boleh melewati tanggal 1). `false` / tidak dikirim → berakhir tanggal 1 bulan berikutnya 00:00 WIB. Refresh tidak memperpanjang akhir sesi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('sesi ingat saya ±30 hari', () => {",
+                  "  pm.expect(data.remember_me).to.eql(true);",
+                  "  const days = (new Date(data.refresh_token_expires_at) - Date.now()) / 86400000;",
+                  "  pm.expect(days).to.be.within(29.9, 30.1);",
+                  "});",
+                  "pm.collectionVariables.set('access_token', data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah kata sandi (lama salah, harus 422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"current_password\": \"salahbanget\",\n  \"new_password\": \"sandiSementara123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/change-password"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error di current_password', () => pm.expect(pm.response.json().errors[0].field).to.eql('current_password'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah kata sandi sendiri",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"sandiSementara123\",\n  \"remember_me\": false\n}" },
+            "url": "{{base_url}}/api/v1/auth/change-password",
+            "description": "Semua role. `new_password` 8-72 karakter & berbeda dari yang lama. Berhasil: semua sesi lama dicabut, respons = sesi baru untuk perangkat ini (simpan token barunya)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('dapat sesi baru', () => pm.expect(data.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('access_token', data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kembalikan kata sandi (password123)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"current_password\": \"sandiSementara123\",\n  \"new_password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/change-password"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Lupa kata sandi (akun tidak ada)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"akun.tidak.ada\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/forgot-password",
+            "description": "Jawaban sama persis dengan akun yang ada (tidak bisa dipakai menebak akun); tidak ada yang dicatat."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('forgot_message', pm.response.json().message);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lupa kata sandi",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"siswa.citra\",\n  \"contact\": \"0812-0000-1111\",\n  \"note\": \"Lupa kata sandi setelah ganti HP\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/forgot-password",
+            "description": "Tanpa login. `identifier` = username, email, atau no HP akun; `contact` & `note` opsional. Permintaan masuk ke daftar admin (1 akun = 1 permintaan menunggu; kirim lagi = request_count bertambah)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('pesan sama dengan akun tidak ada', () => pm.expect(pm.response.json().message).to.eql(pm.collectionVariables.get('forgot_message')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Masuk sebagai admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Daftar permintaan lupa kata sandi (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/password-reset-requests?status=pending&search=citra",
+            "description": "Query: `status` (pending default, resolved, rejected, all), `search` (nama, username, email, no HP, isian form), `page`, `per_page`. Admin hanya akun tutor & siswa; super admin semua."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const req = pm.response.json().data.find(r => r.user.username === 'siswa.citra');",
+                  "pm.test('permintaan siswa.citra menunggu + kontak', () => {",
+                  "  pm.expect(req.status).to.eql('pending');",
+                  "  pm.expect(req.contact).to.eql('0812-0000-1111');",
+                  "});",
+                  "pm.collectionVariables.set('reset_request_id', req.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jumlah permintaan (badge)",
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/v1/password-reset-requests/counts" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ada yang menunggu', () => pm.expect(pm.response.json().data.pending).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset kata sandi user (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"new_password\": \"password123\",\n  \"note\": \"Sudah dikabari via WA\"\n}" },
+            "url": "{{base_url}}/api/v1/password-reset-requests/{{reset_request_id}}/resolve",
+            "description": "Set kata sandi baru (8-72 karakter); semua sesi user dicabut; permintaan selesai. Sudah diproses → 409. Tolak: `POST .../reject` body opsional `{\"note\": \"...\"}`. (Contoh ini memakai password123 supaya akun dummy tetap sama.)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('selesai oleh admin', () => {",
+                  "  pm.expect(data.status).to.eql('resolved');",
+                  "  pm.expect(data.resolved_by).to.not.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset lagi (harus 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"new_password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/password-reset-requests/{{reset_request_id}}/resolve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('sudah diproses → 409', () => pm.response.to.have.status(409));"] }
             }
           ]
         }
@@ -1751,6 +2009,123 @@
               }
             }
           ]
+        },
+        {
+          "name": "Riwayat Daily Quiz (siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/daily-quizzes?page=1&per_page=20",
+            "description": "Daily Quiz yang sudah dikumpulkan, terbaru dulu. Query: `month` (YYYY-MM, kosong = semua waktu), `subject_id`, `difficulty` (easy/medium/hard), `page`, `per_page`. Setiap baris: materi (subject, subject_field, chapter, subchapter, topic, grade), difficulty + difficulty_label, total_questions, correct_count, score, points, duration_seconds, coin_charged, submitted_at. Review: GET /daily-quizzes/:id/review."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Daily Quiz yang baru disubmit ada di riwayat teratas', () => {",
+                  "  pm.expect(data[0].id).to.eql(pm.collectionVariables.get('daily_quiz_id'));",
+                  "  pm.expect(data[0].difficulty_label).to.be.oneOf(['Mudah', 'Sedang', 'Sulit']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistik Daily Quiz (siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/daily-quizzes/stats",
+            "description": "Query `month` (default bulan ini WIB). `this_month` & `all_time` {quizzes, average_score, points}, `rank` {rank, total} = peringkat Daily Quiz bulan itu di antara siswa sekelas (null = belum ikut)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json().data;",
+                  "pm.test('bulan ini ada & sudah ikut peringkat', () => {",
+                  "  pm.expect(s.this_month.quizzes).to.be.above(0);",
+                  "  pm.expect(s.all_time.quizzes).to.be.at.least(s.this_month.quizzes);",
+                  "  pm.expect(s.rank.rank).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Uji Kom & Tryout akan datang (siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/quizzes/upcoming",
+            "description": "Query: `type` (uji_kom / tryout; kosong = Semua), `search`, `subject_id`, `page`, `per_page`. Quiz publish untuk kelas siswa, event belum selesai, belum dikumpulkan: schedule_status (upcoming / ongoing), locked + seconds_until_start (hitung mundur), my_status (not_started / in_progress)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('terkunci = sebelum dimulai', () => pm.response.json().data.forEach(q => {",
+                  "  pm.expect(q.locked).to.eql(q.schedule_status === 'upcoming');",
+                  "  pm.expect(q.my_status).to.be.oneOf(['not_started', 'in_progress']);",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Uji Kom & Tryout sudah dikerjakan (siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/quizzes/history",
+            "description": "Quiz yang sudah dikumpulkan (terbaru dulu): tanggal event, submitted_at, nama, nilai, correct_count/total_questions, points, duration_seconds, rank {rank, total}. Pembahasan: GET /quizzes/:id/review."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('peringkat valid', () => pm.response.json().data.forEach(q => pm.expect(q.rank.rank).to.be.within(1, q.rank.total)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistik Uji Kom & Tryout (siswa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/quizzes/stats",
+            "description": "sessions, average_score, total_points (tab ikut `type`), last_tryout (Tryout terakhir + peringkat; null = belum pernah)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ada kunci statistik', () => pm.expect(pm.response.json().data).to.have.keys('sessions', 'average_score', 'total_points', 'last_tryout'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -2430,6 +2805,109 @@
               }
             }
           ]
+        },
+        {
+          "name": "Kartu ringkasan & grafik (tab Uji Kom)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quiz-reports/overview?type=uji_kom",
+            "description": "Bagian atas halaman Report Quiz per tab. Query: `type` (wajib: daily_quiz, uji_kom, tryout), `date_from` & `date_to` (tanggal submit WIB, inklusif, maks 366 hari; kosong = rentang default pengaturan s/d hari ini), `education_level_id`, `grade_id`, `subject_id`, `wrong_threshold` (1-100 %, kosong = pengaturan).\n\n`data`:\n- `period` {date_from, date_to}\n- `cards.sessions` {total, distinct_quizzes (null Daily Quiz), students}\n- `cards.average_score` {overall, by_level[{education_level, sessions, average}]}\n- `cards.on_time` {percent, on_time, timed_out} (null Daily Quiz: tanpa timer)\n- `cards.frequently_wrong` {threshold_percent, count, total_questions, top_chapter {id, name, count}, questions[maks 10]}\n- `trend.weeks[12]` {week_start, week_end, sessions, average} + `trend.series[]` per jenjang {education_level, points[]}\n- `distribution[5]` {label 0-20 … 81-100, min, max, count, highlighted}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('4 kartu, tren 12 minggu, 5 rentang nilai', () => {",
+                  "  pm.expect(data.type).to.eql('uji_kom');",
+                  "  pm.expect(data.cards.sessions.total).to.be.a('number');",
+                  "  pm.expect(data.cards.on_time).to.not.eql(null);",
+                  "  pm.expect(data.cards.frequently_wrong.threshold_percent).to.be.within(1, 100);",
+                  "  pm.expect(data.trend.weeks.length).to.eql(12);",
+                  "  pm.expect(data.distribution.map(b => b.label)).to.eql(['0-20', '21-40', '41-60', '61-80', '81-100']);",
+                  "  pm.expect(data.distribution.filter(b => b.highlighted).length).to.be.at.most(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kartu ringkasan & grafik (tab Daily Quiz)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quiz-reports/overview?type=daily_quiz&wrong_threshold=30",
+            "description": "Tab Daily Quiz: `distinct_quizzes` dan `on_time` null (Daily Quiz dibuat siswa sendiri, tanpa timer). `wrong_threshold=30` mengganti ambang untuk tampilan ini saja."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const cards = pm.response.json().data.cards;",
+                  "pm.test('tanpa kartu tepat waktu, ambang 30%', () => {",
+                  "  pm.expect(cards.on_time).to.eql(null);",
+                  "  pm.expect(cards.sessions.distinct_quizzes).to.eql(null);",
+                  "  pm.expect(cards.frequently_wrong.threshold_percent).to.eql(30);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pengaturan report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/quiz-report-settings",
+            "description": "Ambang soal sering salah (`wrong_threshold_percent`, nilai awal 15) dan rentang default laporan (`default_range_days`, nilai awal 60). Admin, super admin, tutor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ada ambang & rentang', () => pm.expect(pm.response.json().data).to.have.keys('wrong_threshold_percent', 'default_range_days', 'updated_by', 'updated_at'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah pengaturan report",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"wrong_threshold_percent\": 15,\n  \"default_range_days\": 60\n}" },
+            "url": "{{base_url}}/api/v1/quiz-report-settings",
+            "description": "Admin & super admin. `wrong_threshold_percent` 1-100, `default_range_days` 7-366. Langsung berlaku untuk semua tab report."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('tersimpan & pengubah tercatat', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.wrong_threshold_percent).to.eql(15);",
+                  "  pm.expect(data.updated_by).to.not.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -2492,6 +2970,230 @@
                   "});"
                 ]
               }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Profil siswa",
+      "description": "Halaman Profil siswa: data diri + paket + coin + statistik, ubah data diri (nama, email, no HP, tanggal lahir), no HP orang tua / wali (tampil tersamar), dan foto profil. Username, kelas, cabang, asal & target sekolah tetap diatur admin.\n\nFolder ini memakai akun dummy `siswa.citra` dan mengembalikan data dirinya seperti semula di akhir.",
+      "item": [
+        {
+          "name": "Masuk sebagai siswa.citra",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"siswa.citra\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lihat profil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/student/profile",
+            "description": "`profile` (data diri, `parent_phone_masked` contoh 0812-xxxx-2210, `avatar_url`, `editable_fields`), `access` (paket aktif, berlaku s/d, sisa hari, fitur), `coin_balance`, `stats` {month, daily_quiz_rank {rank, total} (null = belum ikut Daily Quiz bulan ini, sekelas), points_this_month, total_points, quizzes_this_month}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('data diri + statistik', () => {",
+                  "  pm.expect(data.profile.username).to.eql('siswa.citra');",
+                  "  pm.expect(data.profile.editable_fields).to.include('parent_phone');",
+                  "  pm.expect(data.stats).to.have.property('total_points');",
+                  "});",
+                  "pm.collectionVariables.set('profile_original_json', JSON.stringify(data.profile));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah data diri (validasi gagal)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \" \",\n  \"phone\": \"08abc\",\n  \"date_of_birth\": \"2999-01-01\"\n}" },
+            "url": "{{base_url}}/api/v1/student/profile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "const fields = pm.response.json().errors.map(e => e.field);",
+                  "pm.test('semua kesalahan sekaligus', () => pm.expect(fields).to.include.members(['name', 'phone', 'date_of_birth']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah data diri",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Citra Uji Profil\",\n  \"email\": \"citra.uji@example.com\",\n  \"phone\": \"0812-1111-2222\",\n  \"date_of_birth\": \"2015-03-02\"\n}" },
+            "url": "{{base_url}}/api/v1/student/profile",
+            "description": "Ganti penuh: `name` (wajib), `email`, `phone`, `date_of_birth`. Field yang tidak dikirim dikosongkan; field lain (asal sekolah dll.) diabaikan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().data;",
+                  "pm.test('tersimpan', () => {",
+                  "  pm.expect(p.name).to.eql('Citra Uji Profil');",
+                  "  pm.expect(p.date_of_birth).to.eql('2015-03-02');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Simpan no HP orang tua",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"parent_phone\": \"0813-9999-1234\"\n}" },
+            "url": "{{base_url}}/api/v1/student/profile/parent-contact",
+            "description": "`parent_phone` (null / kosong = dihapus). Respons berisi `parent_phone_masked` untuk ditampilkan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('tampil tersamar', () => pm.expect(pm.response.json().data.parent_phone_masked).to.eql('0813-xxxx-1234'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload foto profil",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "photo", "type": "file", "src": "docs/postman/assets/contoh-gambar-1.png" }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/student/profile/photo",
+            "description": "multipart field `photo`: PNG / JPG / WebP (dicek dari isi file), maks 2 MB. Foto lama dihapus. Link publik `avatar_url` (tanpa login)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ada avatar_url', () => pm.expect(pm.response.json().data.avatar_url).to.include('/storage/images/avatar/'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus foto profil",
+          "request": { "method": "DELETE", "header": [], "url": "{{base_url}}/api/v1/student/profile/photo" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('foto kosong', () => pm.expect(pm.response.json().data.avatar_url).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kembalikan data diri",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{profile_restore_body}}" },
+            "url": "{{base_url}}/api/v1/student/profile"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const p = JSON.parse(pm.collectionVariables.get('profile_original_json'));",
+                  "pm.collectionVariables.set('profile_restore_body', JSON.stringify({ name: p.name, email: p.email, phone: p.phone, date_of_birth: p.date_of_birth }));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('kembali seperti semula', () => pm.expect(pm.response.json().data.name).to.eql(JSON.parse(pm.collectionVariables.get('profile_original_json')).name));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kembalikan no HP orang tua",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{parent_restore_body}}" },
+            "url": "{{base_url}}/api/v1/student/profile/parent-contact"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const p = JSON.parse(pm.collectionVariables.get('profile_original_json'));",
+                  "pm.collectionVariables.set('parent_restore_body', JSON.stringify({ parent_phone: p.parent_phone }));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
             }
           ]
         }
@@ -3368,6 +4070,366 @@
       ]
     },
     {
+      "name": "Master Data & Cabang (admin)",
+      "description": "Menu Master Data: mapel, bidang materi, bab, sub bab, topik, kelas, sekolah (`/master-data`) dan cabang (`/branches`). Admin & super admin.\n\nFolder ini membuat 1 mapel uji + bidang materi + bab dan 1 cabang uji, lalu menghapusnya lagi dari bawah ke atas (data dummy kembali seperti semula). Data sistem (jenjang, kelas bawaan, tipe soal, tipe quiz, level) tidak bisa dihapus.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{base_url}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('access_token', pm.response.json().data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jumlah per tab",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/master-data/counts",
+            "description": "Angka tab {all, subject, subject_field, chapter, subchapter, topic, grade, school, branch}. Query `search` & `status` ikut (sama dengan list)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json().data;",
+                  "pm.test('semua tab ada', () => {",
+                  "  pm.expect(c).to.have.keys('all', 'subject', 'subject_field', 'chapter', 'subchapter', 'topic', 'grade', 'school', 'branch');",
+                  "  pm.expect(c.grade).to.eql(14);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List kelas SD (data sistem)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/master-data?type=grade&search=Kelas%204",
+            "description": "Query: `type` (subject, subject_field, chapter, subchapter, topic, grade, school, education_level, question_type, quiz_type, difficulty; kosong = semua yang dikelola admin), `search` (nama/kode), `status`, `parent_id`, `subject_id`, `education_level_id`, `grade_id`, `page`, `per_page`.\n\nSetiap baris: id, type, type_label, code, name, parent (Induk), subject, education_level, grade, sort_order, status, is_system, usage {children, questions, modules, quizzes, images, users} (kolom Isi), can_delete, created_by, updated_by."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const k4 = pm.response.json().data.find(i => i.code === 'GRADE_4');",
+                  "pm.test('Kelas 4 data sistem, tidak bisa dihapus', () => {",
+                  "  pm.expect(k4.is_system).to.eql(true);",
+                  "  pm.expect(k4.can_delete).to.eql(false);",
+                  "  pm.expect(k4.education_level.name).to.eql('SD');",
+                  "});",
+                  "pm.collectionVariables.set('md_grade_id', k4.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah mapel",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"subject\",\n  \"name\": \"Mapel Uji {{$timestamp}}\",\n  \"code\": null,\n  \"sort_order\": null,\n  \"status\": \"active\"\n}" },
+            "url": "{{base_url}}/api/v1/master-data",
+            "description": "Body: `type` (subject, subject_field, chapter, subchapter, topic, grade, school), `name`, `code` (opsional, unik per type), `parent_id` (wajib untuk bidang materi/bab/sub bab/topik/kelas; kosong untuk mapel & sekolah), `grade_id` (wajib untuk bidang materi saja), `sort_order` (kosong = urutan terakhir), `status`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('mapel tanpa induk', () => pm.expect(data.parent).to.eql(null));",
+                  "pm.collectionVariables.set('md_subject_id', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah bidang materi (mapel + kelas)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"subject_field\",\n  \"name\": \"Bilangan\",\n  \"parent_id\": \"{{md_subject_id}}\",\n  \"grade_id\": \"{{md_grade_id}}\"\n}" },
+            "url": "{{base_url}}/api/v1/master-data",
+            "description": "Bidang materi wajib memilih mapel (`parent_id`) dan kelas (`grade_id`); jenjang mengikuti kelas. Nama sama boleh di kelas lain, tidak boleh di mapel & kelas yang sama."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('letak terisi', () => {",
+                  "  pm.expect(data.grade.name).to.eql('Kelas 4');",
+                  "  pm.expect(data.education_level.name).to.eql('SD');",
+                  "});",
+                  "pm.collectionVariables.set('md_field_id', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah bab (cukup pilih induk)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"chapter\",\n  \"name\": \"Pecahan\",\n  \"parent_id\": \"{{md_field_id}}\"\n}" },
+            "url": "{{base_url}}/api/v1/master-data",
+            "description": "Bab / sub bab / topik cukup memilih induknya; mapel, jenjang, dan kelas disalin dari induk."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('letak dari induk', () => pm.expect(data.subject.id).to.eql(pm.collectionVariables.get('md_subject_id')));",
+                  "pm.collectionVariables.set('md_chapter_id', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah bab kembar (harus 422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"chapter\",\n  \"name\": \"pecahan\",\n  \"parent_id\": \"{{md_field_id}}\"\n}" },
+            "url": "{{base_url}}/api/v1/master-data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('nama kembar → 422', () => pm.response.to.have.status(422));"] }
+            }
+          ]
+        },
+        {
+          "name": "Ubah bab",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Pecahan Biasa\",\n  \"code\": null,\n  \"sort_order\": 5,\n  \"status\": \"inactive\"\n}" },
+            "url": "{{base_url}}/api/v1/master-data/{{md_chapter_id}}",
+            "description": "Ganti penuh: `name`, `code`, `sort_order`, `status`. Type, induk, dan letak tetap. Data sistem: hanya nama & urutan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('tersimpan', () => {",
+                  "  pm.expect(data.name).to.eql('Pecahan Biasa');",
+                  "  pm.expect(data.status).to.eql('inactive');",
+                  "  pm.expect(data.updated_by).to.not.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus yang masih dipakai (harus 422)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{md_field_id}}\", \"{{md_grade_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/master-data",
+            "description": "Ditolak (tidak ada yang terhapus) kalau data sistem, atau masih dipakai item anak, soal, modul, quiz, gambar, atau akun. Pesan per `ids[i]`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "const msgs = pm.response.json().errors.map(e => e.message).join(' | ');",
+                  "pm.test('alasan per data', () => {",
+                  "  pm.expect(msgs).to.include('masih dipakai 1 item anak');",
+                  "  pm.expect(msgs).to.include('data sistem');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus bab",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{md_chapter_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/master-data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Hapus bidang materi",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{md_field_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/master-data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "Hapus mapel",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{md_subject_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/master-data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('terhapus', () => pm.expect(pm.response.json().data.deleted_ids).to.eql([pm.collectionVariables.get('md_subject_id')]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List cabang",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/branches",
+            "description": "Semua cabang (urut nama, tanpa pagination) + `users` (jumlah akun) & `can_delete`. Query: `search`, `status`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('cabang dummy dipakai akun', () => {",
+                  "  const timur = pm.response.json().data.find(b => b.name === 'Surabaya Timur');",
+                  "  pm.expect(timur.users).to.be.above(0);",
+                  "  pm.expect(timur.can_delete).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tambah cabang",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cabang Uji {{$timestamp}}\",\n  \"status\": \"active\"\n}" },
+            "url": "{{base_url}}/api/v1/branches",
+            "description": "`name` wajib & unik (tanpa peduli huruf besar/kecil), `status` default active."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('md_branch_id', pm.response.json().data.id);",
+                  "pm.collectionVariables.set('md_branch_name', pm.response.json().data.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ubah cabang (nonaktif)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{md_branch_name}}\",\n  \"status\": \"inactive\"\n}" },
+            "url": "{{base_url}}/api/v1/branches/{{md_branch_id}}",
+            "description": "Cabang nonaktif tidak tampil di dropdown `branch` (tidak bisa dipilih untuk akun), akun lama tetap."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('nonaktif', () => pm.expect(pm.response.json().data.status).to.eql('inactive'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hapus cabang",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{md_branch_id}}\"]\n}" },
+            "url": "{{base_url}}/api/v1/branches",
+            "description": "Soft delete 1-100 cabang. Cabang yang masih dipakai akun → 422."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Dropdown (master data)",
       "description": "Pilihan dropdown dari master data. Semua role yang login boleh. FE cukup memakai `value` (dikirim ke API lain) dan `name` (ditampilkan).\n\n`value` = code untuk question_type, quiz_type, difficulty; = id untuk jenjang s/d topik.\n\nRequest hierarki memakai variabel `q_*` (isi dari seed, sama dengan folder Bank soal).",
       "item": [
@@ -3724,6 +4786,89 @@
                   "pm.test('error di files[1]', () => {",
                   "  pm.expect(pm.response.json().errors.map(e => e.field)).to.include('files[1]');",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Galeri gambar (filter, cari, 15 per halaman)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/images?sort=newest&page=1&per_page=15",
+            "description": "Query (semua opsional): `category` (question / banner / landing), `search` (nama gambar / nama file), `subject_id`, `subject_field_id`, `chapter_id`, `subchapter_id`, `topic_id`, `sort` (newest default, oldest, name, largest), `page`, `per_page` (default 15, maks 100).\n\nSetiap gambar: id, category, name, url, file_name, mime_type, size_bytes, width, height, *_id hierarki, `hierarchy` {subject, subject_field, chapter, subchapter, topic} (id + nama), uploaded_by, `uploader` {id, name}, `used_by` (kode soal aktif yang memakai), `can_delete`, created_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const ids = JSON.parse(pm.collectionVariables.get('image_ids_json'));",
+                  "pm.test('gambar soal baru ada di galeri dengan nama hierarki', () => {",
+                  "  pm.expect(body.meta.per_page).to.eql(15);",
+                  "  const mine = body.data.filter(i => ids.includes(i.id));",
+                  "  pm.expect(mine.length).to.eql(ids.length);",
+                  "  const questions = mine.filter(i => i.category === 'question');",
+                  "  pm.expect(questions.length).to.eql(2);",
+                  "  questions.forEach(i => {",
+                  "    pm.expect(i.hierarchy.chapter.name).to.be.a('string');",
+                  "    pm.expect(i.can_delete).to.eql(true);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Jumlah gambar per kategori",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/images/category-counts",
+            "description": "{all, question, banner, landing}. Filter `search` & hierarki ikut (kategori diabaikan)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json().data;",
+                  "pm.test('all = jumlah per kategori', () => pm.expect(c.all).to.eql(c.question + c.banner + c.landing));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail gambar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/images/{{image_id}}",
+            "description": "1 gambar (bentuk sama dengan baris galeri). Tidak ada → 404."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.collectionVariables.set('image_id', JSON.parse(pm.collectionVariables.get('image_ids_json'))[0]);"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('id sesuai', () => pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('image_id')));"
                 ]
               }
             }

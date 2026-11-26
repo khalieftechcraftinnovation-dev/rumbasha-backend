@@ -22,8 +22,11 @@ const (
 	TypeQuestionType   = "question_type"   // tipe soal
 	TypeQuizType       = "quiz_type"       // tipe quiz (peruntukan soal)
 	TypeDifficulty     = "difficulty"      // level
+	TypeSchool         = "school"          // sekolah (asal sekolah siswa, filter peringkat)
 	// Bukan master data: paket akses (tabel subscription_plans). parent_id = jenjang sasaran paket (null = semua).
 	TypeSubscriptionPlan = "subscription_plan"
+	// Bukan master data: cabang aktif (tabel branches).
+	TypeBranch = "branch"
 )
 
 // Option adalah 1 pilihan dropdown.

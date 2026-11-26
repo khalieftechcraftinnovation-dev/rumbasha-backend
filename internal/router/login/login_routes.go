@@ -20,4 +20,5 @@ func Register(public, private *gin.RouterGroup, h *loginhandler.LoginHandler) {
 	public.POST("/auth/logout", h.Logout)
 
 	private.GET("/auth/me", h.Me)
+	private.POST("/auth/change-password", h.ChangePassword) // ubah kata sandi sendiri (semua role)
 }

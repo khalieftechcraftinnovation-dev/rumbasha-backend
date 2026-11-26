@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	quizreportdto "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/dto/quizreport"
+	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/middleware"
 	quizreportmodel "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/model/quizreport"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/response"
 	quizreportservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/quizreport"
@@ -69,6 +70,47 @@ func (h *QuizReportHandler) Questions(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, "Analisis soal quiz", quizreportdto.ToQuestionsResponse(summary, stats))
+}
+
+// Overview menangani GET /api/v1/quiz-reports/overview: kartu ringkasan + grafik tren & sebaran nilai
+// 1 tab report (type = daily_quiz / uji_kom / tryout).
+func (h *QuizReportHandler) Overview(c *gin.Context) {
+	var q quizreportdto.OverviewQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	overview, err := h.service.Overview(c.Request.Context(), q)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Ringkasan report quiz", quizreportdto.ToOverviewResponse(overview))
+}
+
+// GetSettings menangani GET /api/v1/quiz-report-settings.
+func (h *QuizReportHandler) GetSettings(c *gin.Context) {
+	s, err := h.service.GetSettings(c.Request.Context())
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Pengaturan report quiz", quizreportdto.ToSettingsResponse(s))
+}
+
+// UpdateSettings menangani PUT /api/v1/quiz-report-settings (admin & super admin).
+func (h *QuizReportHandler) UpdateSettings(c *gin.Context) {
+	var req quizreportdto.SettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	s, err := h.service.UpdateSettings(c.Request.Context(), req, middleware.GetUserID(c))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Pengaturan report quiz berhasil diubah", quizreportdto.ToSettingsResponse(s))
 }
 
 // handleError mengubah error dari service menjadi response HTTP yang sesuai.

@@ -44,6 +44,15 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("migration database gagal: %v", err)
 	}
 
+	// master_data_items tidak dikosongkan (lihat di bawah); kolom auditnya (id user, tanpa foreign key)
+	// dikosongkan supaya tidak menunjuk ke user yang sebentar lagi dihapus.
+	err = db.Exec(`
+		UPDATE master_data_items SET created_by = NULL, updated_by = NULL, deleted_by = NULL
+		WHERE created_by IS NOT NULL OR updated_by IS NOT NULL OR deleted_by IS NOT NULL`).Error
+	if err != nil {
+		t.Fatalf("gagal melepas audit master data: %v", err)
+	}
+
 	// Kosongkan semua tabel supaya setiap test mulai dari data kosong.
 	// Tambahkan tabel baru di sini setiap ada migration baru.
 	// JANGAN masukkan master_data_items: isinya data awal dari migration
@@ -53,6 +62,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			branches,
 			users,
 			refresh_tokens,
+			password_reset_requests,
 			students,
 			subscription_plans,
 			student_subscriptions,
@@ -65,6 +75,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			daily_quiz_prize_awards,
 			daily_quiz_prize_periods,
 			daily_quiz_settings,
+			quiz_report_settings,
 			coin_transactions,
 			leaderboard_point_logs,
 			leaderboard_entries,
@@ -80,8 +91,13 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("gagal mengosongkan tabel: %v", err)
 	}
 
+	// Pengaturan report quiz juga 1 baris (ambang 15%, rentang 60 hari).
+	// ON CONFLICT: go test ./... menjalankan beberapa paket paralel di database yang sama.
+	if err := db.Exec(`INSERT INTO quiz_report_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`).Error; err != nil {
+		t.Fatalf("gagal mengisi pengaturan report quiz: %v", err)
+	}
 	// Pengaturan global Daily Quiz selalu 1 baris: isi ulang nilai awal (10/15/20, tanpa hadiah).
-	if err := db.Exec(`INSERT INTO daily_quiz_settings (id) VALUES (1)`).Error; err != nil {
+	if err := db.Exec(`INSERT INTO daily_quiz_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`).Error; err != nil {
 		t.Fatalf("gagal mengisi pengaturan Daily Quiz: %v", err)
 	}
 

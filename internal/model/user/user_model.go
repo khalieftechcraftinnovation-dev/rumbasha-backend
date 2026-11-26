@@ -63,6 +63,7 @@ type ListItem struct {
 	JoinDate       time.Time  // tanggal bergabung
 	EndDate        *time.Time // tanggal berakhir (inklusif); lewat = tidak bisa login
 	LastLoginAt    *time.Time
+	AvatarURL      *string // foto profil (null = belum ada)
 	CreatedAt      time.Time
 	// Akses hari ini (paket aktif + akses khusus); hanya siswa, nil untuk role lain.
 	Access *subscriptionmodel.Access

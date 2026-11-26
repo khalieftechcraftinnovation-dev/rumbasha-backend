@@ -16,6 +16,17 @@ import (
 type LoginRequest struct {
 	Username string `json:"username" binding:"required,max=30"`
 	Password string `json:"password" binding:"required,max=72"` // bcrypt hanya membaca 72 byte pertama
+	// "Ingat saya": true = sesi 30 hari sejak login (boleh melewati tanggal 1); false / tidak dikirim =
+	// sesi berakhir tanggal 1 bulan berikutnya 00:00 WIB.
+	RememberMe bool `json:"remember_me"`
+}
+
+// ChangePasswordRequest adalah body POST /api/v1/auth/change-password (ubah kata sandi sendiri).
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required,max=72"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=72"`
+	// Sesi baru perangkat ini: "Ingat saya" (30 hari) atau sampai tanggal 1 bulan berikutnya.
+	RememberMe bool `json:"remember_me"`
 }
 
 // RefreshTokenRequest adalah body JSON untuk /auth/refresh dan /auth/logout.
@@ -28,7 +39,8 @@ type SessionResponse struct {
 	AccessToken           string       `json:"access_token"`
 	AccessTokenExpiresAt  time.Time    `json:"access_token_expires_at"`
 	RefreshToken          string       `json:"refresh_token"`
-	RefreshTokenExpiresAt time.Time    `json:"refresh_token_expires_at"` // akhir sesi: tanggal 1 bulan depan, 00:00 WIB
+	RefreshTokenExpiresAt time.Time    `json:"refresh_token_expires_at"` // akhir sesi: tanggal 1 bulan depan 00:00 WIB, atau +30 hari kalau "Ingat saya"
+	RememberMe            bool         `json:"remember_me"`              // true = sesi "Ingat saya" (30 hari)
 	User                  UserResponse `json:"user"`
 }
 
@@ -42,6 +54,7 @@ type UserResponse struct {
 	Phone          *string             `json:"phone"`
 	ParentPhone    *string             `json:"parent_phone"`
 	SchoolOrigin   *string             `json:"school_origin"`
+	AvatarURL      *string             `json:"avatar_url"` // foto profil; null = belum ada
 	BranchID       *string             `json:"branch_id"`
 	EducationLevel *MasterDataResponse `json:"education_level"` // jenjang; null kalau tidak ada
 	Grade          *MasterDataResponse `json:"grade"`           // kelas; null kalau tidak ada
@@ -78,12 +91,13 @@ type SubscriptionResponse struct {
 }
 
 // ToSessionResponse mengubah hasil login/refresh menjadi SessionResponse.
-func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time, user loginmodel.UserDetail) SessionResponse {
+func ToSessionResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time, rememberMe bool, user loginmodel.UserDetail) SessionResponse {
 	return SessionResponse{
 		AccessToken:           accessToken,
 		AccessTokenExpiresAt:  accessExpiresAt,
 		RefreshToken:          refreshToken,
 		RefreshTokenExpiresAt: refreshExpiresAt,
+		RememberMe:            rememberMe,
 		User:                  ToUserResponse(user),
 	}
 }
@@ -99,6 +113,7 @@ func ToUserResponse(user loginmodel.UserDetail) UserResponse {
 		Phone:          user.Phone,
 		ParentPhone:    user.ParentPhone,
 		SchoolOrigin:   user.SchoolOrigin,
+		AvatarURL:      user.AvatarURL,
 		BranchID:       user.BranchID,
 		EducationLevel: toMasterDataResponse(user.EducationLevelID, user.EducationLevelType, user.EducationLevelCode, user.EducationLevelName),
 		Grade:          toMasterDataResponse(user.GradeID, user.GradeType, user.GradeCode, user.GradeName),

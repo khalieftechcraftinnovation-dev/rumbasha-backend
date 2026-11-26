@@ -66,3 +66,14 @@ func (r *DropdownRepository) FindPlanOptions(ctx context.Context) ([]dropdownmod
 		Scan(&options).Error
 	return options, err
 }
+
+// FindBranchOptions mengambil cabang aktif (tabel branches, belum dihapus), urut nama. [Native SQL, 1 tabel]
+func (r *DropdownRepository) FindBranchOptions(ctx context.Context) ([]dropdownmodel.Option, error) {
+	options := []dropdownmodel.Option{}
+	err := r.db.WithContext(ctx).
+		Raw(`SELECT id, NULL AS code, name, NULL AS parent_id FROM branches
+			WHERE deleted_at IS NULL AND status = 'active'
+			ORDER BY name`).
+		Scan(&options).Error
+	return options, err
+}

@@ -18,6 +18,9 @@ import (
 func Register(private *gin.RouterGroup, h *imagehandler.ImageHandler) {
 	adminOnly := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin)
 
+	private.GET("/images", adminOnly, h.List)                           // galeri: filter, cari, urutan, 15 per halaman
+	private.GET("/images/category-counts", adminOnly, h.CategoryCounts) // jumlah per kategori
+	private.GET("/images/:id", adminOnly, h.Get)
 	private.POST("/images", adminOnly, h.Upload)   // upload 1-10 gambar (multipart)
 	private.DELETE("/images", adminOnly, h.Delete) // hapus permanen 1-100 gambar, body {"ids": [...]}
 }

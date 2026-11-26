@@ -19,8 +19,17 @@ import (
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/scheduler"
 
 	loginhandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/login"
+	masterdatahandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/masterdata"
+	passwordresethandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/passwordreset"
+	profilehandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/profile"
 	loginrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/login"
+	masterdatarepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/masterdata"
+	passwordresetrepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/passwordreset"
+	profilerepo "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/repository/profile"
 	loginservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/login"
+	masterdataservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/masterdata"
+	passwordresetservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/passwordreset"
+	profileservice "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/service/profile"
 
 	logreporthandler "github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/handler/logreport"
 	"github.com/khalieftechcraftinnovation-dev/rumbasha-backend/internal/mailer"
@@ -159,6 +168,9 @@ func main() {
 		DailyQuizReport: dailyquizreporthandler.NewDailyQuizReportHandler(dailyquizreportservice.NewDailyQuizReportService(dailyquizreportrepo.NewDailyQuizReportRepository(db))),
 		LearningModule:  learningmodulehandler.NewLearningModuleHandler(learningmoduleservice.NewLearningModuleService(learningmodulerepo.NewLearningModuleRepository(db), store, subscriptionService)),
 		Subscription:    subscriptionhandler.NewSubscriptionHandler(subscriptionService),
+		MasterData:      masterdatahandler.NewMasterDataHandler(masterdataservice.NewMasterDataService(masterdatarepo.NewMasterDataRepository(db))),
+		PasswordReset:   passwordresethandler.NewPasswordResetHandler(passwordresetservice.NewPasswordResetService(passwordresetrepo.NewPasswordResetRepository(db))),
+		Profile:         profilehandler.NewProfileHandler(profileservice.NewProfileService(profilerepo.NewProfileRepository(db), subscriptionService, store)),
 	}, cfg.JWTSecret, apiLog, cfg.StorageDir)
 
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: r}

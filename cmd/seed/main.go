@@ -13,6 +13,7 @@
 //  6. dummy_daily_quizzes.sql → 2-6 Daily Quiz bulan ini per siswa SD + leaderboard bulanan (untuk report & leaderboard)
 //  7. dummy_access_plans.sql → paket Basic / Pro / Ultra + akun siswa skenario akses modul (aman diulang)
 //  8. learning_modules.go → 3 modul + PDF dummy per bidang materi Matematika (folder by hierarki mapel)
+//  9. dummy_schools.sql → sekolah (master data) dari asal & target sekolah akun dummy (aman diulang)
 package main
 
 import (
@@ -47,6 +48,9 @@ var (
 
 	//go:embed dummy_access_plans.sql
 	dummyAccessPlansSQL string
+
+	//go:embed dummy_schools.sql
+	dummySchoolsSQL string
 )
 
 func main() {
@@ -121,6 +125,12 @@ func main() {
 		log.Printf("modul pembelajaran: %d file PDF lama tanpa data dihapus", removed)
 	}
 	logModuleSeed(seedLearningModules(db, storage.NewLocal(cfg.StorageDir, cfg.AppURL)))
+
+	// 9. dummy_schools.sql: aman diulang (sekolah dengan nama yang sama dilewati).
+	if err := db.Exec(dummySchoolsSQL).Error; err != nil {
+		log.Fatalf("gagal mengisi dummy_schools.sql: %v", err)
+	}
+	log.Println("dummy_schools.sql berhasil diisi")
 
 	// Ringkasan jumlah data mapel per tingkat.
 	type typeCount struct {

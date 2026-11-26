@@ -92,6 +92,7 @@ type userRow struct {
 	JoinDate               time.Time
 	EndDate                *time.Time
 	LastLoginAt            *time.Time
+	AvatarURL              *string
 	CreatedAt              time.Time
 
 	// Hanya untuk detail.
@@ -116,6 +117,7 @@ func (row userRow) toListItem() usermodel.ListItem {
 		EducationLevel: ref(row.LevelID, row.LevelName), Grade: ref(row.GradeID, row.GradeName),
 		StudentCode: row.StudentCode, CoinBalance: row.CoinBalance,
 		Status: row.Status, JoinDate: row.JoinDate, EndDate: row.EndDate, LastLoginAt: row.LastLoginAt, CreatedAt: row.CreatedAt,
+		AvatarURL: row.AvatarURL,
 	}
 }
 
@@ -125,7 +127,7 @@ const userColumns = `
 	u.branch_id, b.name AS branch_name,
 	u.education_level_id AS level_id, l.name AS level_name,
 	u.grade_id, g.name AS grade_name,
-	s.student_code, s.coin_balance, u.status, u.join_date, u.end_date, u.last_login_at, u.created_at`
+	s.student_code, s.coin_balance, u.status, u.join_date, u.end_date, u.last_login_at, u.created_at, u.avatar_url`
 
 const userJoins = `
 	LEFT JOIN branches          b ON b.id = u.branch_id
@@ -282,6 +284,16 @@ func (r *UserRepository) Update(ctx context.Context, u usermodel.Update, isStude
 		if isStudent {
 			err := tx.Exec(`UPDATE students SET date_of_birth = ?, target_school = ?, updated_at = ? WHERE user_id = ?`,
 				u.DateOfBirth, u.TargetSchool, now, u.ID).Error
+			if err != nil {
+				return err
+			}
+		}
+		if u.PasswordHash != nil {
+			// Admin mereset kata sandi lewat ubah user: permintaan lupa kata sandi yang menunggu ikut selesai.
+			err := tx.Exec(`
+				UPDATE password_reset_requests
+				SET status = 'resolved', resolved_at = ?, resolved_by = ?, resolution_note = 'Kata sandi direset admin lewat ubah user'
+				WHERE user_id = ? AND status = 'pending'`, now, updatedBy, u.ID).Error
 			if err != nil {
 				return err
 			}

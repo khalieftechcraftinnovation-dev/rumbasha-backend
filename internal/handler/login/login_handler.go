@@ -44,7 +44,7 @@ func (h *LoginHandler) Login(c *gin.Context) {
 		return
 	}
 
-	session, err := h.loginService.Login(c.Request.Context(), req.Username, req.Password, c.Request.UserAgent())
+	session, err := h.loginService.Login(c.Request.Context(), req.Username, req.Password, c.Request.UserAgent(), req.RememberMe)
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -115,6 +115,23 @@ func (h *LoginHandler) Me(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Data user berhasil diambil", result)
 }
 
+// ChangePassword menangani POST /api/v1/auth/change-password: ubah kata sandi sendiri (semua role).
+// Semua sesi lama dicabut; respons berisi sesi baru untuk perangkat ini (simpan token barunya).
+func (h *LoginHandler) ChangePassword(c *gin.Context) {
+	var req logindto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ValidationError(c, err)
+		return
+	}
+	session, err := h.loginService.ChangePassword(c.Request.Context(), middleware.GetUserID(c),
+		req.CurrentPassword, req.NewPassword, c.Request.UserAgent(), req.RememberMe)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Kata sandi berhasil diubah", toSessionResponse(session))
+}
+
 // handleError mengubah error dari service menjadi response HTTP yang sesuai.
 //
 // Catatan Go: Go tidak punya try/catch. Error dikembalikan sebagai nilai biasa,
@@ -129,6 +146,10 @@ func (h *LoginHandler) handleError(c *gin.Context, err error) {
 		response.Error(c, http.StatusForbidden, "Masa aktif akun Anda sudah berakhir. Silakan hubungi admin")
 	case errors.Is(err, loginmodel.ErrUserInactive):
 		response.Error(c, http.StatusForbidden, "Akun Anda tidak aktif. Silakan hubungi admin")
+	case errors.Is(err, loginmodel.ErrWrongPassword):
+		response.ErrorWithFields(c, http.StatusUnprocessableEntity, "Validasi gagal", []response.FieldError{{Field: "current_password", Message: "kata sandi lama salah"}})
+	case errors.Is(err, loginmodel.ErrSamePassword):
+		response.ErrorWithFields(c, http.StatusUnprocessableEntity, "Validasi gagal", []response.FieldError{{Field: "new_password", Message: "harus berbeda dengan kata sandi lama"}})
 	case errors.Is(err, loginmodel.ErrSessionExpired), errors.Is(err, loginmodel.ErrUserNotFound):
 		response.Error(c, http.StatusUnauthorized, "Sesi sudah berakhir. Silakan login kembali")
 	default:
@@ -144,6 +165,7 @@ func toSessionResponse(session loginservice.Session) logindto.SessionResponse {
 		session.AccessTokenExpiresAt,
 		session.RefreshToken,
 		session.RefreshTokenExpiresAt,
+		session.RememberMe,
 		session.User,
 	)
 }

@@ -139,19 +139,46 @@ Alias yang dipakai: `<fitur>model`, `<fitur>dto`, `<fitur>repo`, `<fitur>service
 ## Login & sesi
 
 ```text
-POST /auth/login   {username, password}
+POST /auth/login   {username, password, remember_me}
   ← access_token  (JWT, 15 menit)          → kirim di header: Authorization: Bearer <access_token>
-  ← refresh_token (sampai tgl 1 bulan depan, 00:00 WIB)
+  ← refresh_token (tanpa "Ingat saya": sampai tgl 1 bulan depan 00:00 WIB; dengan "Ingat saya": 30 hari)
+  ← remember_me
 
 access_token habis? → POST /auth/refresh {refresh_token} → dapat pasangan token baru
 keluar             → POST /auth/logout  {refresh_token}
+ubah sandi sendiri → POST /auth/change-password {current_password, new_password, remember_me} (wajib login)
+lupa sandi         → POST /auth/forgot-password {identifier, contact, note} (tanpa login, diproses admin)
 ```
 
-- **Semua user wajib login ulang setiap tanggal 1, jam 00:00 WIB.** Refresh tidak bisa memperpanjang sesi melewati batas itu. Ini berkaitan dengan paket offline yang dibayar manual setiap bulan di bimbel.
+- **Tanpa "Ingat saya", semua user wajib login ulang setiap tanggal 1, jam 00:00 WIB.** Refresh tidak bisa memperpanjang sesi melewati batas itu. Ini berkaitan dengan paket offline yang dibayar manual setiap bulan di bimbel.
+- **"Ingat saya"** (`remember_me: true`): sesi **30 hari sejak login** dan boleh melewati tanggal 1 (keputusan pemilik produk). Refresh juga tidak memperpanjangnya. Disimpan di `refresh_tokens.remember_me` (migration 000041).
 - **Paket dicek setiap hari** di `student_subscriptions` memakai tanggal hari ini (WIB), untuk paket offline maupun online. Paket yang habis tanggal 15 otomatis tidak berlaku mulai tanggal 16, tanpa perlu login ulang. Lihat `GET /auth/me`.
 - **Refresh token sekali pakai.** Setiap refresh menukar token lama dengan yang baru; token lama langsung tidak berlaku.
-- **Akun nonaktif atau lewat `end_date`** (tanggal berakhir akun, WIB, inklusif) ditolak saat login maupun refresh (403).
-- Di database hanya disimpan **hash** refresh token dan **hash bcrypt** password.
+- **Akun nonaktif atau lewat `end_date`** (tanggal berakhir akun, WIB, inklusif) ditolak saat login maupun refresh (403), termasuk sesi "Ingat saya".
+- Di database hanya disimpan **hash** refresh token dan **hash bcrypt** password. Field `password`, `current_password`, `new_password`, dan token disamarkan di log API.
+
+### Ubah kata sandi sendiri (`POST /api/v1/auth/change-password`)
+
+Semua role (menu Profil). Body `{"current_password": "...", "new_password": "...", "remember_me": false}`; `new_password` 8-72 karakter dan harus berbeda. Kata sandi lama salah → 422 `current_password`; sama → 422 `new_password`. Berhasil: **semua sesi lama dicabut** (perangkat lain logout) dan respons berisi **sesi baru** untuk perangkat ini (bentuk sama dengan login, simpan token barunya). Permintaan lupa kata sandi yang masih menunggu ikut selesai.
+
+### Lupa kata sandi lewat admin
+
+Keputusan pemilik produk: **tanpa email / OTP**. Admin menghubungi user lalu mereset kata sandinya.
+
+1. Halaman login → "Lupa kata sandi?" → `POST /api/v1/auth/forgot-password` (tanpa login): `{"identifier": "siswa.budi", "contact": "0812-3456-7890", "note": "Ganti HP"}`. `identifier` = username, email, atau no HP akun (no HP boleh `+62` / pakai strip). Jawaban **selalu 200 dengan pesan yang sama**, akunnya ada maupun tidak, supaya form tidak bisa dipakai menebak akun. 1 akun = 1 permintaan menunggu: kirim lagi → `request_count` bertambah, kontak & pesan terbaru dipakai.
+2. Panel admin (admin & super admin):
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /password-reset-requests` | Query `status` (`pending` default, `resolved`, `rejected`, `all`), `search` (nama, username, email, no HP, isian form), `page`, `per_page`. Terbaru dulu. Setiap baris: `user {id, username, name, role, status, email, phone, parent_phone, branch}`, `identifier, contact, note, request_count, status, requested_at, resolved_at, resolved_by, resolution_note` |
+| `GET /password-reset-requests/counts` | `{pending, resolved, rejected}` (badge menu = `pending`) |
+| `GET /password-reset-requests/:id` | Detail |
+| `POST /password-reset-requests/:id/resolve` | `{"new_password": "...", "note": "Dikabari via WA"}`: kata sandi user diganti, **semua sesinya dicabut**, permintaan selesai. Admin menyampaikan kata sandi baru ke user langsung |
+| `POST /password-reset-requests/:id/reject` | Body opsional `{"note": "..."}`; kata sandi tidak berubah |
+
+- Admin hanya melihat & memproses permintaan akun **tutor & siswa**; super admin semua akun (akun admin untuk admin → 403). Sudah diproses → 409.
+- Reset lewat **ubah user** (`PUT /users/:id` dengan `password`) dan **ubah kata sandi sendiri** juga menyelesaikan permintaan yang menunggu.
+- Tabel `password_reset_requests` (migration 000041), index unik 1 permintaan menunggu per akun.
 
 Grup `public` (tanpa login) dan `private` (wajib login) dibuat di [router.go](internal/router/router.go), lalu diteruskan ke route tiap fitur. Contoh di [quiz_routes.go](internal/router/quiz/quiz_routes.go):
 
@@ -289,11 +316,34 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | POST   | `/api/v1/auth/refresh` | Publik       | Tukar refresh token dengan token baru           |
 | POST   | `/api/v1/auth/logout`  | Publik       | Tutup sesi                                      |
 | GET    | `/api/v1/auth/me`      | Login        | Data user; untuk siswa + paket & fitur hari ini |
+| POST   | `/api/v1/auth/change-password` | Login | Ubah kata sandi sendiri (sesi lama dicabut, dapat sesi baru) |
+| GET    | `/api/v1/student/profile` | Siswa | Profil: data diri, paket, coin, statistik |
+| PUT    | `/api/v1/student/profile` | Siswa | Ubah data diri (nama, email, no HP, tanggal lahir) |
+| PUT    | `/api/v1/student/profile/parent-contact` | Siswa | No HP orang tua / wali |
+| POST   | `/api/v1/student/profile/photo` | Siswa | Upload / ganti foto profil |
+| DELETE | `/api/v1/student/profile/photo` | Siswa | Hapus foto profil |
+| POST   | `/api/v1/auth/forgot-password` | Publik | Lupa kata sandi: kirim permintaan ke admin |
+| GET    | `/api/v1/password-reset-requests` | Admin, Super Admin | Daftar permintaan lupa kata sandi |
+| GET    | `/api/v1/password-reset-requests/counts` | Admin, Super Admin | Jumlah per status (badge) |
+| GET    | `/api/v1/password-reset-requests/:id` | Admin, Super Admin | Detail permintaan |
+| POST   | `/api/v1/password-reset-requests/:id/resolve` | Admin, Super Admin | Set kata sandi baru user |
+| POST   | `/api/v1/password-reset-requests/:id/reject` | Admin, Super Admin | Tolak permintaan |
 | POST   | `/api/v1/log-reports`  | Admin        | Laporan bug: kirim log hari ini ke email dev    |
 | POST   | `/api/v1/questions`    | Admin        | Tambah 1-100 soal sekaligus (1 tipe)            |
 | GET    | `/api/v1/questions`    | Admin        | List Bank Soal: filter, search, pagination      |
 | GET    | `/api/v1/questions/type-counts` | Admin | Jumlah soal per tipe (angka di tab)     |
 | GET    | `/api/v1/dropdowns/:type` | Login (semua role) | Pilihan dropdown dari master data  |
+| GET    | `/api/v1/master-data` | Admin, Super Admin | List master data (tab, filter letak, cari, status) + kolom Isi |
+| GET    | `/api/v1/master-data/counts` | Admin, Super Admin | Jumlah per tab (termasuk cabang) |
+| GET    | `/api/v1/master-data/:id` | Admin, Super Admin | Detail master data |
+| POST   | `/api/v1/master-data` | Admin, Super Admin | Tambah mapel / bidang materi / bab / sub bab / topik / kelas / sekolah |
+| PUT    | `/api/v1/master-data/:id` | Admin, Super Admin | Ubah nama, kode, urutan, status |
+| DELETE | `/api/v1/master-data` | Admin, Super Admin | Hapus banyak master data (soft delete, ditolak kalau masih dipakai) |
+| GET    | `/api/v1/branches` | Admin, Super Admin | List cabang + jumlah akun |
+| GET    | `/api/v1/branches/:id` | Admin, Super Admin | Detail cabang |
+| POST   | `/api/v1/branches` | Admin, Super Admin | Tambah cabang |
+| PUT    | `/api/v1/branches/:id` | Admin, Super Admin | Ubah cabang |
+| DELETE | `/api/v1/branches` | Admin, Super Admin | Hapus banyak cabang (soft delete) |
 | POST   | `/api/v1/quizzes`      | Admin        | Buat quiz Uji Kom / Tryout + soal yang dipilih  |
 | GET    | `/api/v1/quizzes`      | Admin        | List quiz + status jadwal (akan/berjalan/lewat) |
 | GET    | `/api/v1/quizzes/schedule-counts` | Admin | Jumlah quiz per status jadwal (angka tab) |
@@ -301,6 +351,11 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | PUT    | `/api/v1/quizzes/:id`  | Admin        | Ubah 1 quiz (ganti penuh), hanya yang belum mulai |
 | DELETE | `/api/v1/quizzes`      | Admin        | Hapus 1-100 quiz (soft delete), kecuali yang berjalan |
 | GET    | `/api/v1/student/quiz-announcements` | Siswa | Pengumuman quiz publish untuk kelas siswa |
+| GET    | `/api/v1/student/quizzes/upcoming` | Siswa | Uji Kom & Tryout "Akan datang" (terkunci, hitung mundur) |
+| GET    | `/api/v1/student/quizzes/history` | Siswa | Uji Kom & Tryout "Sudah dikerjakan" + peringkat |
+| GET    | `/api/v1/student/quizzes/stats` | Siswa | Statistik Uji Kom & Tryout + Tryout terakhir |
+| GET    | `/api/v1/student/daily-quizzes` | Siswa | Riwayat Daily Quiz |
+| GET    | `/api/v1/student/daily-quizzes/stats` | Siswa | Statistik Daily Quiz (bulan ini + semua waktu + peringkat) |
 | GET    | `/api/v1/daily-quizzes/grade-options` | Siswa | Dropdown kelas Daily Quiz (sesuai jenjang/kelompok) |
 | POST   | `/api/v1/daily-quizzes` | Siswa       | Generate Daily Quiz dari soal acak              |
 | POST   | `/api/v1/daily-quizzes/:id/open` | Siswa | Buka Daily Quiz (jatah gratis / potong coin) + kunci jawaban |
@@ -330,6 +385,9 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | GET    | `/api/v1/quiz-reports` | Admin, Super Admin, Tutor | Report Uji Kom & Tryout per event (peserta, nilai rata-rata / tertinggi / terendah) |
 | GET    | `/api/v1/quiz-reports/:id` | Admin, Super Admin, Tutor | Detail report: peserta urut peringkat |
 | GET    | `/api/v1/quiz-reports/:id/questions` | Admin, Super Admin, Tutor | Soal urut dari yang paling sering salah |
+| GET    | `/api/v1/quiz-reports/overview` | Admin, Super Admin, Tutor | Kartu ringkasan + grafik tren & sebaran nilai per tab (Daily Quiz / Uji Kom / Tryout) |
+| GET    | `/api/v1/quiz-report-settings` | Admin, Super Admin, Tutor | Pengaturan report (ambang soal sering salah, rentang default) |
+| PUT    | `/api/v1/quiz-report-settings` | Admin, Super Admin | Ubah pengaturan report |
 | GET    | `/api/v1/daily-quiz-reports` | Admin, Super Admin, Tutor | Report Daily Quiz per siswa (peringkat + rekap, filter periode/mapel/kelas) |
 | GET    | `/api/v1/daily-quiz-reports/students/:id` | Admin, Super Admin, Tutor | Report Daily Quiz 1 siswa: total + rincian per mapel |
 | POST   | `/api/v1/learning-modules` | Admin, Super Admin | Upload modul pembelajaran (1 PDF + data, multipart) |
@@ -358,6 +416,9 @@ Setiap file baru diawali `package material`, dan diimport dengan alias (`materia
 | PUT    | `/api/v1/questions/:id`| Admin        | Ubah 1 soal (ganti penuh)                       |
 | DELETE | `/api/v1/questions`    | Admin        | Hapus 1-100 soal sekaligus (soft delete)        |
 | POST   | `/api/v1/questions/import/check` | Admin | Cek file Excel soal (tidak menyimpan)  |
+| GET    | `/api/v1/images`       | Admin        | Galeri gambar (filter kategori & hierarki, cari, urutan, 15/halaman) |
+| GET    | `/api/v1/images/category-counts` | Admin | Jumlah gambar per kategori |
+| GET    | `/api/v1/images/:id`   | Admin        | Detail gambar + soal yang memakainya |
 | POST   | `/api/v1/images`       | Admin        | Upload 1-10 gambar (multipart)                  |
 | DELETE | `/api/v1/images`       | Admin        | Hapus permanen 1-100 gambar                     |
 | GET    | `/storage/images/...`  | Publik       | File gambar (link dari field `url`)             |
@@ -834,6 +895,18 @@ Khusus siswa. Berisi quiz Uji Kom & Tryout yang **sudah publish**, **belum seles
 
 Setiap item: `id`, `name`, `type`, `placement` (nama letak), `start_at`/`end_at` (WIB), `schedule_status` (`upcoming`/`ongoing`), `duration_minutes`, `total_questions`, `coin_cost`, `points` (point per level), `prize_coins` (hadiah juara 1-3). **Tanpa kode akses** (dibagikan tutor saat quiz dimulai) dan tanpa soal. Siswa yang kelasnya belum diisi → `data: []`. Index `quizzes_announcement_idx (grade_id, start_at)` khusus quiz publish.
 
+### Halaman Uji Kom & Tryout siswa (`/api/v1/student/quizzes/...`)
+
+Khusus siswa. Query yang sama untuk ketiganya: `type` (`uji_kom` / `tryout`; kosong = tab **Semua**), `search` (nama quiz), `subject_id` (filter mapel), `page`, `per_page` (default 20, maks 100).
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /student/quizzes/upcoming` | **Akan datang**: quiz publish untuk kelas siswa yang event-nya belum selesai dan **belum dikumpulkan** siswa, urut paling dekat dimulai. Setiap quiz: `id, name, type, subject, subject_field, chapter, total_questions, duration_minutes, coin_cost, start_at, end_at`, `schedule_status` (`upcoming` / `ongoing`), `locked` (true sampai `start_at`), `seconds_until_start` (hitung mundur dari waktu server), `my_status` (`not_started` / `in_progress` = sudah dibuka, lanjutkan tanpa kode akses), `started_at` |
+| `GET /student/quizzes/history` | **Sudah dikerjakan** (terbaru dulu): `quiz_id, name, type, subject, start_at` (tanggal event), `submitted_at, score, correct_count, total_questions, points, duration_seconds, rank {rank, total}` (contoh "peringkat #1 dari 30", aturan leaderboard). Pembahasan: `GET /quizzes/:id/review` |
+| `GET /student/quizzes/stats` | `sessions, average_score, total_points` (Uji Kom + Tryout, tab ikut `type`) dan `last_tryout` (Tryout terakhir yang dikumpulkan + peringkatnya; null = belum pernah) |
+
+Quiz yang sudah dihapus admin tidak tampil. Performa: "Akan datang" memakai index `quizzes_announcement_idx`; riwayat & statistik memakai index `quiz_attempts_student_history_idx` (migration 000043), peringkat dihitung `RANK()` per quiz hanya untuk quiz di halaman itu.
+
 ## Daily Quiz (siswa)
 
 Quiz latihan yang **di-generate siswa** dari soal acak sesuai pilihannya. **Tanpa kode akses dan tanpa timer.** Disimpan di tabel terpisah `daily_quizzes` + `daily_quiz_questions` (migration 000019), bukan di `quizzes`, karena milik 1 siswa dan tidak ikut jadwal event / aturan bentrok / list quiz admin.
@@ -941,6 +1014,15 @@ Penerima: `GET /api/v1/daily-quiz-prizes?month=2026-11&grade_id=...` (admin & su
 - **Pembahasan (`explanation`) tidak diberikan.**
 - Gambar Image Library (soal & opsi) sudah diubah menjadi link `image_url`. 2 query untuk semua soal (soal + link gambar opsi).
 
+### Riwayat & statistik Daily Quiz siswa
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /student/daily-quizzes` | Riwayat Daily Quiz yang **sudah dikumpulkan**, terbaru dulu. Query: `month` (`YYYY-MM`, kosong = semua waktu), `subject_id`, `difficulty` (`easy`/`medium`/`hard`), `page`, `per_page`. Setiap baris: `subject, subject_field, chapter, subchapter, topic, grade` (materi), `difficulty, difficulty_label` (Mudah/Sedang/Sulit), `total_questions, correct_count, score, points, duration_seconds, coin_charged, submitted_at`. Review: `GET /daily-quizzes/:id/review` |
+| `GET /student/daily-quizzes/stats` | Query `month` (default bulan ini WIB): `this_month {quizzes, average_score, points}`, `all_time {quizzes, average_score, points}`, `rank {rank, total}` = peringkat Daily Quiz bulan itu di antara siswa **sekelas** (aturan leaderboard; null = belum ikut) |
+
+Performa: index `daily_quizzes_student_report_idx (student_id, submitted_at)`; statistik 1 query.
+
 ## Leaderboard
 
 **Nilai ≠ point.** Nilai (0-100) hanya untuk hasil quiz. Leaderboard memakai **point**: setiap soal **benar** mendapat point sesuai level soal — easy **10**, medium **15**, hard **20**; salah / tidak dijawab **0**. Berlaku untuk semua quiz (Daily Quiz, Uji Kom, Tryout). Point dihitung server saat submit dan disimpan di kolom `points` (migration 000023). Besar point per level bisa diubah admin: **Uji Kom & Tryout** per quiz (`points` saat buat/ubah quiz, migration 000025), **Daily Quiz** global untuk seluruh Daily Quiz (`PUT /api/v1/daily-quiz-settings`, migration 000026).
@@ -1024,6 +1106,35 @@ Event terbaru dulu (tanggal mulai). Query opsional: `type` (`uji_kom`/`tryout`),
 ### Soal paling sering salah (`GET /api/v1/quiz-reports/:id/questions`)
 
 Semua soal quiz, urut dari **persentase benar terendah** (paling sering salah) ke tertinggi; sama → salah lebih banyak dulu, lalu nomor soal. Setiap soal: `no` (nomor di quiz), `id`, `code`, `type`, `question`, `difficulty`, `participants`, `correct_count`, `wrong_count` (menjawab tapi salah), `unanswered_count` (tidak dijawab), `correct_percent` (0-100, contoh `13.33`), `correct_label` (contoh `"13%"`). Dihitung dari jawaban yang tersimpan saat submit (kolom JSONB `answers`), 1 query.
+
+### Kartu ringkasan & grafik (`GET /api/v1/quiz-reports/overview`)
+
+Satu endpoint untuk bagian atas halaman Report Quiz per tab (FR-RPT-001 s/d 005). Admin, Super Admin, Tutor.
+
+| Query | Isi |
+| ----- | --- |
+| `type` | **Wajib**: `daily_quiz`, `uji_kom`, `tryout` (tab) |
+| `date_from`, `date_to` | Periode **tanggal submit** (WIB, inklusif, maks 366 hari). Kosong = `default_range_days` hari terakhir s/d hari ini (pengaturan); hanya `date_to` = rentang default s/d tanggal itu |
+| `education_level_id`, `grade_id`, `subject_id` | Letak quiz (Daily Quiz: pilihan siswa) |
+| `wrong_threshold` | Ambang "soal sering salah" (1-100 %) untuk request ini saja; kosong = pengaturan |
+
+Isi `data`:
+
+- `period {date_from, date_to}` = periode yang dipakai.
+- `cards.sessions {total, distinct_quizzes, students}`: pengerjaan yang sudah dikumpulkan, quiz berbeda (null untuk Daily Quiz), siswa berbeda.
+- `cards.average_score {overall, by_level[{education_level, sessions, average}]}`: rata-rata nilai keseluruhan & per jenjang (urut jenjang).
+- `cards.on_time {percent, on_time, timed_out}`: **kehabisan waktu** = dikumpulkan saat waktu sudah habis (≥ mulai + durasi, atau akhir event kalau lebih dulu; biasanya submit otomatis FE). `null` untuk Daily Quiz (tanpa timer).
+- `cards.frequently_wrong {threshold_percent, count, total_questions, top_chapter {id, name, count}, questions[]}`: soal yang salah (termasuk tidak dijawab) oleh **lebih dari** ambang % dari yang mengerjakannya di periode, bab dengan soal sering salah terbanyak, dan maks 10 soal teratas `{id, code, question_text, chapter, answered, wrong, wrong_percent}`.
+- `trend.weeks[]` (12 minggu Senin-Minggu WIB s/d minggu `date_to`, tidak dibatasi `date_from`): `{week_start, week_end, sessions, average}`; `trend.series[]` 1 garis per jenjang `{education_level, points[{week_start, sessions, average}]}`. Minggu tanpa pengerjaan → `average: null`. Rata-rata = total nilai / jumlah pengerjaan (bukan rata-rata dari rata-rata).
+- `distribution[]`: `{label, min, max, count, highlighted}` untuk 0-20, 21-40, 41-60, 61-80, 81-100 (nilai berkoma di atas batas masuk rentang berikutnya, contoh 20,5 → 21-40); rentang terbanyak `highlighted: true`.
+
+Tabel rincian per sesi (FR-RPT-004) = `GET /api/v1/quiz-reports` di atas.
+
+Performa: 4 query hitung (kartu + sebaran, per jenjang, soal sering salah, tren) masing-masing dari CTE pengerjaan per tanggal submit: Uji Kom/Tryout memakai index `quiz_attempts_period_idx`, Daily Quiz `daily_quizzes_report_idx`.
+
+### Pengaturan report (`GET` / `PUT /api/v1/quiz-report-settings`)
+
+`{"wrong_threshold_percent": 15, "default_range_days": 60}`: ambang soal sering salah (1-100 %) dan rentang default laporan (7-366 hari). GET: admin, super admin, tutor; PUT: admin & super admin (respons berisi `updated_by`, `updated_at`). Tabel `quiz_report_settings` 1 baris (migration 000038), langsung berlaku untuk semua tab.
 
 ## Report Daily Quiz (per siswa)
 
@@ -1181,6 +1292,23 @@ Ada error (422) → **semua data ditolak**, semua error dikembalikan sekaligus d
 
 Body `{"ids": [...]}` (1-100). **Soft delete**: `deleted_at` & `deleted_by` diisi, baris & riwayat (nilai, coin, leaderboard) tetap ada, username tetap terpakai, sesi login diakhiri, tidak bisa login lagi. Semua atau tidak sama sekali: ID tidak ada, akun sendiri, atau akun yang tidak boleh dihapus → 422 per `ids[i]`.
 
+## Profil siswa (`/api/v1/student/profile`)
+
+Khusus **siswa** (profil milik sendiri). Keputusan pemilik produk (BD-014): siswa boleh mengubah sendiri **nama lengkap, email, no HP, tanggal lahir, foto profil**, dan **no HP orang tua / wali**. Username, jenjang, kelas, cabang, asal & target sekolah, status, tanggal bergabung/berakhir tetap diatur admin (menu User).
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /student/profile` | `profile` (data diri + `parent_phone_masked`, `avatar_url`, `editable_fields`), `access` (paket aktif, berlaku s/d, sisa hari, fitur; sama dengan list user), `coin_balance`, `stats {month, daily_quiz_rank {rank, total} (null = belum ikut), points_this_month, total_points, quizzes_this_month}` |
+| `PUT /student/profile` | Data diri, ganti penuh: `{"name": "...", "email": "...", "phone": "...", "date_of_birth": "2015-03-02"}`. Field yang tidak dikirim dikosongkan; field lain (contoh `school_origin`) diabaikan |
+| `PUT /student/profile/parent-contact` | `{"parent_phone": "0812-3456-2210"}` (null / kosong = dihapus). Ditampilkan tersamar: `parent_phone_masked` = `0812-xxxx-2210` |
+| `POST /student/profile/photo` | multipart field `photo`: PNG / JPG / WebP (dicek dari isi file), maks 2 MB. Foto lama dihapus |
+| `DELETE /student/profile/photo` | Hapus foto profil (data & file) |
+
+- Validasi: `name` wajib (maks 150), `email` format email (disimpan huruf kecil), no HP hanya angka/spasi/strip dengan `+` di depan (8-20 karakter), `date_of_birth` tidak boleh di masa depan. Semua kesalahan dikembalikan sekaligus.
+- **Statistik**: peringkat Daily Quiz bulan ini (WIB) di antara siswa **kelas yang sama** (aturan leaderboard: point tertinggi, lalu waktu tersingkat), point Daily Quiz bulan ini, total semua point (Daily Quiz semua bulan + Uji Kom + Tryout), dan jumlah quiz (Daily Quiz + Uji Kom + Tryout) yang dikumpulkan bulan ini. 1 query.
+- **Foto profil** disimpan publik di `STORAGE_DIR/images/avatar/<tahun>/<bulan>/<uuid>.<ext>` (kolom `users.avatar_path` & `avatar_url`, migration 000042) dan ikut tampil di `GET /auth/me`, respons login, serta list & detail user admin (`avatar_url`).
+- Ubah kata sandi: `POST /auth/change-password` (lihat [Login & sesi](#login--sesi)).
+
 ## Paket akses & akses siswa
 
 Paket akses (tabel `subscription_plans`) menentukan fitur yang terbuka bagi siswa: `module, daily_quiz, uji_kom, tryout, rumath`. Akses siswa **hari ini** (WIB) = fitur paket yang aktif hari ini, lalu ditimpa **akses khusus** dari admin (`student_feature_overrides`). Status paket siswa dihitung dari tanggal, tanpa job: `active`, `upcoming` (belum mulai), `expired`, `cancelled`.
@@ -1308,6 +1436,8 @@ Pilihan dropdown dari `master_data_items`. Semua role yang login boleh (siswa ju
 | `quiz_type` | Tipe quiz (Dipakai untuk) | - |
 | `difficulty` | Level | - |
 | `subscription_plan` | Paket akses aktif (tabel `subscription_plans`, untuk pilihan paket di modul pembelajaran). `value` = id paket, `parent_id` = jenjang sasaran (null = semua jenjang) | - |
+| `school` | Sekolah (asal sekolah siswa, filter peringkat) | - |
+| `branch` | Cabang aktif (tabel `branches`, untuk form User) | - |
 
 ```http
 GET /api/v1/dropdowns/difficulty
@@ -1329,6 +1459,45 @@ GET /api/v1/dropdowns/subject_field?subject_id=...&grade_id=...
 - Filter yang tidak berlaku untuk type tersebut diabaikan. Induk wajib belum diisi → 422 (contoh `subject_id: wajib diisi`); format bukan UUID → 422; type tidak dikenal → 404 berisi daftar type.
 - 1 query 1 tabel, memakai index `master_data_items_dropdown_idx (type, parent_id, sort_order)`.
 - Kelas tanpa filter → 14 kelas (urut Nol Kecil s/d Kelas 12), `parent_id` = id jenjangnya (bisa dipakai FE untuk mengelompokkan).
+
+## Master Data & Cabang (menu admin)
+
+Kelola data acuan (FR-MST-001 s/d 008, FR-LMS-001 s/d 007). Khusus **admin & super admin**; pilihan untuk form/filter tetap lewat `/dropdowns/:type` (semua user yang login).
+
+| Endpoint | Isi |
+| -------- | --- |
+| `GET /master-data` | 1 halaman data. Query: `type` (tab; kosong = mapel, bidang materi, bab, sub bab, topik, kelas, sekolah), `search` (nama / kode), `status`, `parent_id`, `subject_id`, `education_level_id`, `grade_id`, `page`, `per_page` (maks 100). Urut tab → kelas → `sort_order` → nama |
+| `GET /master-data/counts` | Angka tab `{all, subject, subject_field, chapter, subchapter, topic, grade, school, branch}` (filter `search` & `status` ikut) |
+| `GET /master-data/:id` | Detail |
+| `POST /master-data` | Tambah 1 data (201) |
+| `PUT /master-data/:id` | Ubah `name`, `code`, `sort_order`, `status` (ganti penuh). Type, induk, dan letak tidak bisa diubah (hapus lalu buat ulang kalau salah letak) |
+| `DELETE /master-data` | Hapus 1-100 data (soft delete), body `{"ids": [...]}` |
+| `GET /branches`, `GET /branches/:id` | Cabang (search, status) + jumlah akun |
+| `POST /branches`, `PUT /branches/:id` | `{"name": "Gresik", "status": "active"}` (nama unik tanpa peduli huruf besar/kecil) |
+| `DELETE /branches` | Hapus 1-100 cabang (soft delete). Cabang yang masih dipakai akun → 422 |
+
+Setiap baris: `id, type, type_label, code, name, parent` (kolom Induk), `subject, education_level, grade` (letak), `sort_order, status, is_system, usage {children, questions, modules, quizzes, images, users}` (kolom **Isi**), `can_delete, created_by, updated_by, created_at, updated_at`.
+
+**Tambah** (`POST /master-data`), semua kesalahan dikembalikan sekaligus:
+
+| `type` | Induk (`parent_id`) | Lainnya |
+| ------ | ------------------- | ------- |
+| `subject` (mapel), `school` (sekolah) | harus kosong | - |
+| `grade` (kelas) | jenjang | - |
+| `subject_field` (bidang materi) | mapel | `grade_id` **wajib**; jenjang = jenjang kelas itu |
+| `chapter` / `subchapter` / `topic` | bidang materi / bab / sub bab | mapel, jenjang, kelas **disalin dari induk** (`grade_id` tidak boleh diisi) |
+
+```json
+{"type": "subject_field", "name": "Bilangan", "parent_id": "<mapel>", "grade_id": "<kelas>", "code": null, "sort_order": null, "status": "active"}
+```
+
+- `name` unik dalam type, induk, dan kelas yang sama (Bilangan Kelas 1 & Kelas 4 boleh). `code` opsional (huruf, angka, `._-`, maks 30), unik per type. `sort_order` kosong = urutan terakhir + 1 di antara saudaranya.
+- **Data sistem** (`is_system = true`: jenjang, kelas bawaan, tipe soal, tipe quiz, level, migration 000039): tidak bisa dihapus; kode & status tidak bisa diubah, hanya nama & urutan (FR-MST-009).
+- **Hapus** ditolak (422 per `ids[i]`, tidak ada yang terhapus) kalau data sistem, atau masih dipakai: item anak (termasuk bidang materi yang memakai kelas), soal, modul PDF, quiz, gambar, atau akun. Hapus dari bawah dulu (topik → sub bab → bab → bidang materi). Riwayat Daily Quiz tidak menghalangi. Nama data yang dihapus boleh dipakai lagi.
+- Status `inactive` = tidak tampil di dropdown; data lama yang memakainya tidak berubah.
+- Sekolah disimpan sebagai master data `type = school`; kolom `users.school_origin` tetap teks (FE memakai dropdown `school` sebagai pilihan / saran).
+
+Performa: list = CTE halaman dulu lalu JOIN; kolom **Isi** dihitung 1 query `UNION ALL` untuk semua baris halaman (`kolom IN (id halaman)` per tabel, memakai index per kolom); cari nama memakai index trigram `master_data_items_name_trgm_idx`.
 
 ## Modul pembelajaran (PDF)
 
@@ -1421,7 +1590,24 @@ Link gambar (`url`) disimpan lengkap, dibentuk dari `APP_URL` di `.env`, contoh 
 
 - Semua file dalam 1 upload memakai kategori & hierarki yang sama.
 - **Semua atau tidak sama sekali**: 1 file salah → tidak ada yang tersimpan, error di `files[i]`.
-- Response 201: daftar gambar (urut sesuai file) dengan `id`, `name`, `url`, `mime_type`, `size_bytes`, `width`, `height`, hierarki. `id` dipakai sebagai `image_id` di soal.
+- Response 201: daftar gambar (urut sesuai file), bentuk sama dengan baris galeri di bawah. `id` dipakai sebagai `image_id` di soal.
+
+### Galeri (`GET /api/v1/images`), jumlah per kategori, detail
+
+| Query | Isi |
+| ----- | --- |
+| `category` | `question` / `banner` / `landing` |
+| `search` | Nama gambar atau nama file (sebagian kata, tanpa peduli huruf besar/kecil) |
+| `subject_id`, `subject_field_id`, `chapter_id`, `subchapter_id`, `topic_id` | Hierarki mapel gambar soal (sama persis dengan kolomnya) |
+| `sort` | `newest` (default), `oldest`, `name` (A-Z), `largest` (ukuran terbesar) |
+| `page`, `per_page` | Default 1 & **15** (sesuai desain), maks 100 |
+
+Setiap gambar: `id, category, name, url, file_name, mime_type, size_bytes, width, height`, `subject_id … topic_id`, `hierarchy {subject, subject_field, chapter, subchapter, topic}` (id + nama, null = tidak diisi), `uploaded_by` (id), `uploader {id, name}`, `used_by` (kode soal aktif yang memakai gambar sebagai gambar soal / opsi, contoh `["Q-12"]`), `can_delete` (= tidak dipakai soal aktif), `created_at` (WIB).
+
+- `GET /api/v1/images/category-counts` → `{all, question, banner, landing}` dengan filter yang sama (kategori diabaikan).
+- `GET /api/v1/images/:id` → 1 gambar. Tidak ada → 404.
+
+Performa: halaman diambil dulu (CTE, index `media_assets_list_idx` / `media_assets_category_created_idx`; cari memakai index trigram `media_assets_name_trgm_idx` & `media_assets_file_name_trgm_idx`, migration 000040), baru di-JOIN ke nama hierarki & pengunggah; `used_by` 1 query untuk semua baris halaman; COUNT dilewati di halaman terakhir yang tidak penuh.
 
 ### Hapus gambar (`DELETE /api/v1/images`)
 

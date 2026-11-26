@@ -30,7 +30,7 @@ func (r *RefreshTokenRepository) FindValidByHash(ctx context.Context, tokenHash 
 	var refreshToken loginmodel.RefreshToken
 	err := r.db.WithContext(ctx).
 		Raw(`
-			SELECT id, user_id, token_hash, user_agent, expires_at, revoked_at, created_at
+			SELECT id, user_id, token_hash, user_agent, expires_at, remember_me, revoked_at, created_at
 			FROM refresh_tokens
 			WHERE token_hash = ?
 			  AND revoked_at IS NULL
@@ -77,4 +77,15 @@ func (r *RefreshTokenRepository) RevokeByHash(ctx context.Context, tokenHash str
 		UPDATE refresh_tokens
 		SET revoked_at = ?
 		WHERE token_hash = ? AND revoked_at IS NULL`, now, tokenHash).Error
+}
+
+// ReplaceAllWithNew mencabut SEMUA sesi user lalu menyimpan 1 sesi baru, dalam 1 transaksi
+// (dipakai setelah ubah kata sandi sendiri: perangkat lain logout, perangkat ini tetap login). [Native SQL]
+func (r *RefreshTokenRepository) ReplaceAllWithNew(ctx context.Context, userID string, newToken loginmodel.RefreshToken, now time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`, now, userID).Error; err != nil {
+			return err
+		}
+		return tx.Create(&newToken).Error
+	})
 }

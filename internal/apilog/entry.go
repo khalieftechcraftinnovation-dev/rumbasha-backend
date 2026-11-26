@@ -45,6 +45,7 @@ var sensitiveKeys = map[string]bool{
 	"password":              true,
 	"password_hash":         true,
 	"old_password":          true,
+	"current_password":      true,
 	"new_password":          true,
 	"password_confirmation": true,
 	"access_token":          true,

@@ -73,7 +73,7 @@ func NewImageService(repo *imagerepo.ImageRepository, store *storage.Local) *Ima
 
 // UploadMany menyimpan 1 sampai MaxFilesPerUpload gambar dengan kategori & hierarki yang sama.
 // Hasilnya urut sesuai urutan file di request.
-func (s *ImageService) UploadMany(ctx context.Context, req imagedto.UploadImagesRequest, files []UploadFile, uploadedBy string) ([]imagemodel.Image, error) {
+func (s *ImageService) UploadMany(ctx context.Context, req imagedto.UploadImagesRequest, files []UploadFile, uploadedBy string) ([]imagemodel.ListItem, error) {
 	errs := &fieldErrors{}
 
 	// ---- 1. Cek tanpa database --------------------------------------------------
@@ -137,7 +137,12 @@ func (s *ImageService) UploadMany(ctx context.Context, req imagedto.UploadImages
 		s.removeFiles(saved)
 		return nil, fmt.Errorf("gagal menyimpan data %d gambar: %w", len(images), err)
 	}
-	return images, nil
+	// Baca ulang supaya respons sama dengan galeri (nama hierarki & pengunggah).
+	ids := make([]string, 0, len(images))
+	for _, img := range images {
+		ids = append(ids, img.ID)
+	}
+	return s.repo.FindByIDs(ctx, ids)
 }
 
 // DeleteMany menghapus permanen 1 sampai 100 gambar (data + file).

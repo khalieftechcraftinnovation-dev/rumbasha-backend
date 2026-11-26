@@ -23,6 +23,8 @@ func Register(private *gin.RouterGroup, h *dailyquizhandler.DailyQuizHandler) {
 	private.POST("/daily-quizzes/:id/open", studentOnly, h.Open)             // buka: jatah gratis / potong coin, soal + kunci
 	private.POST("/daily-quizzes/:id/submit", studentOnly, h.Submit)         // kumpulkan jawaban (dinilai FE) → nilai + review
 	private.GET("/daily-quizzes/:id/review", studentOnly, h.Review)          // hasil & review setelah submit
+	private.GET("/student/daily-quizzes", studentOnly, h.History)            // riwayat Daily Quiz siswa
+	private.GET("/student/daily-quizzes/stats", studentOnly, h.HistoryStats) // statistik (bulan ini + semua waktu)
 
 	// Pengaturan global Daily Quiz: semua role yang login boleh melihat, admin & super admin mengubah.
 	adminOnly := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin)

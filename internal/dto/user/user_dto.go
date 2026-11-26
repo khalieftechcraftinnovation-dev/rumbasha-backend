@@ -64,6 +64,7 @@ type UserResponse struct {
 	// true kalau end_date sudah lewat (WIB): akun tidak bisa login walaupun status active.
 	Ended       bool       `json:"ended"`
 	LastLoginAt *time.Time `json:"last_login_at"` // WIB
+	AvatarURL   *string    `json:"avatar_url"`    // foto profil; null = belum ada
 	CreatedAt   time.Time  `json:"created_at"`    // WIB
 	// Akses hari ini (kolom Paket, Akses, Berlaku s/d); hanya siswa, null untuk role lain.
 	Access *subscriptiondto.AccessResponse `json:"access"`
@@ -77,6 +78,7 @@ func ToUserResponse(u usermodel.ListItem) UserResponse {
 		StudentCode: u.StudentCode, CoinBalance: u.CoinBalance, Status: u.Status,
 		JoinDate: u.JoinDate.Format(DateLayout), Ended: isEnded(u.EndDate, time.Now()),
 		CreatedAt: u.CreatedAt.In(clock.Jakarta),
+		AvatarURL: u.AvatarURL,
 	}
 	if u.EndDate != nil {
 		s := u.EndDate.Format(DateLayout)

@@ -244,7 +244,8 @@ func TestUsers_DetailDanUbah(t *testing.T) {
 		t.Errorf("username kembar: status %d, %v", res.Code, f)
 	}
 
-	// Reset password tutor → login dengan password baru berhasil.
+	// Reset password tutor → login dengan password baru berhasil, permintaan lupa kata sandi ikut selesai.
+	db.Exec(`INSERT INTO password_reset_requests (user_id, identifier) VALUES (?, 'tutor.uji')`, tutor)
 	res = sendRequest(r, http.MethodPut, "/api/v1/users/"+tutor, fmt.Sprintf(
 		`{"join_date":"2026-01-01","username":"tutor.uji","name":"Rina","branch_id":%q,"status":"active","password":"PasswordBaru123"}`, branch), admin)
 	if res.Code != http.StatusOK {
@@ -252,6 +253,11 @@ func TestUsers_DetailDanUbah(t *testing.T) {
 	}
 	if res := sendRequest(r, http.MethodPost, "/api/v1/auth/login", `{"username":"tutor.uji","password":"PasswordBaru123"}`, ""); res.Code != http.StatusOK {
 		t.Errorf("login dengan password baru: status %d", res.Code)
+	}
+	var resetStatus string
+	db.Raw(`SELECT status FROM password_reset_requests WHERE user_id = ?`, tutor).Scan(&resetStatus)
+	if resetStatus != "resolved" {
+		t.Errorf("permintaan lupa kata sandi setelah reset lewat ubah user: %q", resetStatus)
 	}
 
 	// Hak akses: admin tidak boleh mengubah admin lain / super admin; super admin boleh.

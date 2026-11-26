@@ -28,9 +28,12 @@ func Register(private *gin.RouterGroup, h *quizhandler.QuizHandler) {
 	// Dashboard siswa: pengumuman quiz publish untuk kelasnya (tanpa kode akses).
 	studentOnly := middleware.RequireRole(loginmodel.RoleStudent)
 	private.GET("/student/quiz-announcements", studentOnly, h.Announcements)
-	private.POST("/quizzes/:id/open", studentOnly, h.Open)     // buka Uji Kom / Tryout (kode akses), soal + kunci jawaban
-	private.POST("/quizzes/:id/submit", studentOnly, h.Submit) // kumpulkan jawaban (dinilai FE) → nilai + review
-	private.GET("/quizzes/:id/review", studentOnly, h.Review)  // hasil & review setelah submit
+	private.GET("/student/quizzes/upcoming", studentOnly, h.StudentUpcoming) // "Akan datang"
+	private.GET("/student/quizzes/history", studentOnly, h.StudentHistory)   // "Sudah dikerjakan" + peringkat
+	private.GET("/student/quizzes/stats", studentOnly, h.StudentStats)       // statistik + Tryout terakhir
+	private.POST("/quizzes/:id/open", studentOnly, h.Open)                   // buka Uji Kom / Tryout (kode akses), soal + kunci jawaban
+	private.POST("/quizzes/:id/submit", studentOnly, h.Submit)               // kumpulkan jawaban (dinilai FE) → nilai + review
+	private.GET("/quizzes/:id/review", studentOnly, h.Review)                // hasil & review setelah submit
 
 	// Kode akses quiz untuk dibagikan ke siswa: tutor, admin, super admin.
 	staff := middleware.RequireRole(loginmodel.RoleSuperAdmin, loginmodel.RoleAdmin, loginmodel.RoleTutor)
